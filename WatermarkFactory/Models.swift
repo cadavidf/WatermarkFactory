@@ -116,6 +116,7 @@ struct WatermarkSettings {
     var offsetX: Double
     var offsetY: Double
     var layoutMode: LayoutMode
+    var padding: Double
     var spacing: Double
     var rotationPattern: RotationPattern
     var customAngle: Double

@@ -75,7 +75,7 @@ struct ImageProcessor {
 
         switch settings.layoutMode {
         case .single:
-            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, offsetX: settings.offsetX, offsetY: settings.offsetY))
+            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, padding: settings.padding, offsetX: settings.offsetX, offsetY: settings.offsetY))
         case .tiled:
             drawTiles(context: context, watermark: watermark, canvas: CGSize(width: width, height: height), size: watermarkSize, settings: settings)
         }
@@ -84,28 +84,31 @@ struct ImageProcessor {
         return image
     }
 
-    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, offsetX: Double, offsetY: Double) -> CGRect {
+    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, padding: Double, offsetX: Double, offsetY: Double) -> CGRect {
         var x: CGFloat
         var y: CGFloat
+        let padding = CGFloat(padding)
         switch anchor {
-        case .topLeft, .left, .bottomLeft: x = 0
+        case .topLeft, .left, .bottomLeft: x = padding
         case .top, .center, .bottom: x = (canvas.width - size.width) / 2
-        case .topRight, .right, .bottomRight: x = canvas.width - size.width
+        case .topRight, .right, .bottomRight: x = canvas.width - size.width - padding
         }
         switch anchor {
-        case .bottomLeft, .bottom, .bottomRight: y = 0
+        case .bottomLeft, .bottom, .bottomRight: y = padding
         case .left, .center, .right: y = (canvas.height - size.height) / 2
-        case .topLeft, .top, .topRight: y = canvas.height - size.height
+        case .topLeft, .top, .topRight: y = canvas.height - size.height - padding
         }
         return CGRect(x: x + offsetX, y: y - offsetY, width: size.width, height: size.height)
     }
 
     private static func drawTiles(context: CGContext, watermark: CGImage, canvas: CGSize, size: CGSize, settings: WatermarkSettings) {
-        let stepX = max(1, size.width + settings.spacing)
-        let stepY = max(1, size.height + settings.spacing)
+        let padding = CGFloat(settings.padding)
+        let cellSize = CGSize(width: size.width + padding * 2, height: size.height + padding * 2)
+        let stepX = max(1, cellSize.width + settings.spacing)
+        let stepY = max(1, cellSize.height + settings.spacing)
         var row = 0
-        var y = -size.height
-        while y < canvas.height + size.height {
+        var y = -cellSize.height
+        while y < canvas.height + cellSize.height {
             let angle: CGFloat
             switch settings.rotationPattern {
             case .none: angle = 0
@@ -113,10 +116,10 @@ struct ImageProcessor {
             case .alternating: angle = row.isMultiple(of: 2) ? 0 : 45
             case .custom: angle = settings.customAngle
             }
-            var x = -size.width
-            while x < canvas.width + size.width {
+            var x = -cellSize.width
+            while x < canvas.width + cellSize.width {
                 context.saveGState()
-                context.translateBy(x: x + size.width / 2, y: y + size.height / 2)
+                context.translateBy(x: x + padding + size.width / 2, y: y + padding + size.height / 2)
                 context.rotate(by: angle * .pi / 180)
                 context.draw(watermark, in: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
                 context.restoreGState()

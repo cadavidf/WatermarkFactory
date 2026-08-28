@@ -15,6 +15,7 @@ final class AppState: ObservableObject {
     @Published var offsetX = 24.0 { didSet { saveSettings(); updateEstimate() } }
     @Published var offsetY = 24.0 { didSet { saveSettings(); updateEstimate() } }
     @Published var layoutMode: LayoutMode = .single { didSet { saveSettings(); updateEstimate() } }
+    @Published var padding = 16.0 { didSet { saveSettings(); updateEstimate() } }
     @Published var spacing = 80.0 { didSet { saveSettings(); updateEstimate() } }
     @Published var rotationPattern: RotationPattern = .diagonal { didSet { saveSettings(); updateEstimate() } }
     @Published var customAngle = 30.0 { didSet { saveSettings(); updateEstimate() } }
@@ -40,7 +41,7 @@ final class AppState: ObservableObject {
         return nil
     }
     var settings: WatermarkSettings {
-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
+        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
     }
 
     func chooseFolder() {
@@ -200,6 +201,7 @@ final class AppState: ObservableObject {
         defaults.set(offsetX, forKey: "offsetX")
         defaults.set(offsetY, forKey: "offsetY")
         defaults.set(layoutMode.rawValue, forKey: "layoutMode")
+        defaults.set(padding, forKey: "padding")
         defaults.set(spacing, forKey: "spacing")
         defaults.set(rotationPattern.rawValue, forKey: "rotationPattern")
         defaults.set(customAngle, forKey: "customAngle")
@@ -214,6 +216,7 @@ final class AppState: ObservableObject {
         offsetX = defaults.object(forKey: "offsetX") == nil ? 24 : defaults.double(forKey: "offsetX")
         offsetY = defaults.object(forKey: "offsetY") == nil ? 24 : defaults.double(forKey: "offsetY")
         layoutMode = LayoutMode(rawValue: defaults.string(forKey: "layoutMode") ?? "") ?? .single
+        padding = defaults.object(forKey: "padding") == nil ? 16 : defaults.double(forKey: "padding")
         spacing = defaults.object(forKey: "spacing") == nil ? 80 : defaults.double(forKey: "spacing")
         rotationPattern = RotationPattern(rawValue: defaults.string(forKey: "rotationPattern") ?? "") ?? .diagonal
         customAngle = defaults.object(forKey: "customAngle") == nil ? 30 : defaults.double(forKey: "customAngle")
@@ -361,6 +364,11 @@ struct ContentView: View {
                 .pickerStyle(.segmented)
 
                 if state.layoutMode == .single { singleControls } else { tiledControls }
+                Slider(value: $state.padding, in: 0...100) { Text("Padding") }
+                Text("Padding \(Int(state.padding)) px").font(.caption)
+                if state.layoutMode == .tiled {
+                    Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(.secondary)
+                }
 
                 Picker("Export format", selection: $state.exportFormat) {
                     ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
