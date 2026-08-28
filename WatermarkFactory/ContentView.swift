@@ -33,11 +33,10 @@ final class AppState: ObservableObject {
         restore()
     }
 
-    var canExport: Bool { folderURL != nil && watermarkURL != nil && !images.isEmpty && !isExporting }
+    var canExport: Bool { watermarkURL != nil && !images.isEmpty && !isExporting }
     var exportHint: String? {
-        if folderURL == nil { return "Choose a source folder before export." }
+        if images.isEmpty { return "Choose a folder or images before export." }
         if watermarkURL == nil { return "Choose a watermark image before export." }
-        if images.isEmpty { return "No supported images found." }
         return nil
     }
     var settings: WatermarkSettings {
@@ -51,6 +50,17 @@ final class AppState: ObservableObject {
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
             setFolder(url)
+        }
+    }
+
+    func chooseImages() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = true
+        panel.allowedContentTypes = [.png, .jpeg, .heic, .tiff]
+        if panel.runModal() == .OK {
+            setImages(panel.urls)
         }
     }
 
@@ -92,7 +102,7 @@ final class AppState: ObservableObject {
     }
 
     func exportAll() {
-        guard let folder = folderURL, let watermark = watermarkURL else { return }
+        guard let watermark = watermarkURL else { return }
         isExporting = true
         progress = 0
         status = "Exporting 0 of \(images.count)..."
@@ -100,42 +110,39 @@ final class AppState: ObservableObject {
         let settings = settings
         Task.detached {
             var summary = ExportSummary(success: 0, failed: [], bytes: 0, usedHEICFallback: false)
-            let folderAccess = folder.startAccessingSecurityScopedResource()
             let watermarkAccess = watermark.startAccessingSecurityScopedResource()
+            var revealURL: URL?
             defer {
-                if folderAccess { folder.stopAccessingSecurityScopedResource() }
                 if watermarkAccess { watermark.stopAccessingSecurityScopedResource() }
             }
-            do {
-                let output = folder.appendingPathComponent("Watermarked", isDirectory: true)
-                try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-                for (index, item) in items.enumerated() {
-                    do {
-                        let result = try ImageProcessor.export(sourceURL: item.url, watermarkURL: watermark, outputFolder: output, settings: settings)
-                        summary.success += 1
-                        summary.bytes += result.bytes
-                        summary.usedHEICFallback = summary.usedHEICFallback || result.usedHEICFallback
-                    } catch {
-                        summary.failed.append(item.filename)
-                    }
-                    await MainActor.run {
-                        self.progress = Double(index + 1) / Double(items.count)
-                        self.status = "Exporting \(index + 1) of \(items.count)..."
-                    }
+            for (index, item) in items.enumerated() {
+                let access = item.url.startAccessingSecurityScopedResource()
+                defer { if access { item.url.stopAccessingSecurityScopedResource() } }
+                do {
+                    let output = item.url.deletingLastPathComponent().appendingPathComponent("Watermarked", isDirectory: true)
+                    try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+                    let result = try ImageProcessor.export(sourceURL: item.url, watermarkURL: watermark, outputFolder: output, settings: settings)
+                    revealURL = revealURL ?? output
+                    summary.success += 1
+                    summary.bytes += result.bytes
+                    summary.usedHEICFallback = summary.usedHEICFallback || result.usedHEICFallback
+                } catch {
+                    summary.failed.append(item.filename)
                 }
                 await MainActor.run {
-                    NSWorkspace.shared.activateFileViewerSelecting([output])
-                    self.isExporting = false
-                    var text = "\(summary.success) of \(items.count) images watermarked, total output size ~\(Self.formatBytes(summary.bytes))."
-                    if summary.usedHEICFallback { text += " HEIC was exported as PNG." }
-                    if !summary.failed.isEmpty { text += " Failed: \(summary.failed.joined(separator: ", "))." }
-                    self.status = text
+                    self.progress = Double(index + 1) / Double(items.count)
+                    self.status = "Exporting \(index + 1) of \(items.count)..."
                 }
-            } catch {
-                await MainActor.run {
-                    self.isExporting = false
-                    self.status = "Couldn't access the selected folder or watermark. Please re-choose it."
+            }
+            await MainActor.run {
+                if let revealURL {
+                    NSWorkspace.shared.activateFileViewerSelecting([revealURL])
                 }
+                self.isExporting = false
+                var text = "\(summary.success) of \(items.count) images watermarked, total output size ~\(Self.formatBytes(summary.bytes))."
+                if summary.usedHEICFallback { text += " HEIC was exported as PNG." }
+                if !summary.failed.isEmpty { text += " Failed: \(summary.failed.joined(separator: ", "))." }
+                self.status = text
             }
         }
     }
@@ -144,6 +151,19 @@ final class AppState: ObservableObject {
         folderURL = url
         saveBookmark(url, key: "folderBookmark")
         reloadImages()
+    }
+
+    private func setImages(_ urls: [URL]) {
+        folderURL = nil
+        defaults.set(true, forKey: "usedIndividualImages")
+        let filtered = urls
+            .filter { ImageProcessor.supportedExtensions.contains($0.pathExtension.lowercased()) }
+            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+        images = filtered.map(ImageItem.init)
+        selected = images.first
+        status = images.isEmpty ? "No supported images selected." : "\(images.count) images selected."
+        saveImageBookmarks()
+        updateEstimate()
     }
 
     private func setWatermark(_ url: URL) {
@@ -157,12 +177,14 @@ final class AppState: ObservableObject {
         let access = folderURL.startAccessingSecurityScopedResource()
         defer { if access { folderURL.stopAccessingSecurityScopedResource() } }
         do {
+            defaults.set(false, forKey: "usedIndividualImages")
             images = try FileManager.default.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: nil)
                 .filter { ImageProcessor.supportedExtensions.contains($0.pathExtension.lowercased()) }
                 .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
                 .map(ImageItem.init)
             selected = images.first
             status = images.isEmpty ? "No supported images found in this folder." : "\(images.count) images found."
+            saveImageBookmarks()
             updateEstimate()
         } catch {
             images = []
@@ -199,7 +221,16 @@ final class AppState: ObservableObject {
         jpegQuality = defaults.object(forKey: "jpegQuality") == nil ? 0.9 : defaults.double(forKey: "jpegQuality")
         folderURL = restoreBookmark("folderBookmark")
         watermarkURL = restoreBookmark("watermarkBookmark")
-        reloadImages()
+        let restoredImages = restoreImageBookmarks()
+        if restoredImages.isEmpty {
+            reloadImages()
+        } else {
+            if defaults.bool(forKey: "usedIndividualImages") { folderURL = nil }
+            images = restoredImages.map(ImageItem.init)
+            selected = images.first
+            status = "\(images.count) images restored."
+            updateEstimate()
+        }
     }
 
     private func saveBookmark(_ url: URL, key: String) {
@@ -212,6 +243,21 @@ final class AppState: ObservableObject {
         guard let data = defaults.data(forKey: key) else { return nil }
         var stale = false
         return try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)
+    }
+
+    private func saveImageBookmarks() {
+        let bookmarks = images.compactMap {
+            try? $0.url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+        }
+        defaults.set(bookmarks, forKey: "imageBookmarks")
+    }
+
+    private func restoreImageBookmarks() -> [URL] {
+        guard let bookmarks = defaults.array(forKey: "imageBookmarks") as? [Data] else { return [] }
+        return bookmarks.compactMap { data in
+            var stale = false
+            return try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)
+        }
     }
 
     static func formatBytes(_ count: Int) -> String {
@@ -236,12 +282,13 @@ struct ContentView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 12) {
             Button("Choose Folder...") { state.chooseFolder() }
+            Button("Choose Images...") { state.chooseImages() }
             if let folder = state.folderURL {
                 Text(folder.lastPathComponent).font(.caption).foregroundStyle(.secondary)
             }
             if state.images.isEmpty {
                 Spacer()
-                Text("No supported images found.").foregroundStyle(.secondary).frame(maxWidth: .infinity)
+                Text("Choose a folder or select individual images to get started.").foregroundStyle(.secondary).frame(maxWidth: .infinity)
                 Spacer()
             } else {
                 List(state.images, selection: Binding(get: { state.selected }, set: { if let item = $0 { state.select(item) } })) { item in
