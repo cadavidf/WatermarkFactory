@@ -432,6 +432,11 @@ struct ContentView: View {
     @State private var presetName = ""
     @State private var duplicatePresetName = ""
     @State private var showingOverwriteConfirm = false
+    private let sidebarWidth: CGFloat = 260
+    private let controlsWidth: CGFloat = 360
+    private let previewMinWidth: CGFloat = 560
+    private let spacing: CGFloat = 12
+    private let panePadding: CGFloat = 16
 
     var body: some View {
         HStack(spacing: 0) {
@@ -469,19 +474,25 @@ struct ContentView: View {
     }
 
     private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button("Choose Folder...") { state.chooseFolder() }
-            Button("Choose Images...") { state.chooseImages() }
+        VStack(alignment: .leading, spacing: spacing) {
+            HStack(spacing: 8) {
+                Button("Choose Folder...") { state.chooseFolder() }
+                Button("Choose Images...") { state.chooseImages() }
+            }
             if let folder = state.folderURL {
                 Text(folder.lastPathComponent).font(.caption).foregroundStyle(.secondary)
             }
             if state.images.isEmpty {
                 Spacer()
-                Text("Choose a folder or select individual images to get started.").foregroundStyle(.secondary).frame(maxWidth: .infinity)
+                Text("Choose a folder or select individual images to get started.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
                 Spacer()
             } else {
                 List(state.images, selection: Binding(get: { state.selected }, set: { if let item = $0 { state.select(item) } })) { item in
-                    HStack {
+                    HStack(spacing: 8) {
                         Thumb(url: item.url, size: 42)
                         Text(item.filename).lineLimit(1)
                     }
@@ -489,112 +500,136 @@ struct ContentView: View {
                 }
             }
         }
-        .padding()
-        .frame(width: 260)
+        .padding(panePadding)
+        .frame(width: sidebarWidth)
     }
 
     private var previewPane: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: spacing) {
             ZStack {
-                Color(NSColor.windowBackgroundColor)
+                Color(NSColor.textBackgroundColor)
                 if let image = state.previewImage {
                     WatermarkPreview(image: image, state: state)
                 } else {
-                    Text("Select an image to preview.").foregroundStyle(.secondary)
+                    Text("Select an image to preview.")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(Rectangle().stroke(Color.secondary.opacity(0.12)))
             .clipped()
             ScrollView(.horizontal) {
-                HStack {
+                HStack(spacing: 8) {
                     ForEach(state.images) { item in
-                        Thumb(url: item.url, size: 64)
-                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(state.selected == item ? Color.accentColor : .clear, lineWidth: 3))
+                        Thumb(url: item.url, size: 60)
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(state.selected == item ? Color.accentColor : Color.secondary.opacity(0.18), lineWidth: state.selected == item ? 2 : 1))
                             .onTapGesture { state.select(item) }
                     }
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, panePadding)
             }
-            .frame(height: 86)
-            Text(state.status).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+            .frame(height: 76)
+            .background(Color(NSColor.controlBackgroundColor))
+            Text(state.status)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, panePadding)
+                .padding(.bottom, 8)
         }
-        .frame(minWidth: 500)
+        .frame(minWidth: previewMinWidth)
     }
 
     private var controls: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: spacing) {
                 presetLibrary
-                GroupBox("Watermark image") {
-                    HStack {
+                ControlSection("Watermark source") {
+                    HStack(spacing: 12) {
                         Button("Choose Watermark...") { state.chooseWatermark() }
+                        Spacer()
                         if let url = state.watermarkURL { Thumb(url: url, size: 56) }
                     }
                 }
-                presetSection("Size", presets: WatermarkSizePreset.allCases, selected: state.sizePreset?.id, valueText: state.sizePreset?.label ?? "Custom") { preset in
-                    state.sizePreset = preset
-                    state.sizeFraction = preset.value
-                }
-                Slider(value: Binding(get: { state.sizeFraction }, set: { state.sizePreset = nil; state.sizeFraction = $0 }), in: 0.05...1.0)
-                Text("\(Int(state.sizeFraction * 100))%").font(.caption)
 
-                presetSection("Opacity", presets: OpacityPreset.allCases, selected: state.opacityPreset?.id, valueText: state.opacityPreset?.label ?? "Custom") { preset in
-                    state.opacityPreset = preset
-                    state.opacity = preset.value
-                }
-                Slider(value: Binding(get: { state.opacity }, set: { state.opacityPreset = nil; state.opacity = $0 }), in: 0...1)
-                Text("\(Int(state.opacity * 100))%").font(.caption)
-
-                Picker("Layout mode", selection: $state.layoutMode) {
-                    ForEach(LayoutMode.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-
-                if state.layoutMode == .single { singleControls } else { tiledControls }
-                Slider(value: $state.padding, in: 0...100) { Text("Padding") }
-                Text("Padding \(Int(state.padding)) px").font(.caption)
-                if state.layoutMode == .tiled {
-                    Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(.secondary)
+                ControlSection("Size & Opacity") {
+                    presetSection("Size", presets: WatermarkSizePreset.allCases, selected: state.sizePreset?.id, valueText: state.sizePreset?.label ?? "Custom") { preset in
+                        state.sizePreset = preset
+                        state.sizeFraction = preset.value
+                    }
+                    Slider(value: Binding(get: { state.sizeFraction }, set: { state.sizePreset = nil; state.sizeFraction = $0 }), in: 0.05...1.0)
+                    Text("\(Int(state.sizeFraction * 100))%").font(.caption).foregroundStyle(.secondary)
+                    Divider()
+                    presetSection("Opacity", presets: OpacityPreset.allCases, selected: state.opacityPreset?.id, valueText: state.opacityPreset?.label ?? "Custom") { preset in
+                        state.opacityPreset = preset
+                        state.opacity = preset.value
+                    }
+                    Slider(value: Binding(get: { state.opacity }, set: { state.opacityPreset = nil; state.opacity = $0 }), in: 0...1)
+                    Text("\(Int(state.opacity * 100))%").font(.caption).foregroundStyle(.secondary)
                 }
 
-                Picker("Export format", selection: $state.exportFormat) {
-                    ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
+                ControlSection("Layout mode") {
+                    Picker("Layout mode", selection: $state.layoutMode) {
+                        ForEach(LayoutMode.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    if state.layoutMode == .tiled { tiledControls }
                 }
-                .pickerStyle(.segmented)
-                Toggle("Optimize for Web", isOn: Binding(get: { state.optimizeForWeb }, set: { state.setOptimizeForWeb($0) }))
-                HStack {
-                    TextField("Width", value: $state.outputWidth, format: .number)
-                    TextField("Height", value: $state.outputHeight, format: .number)
+
+                ControlSection("Position & Padding") {
+                    if state.layoutMode == .single { singleControls }
+                    Slider(value: $state.padding, in: 0...100) { Text("Padding") }
+                    Text("Padding \(Int(state.padding)) px").font(.caption).foregroundStyle(.secondary)
+                    if state.layoutMode == .tiled {
+                        Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(.secondary)
+                    }
                 }
-                Text(state.outputWidth > 0 && state.outputHeight > 0 ? "Output size \(state.outputWidth)x\(state.outputHeight) px" : "Output size original").font(.caption).foregroundStyle(.secondary)
-                HStack {
-                    TextField("Prefix", text: Binding(get: { state.outputPrefix }, set: { state.outputPrefix = AppState.sanitizedFilenameAffix($0) }))
-                    TextField("Suffix", text: Binding(get: { state.outputSuffix }, set: { state.outputSuffix = AppState.sanitizedFilenameAffix($0) }))
+
+                ControlSection("Export") {
+                    Picker("Export format", selection: $state.exportFormat) {
+                        ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    Toggle("Optimize for Web", isOn: Binding(get: { state.optimizeForWeb }, set: { state.setOptimizeForWeb($0) }))
+                        .toggleStyle(.button)
+                        .buttonStyle(.bordered)
+                        .tint(state.optimizeForWeb ? .accentColor : .secondary)
+                    HStack(spacing: 8) {
+                        TextField("Width", value: $state.outputWidth, format: .number)
+                        TextField("Height", value: $state.outputHeight, format: .number)
+                    }
+                    Text(state.outputWidth > 0 && state.outputHeight > 0 ? "Output size \(state.outputWidth)x\(state.outputHeight) px" : "Output size original").font(.caption).foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        TextField("Prefix", text: Binding(get: { state.outputPrefix }, set: { state.outputPrefix = AppState.sanitizedFilenameAffix($0) }))
+                        TextField("Suffix", text: Binding(get: { state.outputSuffix }, set: { state.outputSuffix = AppState.sanitizedFilenameAffix($0) }))
+                    }
+                    if state.exportFormat == .jpeg {
+                        Slider(value: $state.jpegQuality, in: 0...1)
+                        Text("JPEG quality \(Int(state.jpegQuality * 100))%").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Text(state.exportFormat.hint).font(.caption).foregroundStyle(.secondary)
+                    if !state.estimatedSize.isEmpty {
+                        Text("Estimated output size \(state.estimatedSize)").font(.caption)
+                    }
+                    if !state.estimatedFilename.isEmpty {
+                        Text("-> \(state.estimatedFilename)").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Button("Watermark All Images") { state.exportAll() }
+                        .disabled(!state.canExport)
+                    if let hint = state.exportHint { Text(hint).font(.caption).foregroundStyle(.secondary) }
+                    if state.isExporting { ProgressView(value: state.progress) }
                 }
-                if state.exportFormat == .jpeg {
-                    Slider(value: $state.jpegQuality, in: 0...1)
-                    Text("JPEG quality \(Int(state.jpegQuality * 100))%").font(.caption)
-                }
-                Text(state.exportFormat.hint).font(.caption).foregroundStyle(.secondary)
-                if !state.estimatedSize.isEmpty {
-                    Text("Estimated output size \(state.estimatedSize)").font(.caption)
-                }
-                if !state.estimatedFilename.isEmpty {
-                    Text("-> \(state.estimatedFilename)").font(.caption).foregroundStyle(.secondary)
-                }
-                Button("Watermark All Images") { state.exportAll() }
-                    .disabled(!state.canExport)
-                if let hint = state.exportHint { Text(hint).font(.caption).foregroundStyle(.secondary) }
-                if state.isExporting { ProgressView(value: state.progress) }
             }
-            .padding()
+            .padding(panePadding)
         }
-        .frame(width: 340)
+        .frame(width: controlsWidth)
     }
 
     private var presetLibrary: some View {
-        GroupBox("Presets") {
-            VStack(alignment: .leading, spacing: 8) {
+        ControlSection("Presets") {
+            VStack(alignment: .leading, spacing: 12) {
                 Text("Platform presets").font(.caption).foregroundStyle(.secondary)
                 ForEach(PlatformExportPreset.all) { preset in
                     Button {
@@ -654,18 +689,17 @@ struct ContentView: View {
     }
 
     private var singleControls: some View {
-        VStack(alignment: .leading) {
-            Text("Position").font(.headline)
+        VStack(alignment: .leading, spacing: 8) {
             LazyVGrid(columns: Array(repeating: GridItem(.fixed(44)), count: 3), spacing: 8) {
                 ForEach(Anchor.allCases) { anchor in
                     Button { state.anchor = anchor } label: {
-                        Image(systemName: anchor.symbol).frame(width: 32, height: 28)
+                        Image(systemName: anchor.symbol).frame(width: 32, height: 30)
                     }
                     .buttonStyle(.bordered)
                     .tint(state.anchor == anchor ? .accentColor : .secondary)
                 }
             }
-            HStack {
+            HStack(spacing: 8) {
                 TextField("X", value: $state.offsetX, format: .number).frame(width: 70)
                 TextField("Y", value: $state.offsetY, format: .number).frame(width: 70)
             }
@@ -673,9 +707,9 @@ struct ContentView: View {
     }
 
     private var tiledControls: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 8) {
             Slider(value: $state.spacing, in: 0...400) { Text("Spacing") }
-            Text("Spacing \(Int(state.spacing)) px").font(.caption)
+            Text("Spacing \(Int(state.spacing)) px").font(.caption).foregroundStyle(.secondary)
             Picker("Rotation", selection: $state.rotationPattern) {
                 ForEach(RotationPattern.allCases) { Text($0.rawValue).tag($0) }
             }
@@ -687,7 +721,11 @@ struct ContentView: View {
 
     private func presetSection<P: Identifiable>(_ title: String, presets: [P], selected: P.ID?, valueText: String, action: @escaping (P) -> Void) -> some View where P.ID == String {
         VStack(alignment: .leading, spacing: 8) {
-            Text("\(title): \(valueText)").font(.headline)
+            HStack {
+                Text(title).font(.subheadline).fontWeight(.semibold)
+                Spacer()
+                Text(valueText).font(.caption).foregroundStyle(.secondary)
+            }
             FlowLayout {
                 ForEach(presets) { preset in
                     Button(label(for: preset)) { action(preset) }
@@ -702,6 +740,29 @@ struct ContentView: View {
         if let preset = preset as? WatermarkSizePreset { return preset.label }
         if let preset = preset as? OpacityPreset { return preset.label }
         return ""
+    }
+}
+
+struct ControlSection<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: Content
+
+    init(_ title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 12) {
+                content
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+        }
     }
 }
 
