@@ -21,8 +21,11 @@ final class AppState: ObservableObject {
     @Published var customAngle = 30.0 { didSet { saveSettings(); updateEstimate() } }
     @Published var exportFormat: ExportFormat = .keepOriginal { didSet { saveSettings(); updateEstimate() } }
     @Published var jpegQuality = 0.9 { didSet { saveSettings(); updateEstimate() } }
+    @Published var outputPrefix = "" { didSet { saveSettings(); updateEstimate() } }
+    @Published var outputSuffix = "" { didSet { saveSettings(); updateEstimate() } }
     @Published var previewImage: NSImage?
     @Published var estimatedSize = ""
+    @Published var estimatedFilename = ""
     @Published var status = "Choose a folder and watermark to begin."
     @Published var progress = 0.0
     @Published var isExporting = false
@@ -41,7 +44,7 @@ final class AppState: ObservableObject {
         return nil
     }
     var settings: WatermarkSettings {
-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
+        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, outputPrefix: outputPrefix, outputSuffix: outputSuffix)
     }
 
     func chooseFolder() {
@@ -82,12 +85,14 @@ final class AppState: ObservableObject {
 
     func updateEstimate() {
         previewTask?.cancel()
+        let settings = settings
         guard let source = selected?.url, let watermark = watermarkURL else {
             previewImage = selected.flatMap { ImageProcessor.thumbnail(for: $0.url, maxPixelSize: 900) }
             estimatedSize = ""
+            estimatedFilename = selected.map { ImageProcessor.outputFilename(for: $0.url, settings: settings) } ?? ""
             return
         }
-        let settings = settings
+        let filename = ImageProcessor.outputFilename(for: source, settings: settings)
         previewTask = Task.detached {
             try? await Task.sleep(nanoseconds: 100_000_000)
             if Task.isCancelled { return }
@@ -97,6 +102,7 @@ final class AppState: ObservableObject {
                 if !Task.isCancelled {
                     self.previewImage = image.map { NSImage(cgImage: $0, size: .zero) }
                     self.estimatedSize = data.map { "~" + Self.formatBytes($0.count) } ?? ""
+                    self.estimatedFilename = filename
                 }
             }
         }
@@ -111,6 +117,7 @@ final class AppState: ObservableObject {
         let settings = settings
         Task.detached {
             var summary = ExportSummary(success: 0, failed: [], bytes: 0, usedHEICFallback: false)
+            var usedOutputURLs = Set<URL>()
             let watermarkAccess = watermark.startAccessingSecurityScopedResource()
             var revealURL: URL?
             defer {
@@ -122,7 +129,8 @@ final class AppState: ObservableObject {
                 do {
                     let output = item.url.deletingLastPathComponent().appendingPathComponent("Watermarked", isDirectory: true)
                     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-                    let result = try ImageProcessor.export(sourceURL: item.url, watermarkURL: watermark, outputFolder: output, settings: settings)
+                    let outputURL = ImageProcessor.uniqueOutputURL(for: item.url, outputFolder: output, settings: settings, usedURLs: &usedOutputURLs)
+                    let result = try ImageProcessor.export(sourceURL: item.url, watermarkURL: watermark, outputURL: outputURL, settings: settings)
                     revealURL = revealURL ?? output
                     summary.success += 1
                     summary.bytes += result.bytes
@@ -207,6 +215,8 @@ final class AppState: ObservableObject {
         defaults.set(customAngle, forKey: "customAngle")
         defaults.set(exportFormat.rawValue, forKey: "exportFormat")
         defaults.set(jpegQuality, forKey: "jpegQuality")
+        defaults.set(outputPrefix, forKey: "outputPrefix")
+        defaults.set(outputSuffix, forKey: "outputSuffix")
     }
 
     private func restore() {
@@ -222,6 +232,8 @@ final class AppState: ObservableObject {
         customAngle = defaults.object(forKey: "customAngle") == nil ? 30 : defaults.double(forKey: "customAngle")
         exportFormat = ExportFormat(rawValue: defaults.string(forKey: "exportFormat") ?? "") ?? .keepOriginal
         jpegQuality = defaults.object(forKey: "jpegQuality") == nil ? 0.9 : defaults.double(forKey: "jpegQuality")
+        outputPrefix = Self.sanitizedFilenameAffix(defaults.string(forKey: "outputPrefix") ?? "")
+        outputSuffix = Self.sanitizedFilenameAffix(defaults.string(forKey: "outputSuffix") ?? "")
         folderURL = restoreBookmark("folderBookmark")
         watermarkURL = restoreBookmark("watermarkBookmark")
         let restoredImages = restoreImageBookmarks()
@@ -266,6 +278,10 @@ final class AppState: ObservableObject {
     static func formatBytes(_ count: Int) -> String {
         let value = Double(count)
         return value >= 1_048_576 ? String(format: "%.1f MB", value / 1_048_576) : String(format: "%.0f KB", value / 1024)
+    }
+
+    static func sanitizedFilenameAffix(_ value: String) -> String {
+        value.replacingOccurrences(of: "/", with: "").replacingOccurrences(of: "\0", with: "")
     }
 }
 
@@ -374,6 +390,10 @@ struct ContentView: View {
                     ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                HStack {
+                    TextField("Prefix", text: Binding(get: { state.outputPrefix }, set: { state.outputPrefix = AppState.sanitizedFilenameAffix($0) }))
+                    TextField("Suffix", text: Binding(get: { state.outputSuffix }, set: { state.outputSuffix = AppState.sanitizedFilenameAffix($0) }))
+                }
                 if state.exportFormat == .jpeg {
                     Slider(value: $state.jpegQuality, in: 0...1)
                     Text("JPEG quality \(Int(state.jpegQuality * 100))%").font(.caption)
@@ -381,6 +401,9 @@ struct ContentView: View {
                 Text(state.exportFormat.hint).font(.caption).foregroundStyle(.secondary)
                 if !state.estimatedSize.isEmpty {
                     Text("Estimated output size \(state.estimatedSize)").font(.caption)
+                }
+                if !state.estimatedFilename.isEmpty {
+                    Text("-> \(state.estimatedFilename)").font(.caption).foregroundStyle(.secondary)
                 }
                 Button("Watermark All Images") { state.exportAll() }
                     .disabled(!state.canExport)

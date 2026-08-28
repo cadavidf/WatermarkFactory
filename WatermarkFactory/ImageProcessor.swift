@@ -35,13 +35,33 @@ struct ImageProcessor {
         return try encode(image: image, sourceURL: sourceURL, format: settings.exportFormat, quality: settings.jpegQuality).data
     }
 
-    static func export(sourceURL: URL, watermarkURL: URL, outputFolder: URL, settings: WatermarkSettings) throws -> (url: URL, bytes: Int, usedHEICFallback: Bool) {
+    static func outputFilename(for sourceURL: URL, settings: WatermarkSettings) -> String {
+        "\(sanitize(settings.outputPrefix))\(sourceURL.deletingPathExtension().lastPathComponent)\(sanitize(settings.outputSuffix)).\(resolvedFormat(sourceURL: sourceURL, format: settings.exportFormat).ext)"
+    }
+
+    static func uniqueOutputURL(for sourceURL: URL, outputFolder: URL, settings: WatermarkSettings, usedURLs: inout Set<URL>) -> URL {
+        let filename = outputFilename(for: sourceURL, settings: settings)
+        let base = (filename as NSString).deletingPathExtension
+        let ext = (filename as NSString).pathExtension
+        var candidate = outputFolder.appendingPathComponent(filename)
+        var index = 2
+        while usedURLs.contains(candidate) {
+            candidate = outputFolder.appendingPathComponent("\(base) (\(index))").appendingPathExtension(ext)
+            index += 1
+        }
+        usedURLs.insert(candidate)
+        return candidate
+    }
+
+    static func export(sourceURL: URL, watermarkURL: URL, outputURL: URL, settings: WatermarkSettings) throws -> (url: URL, bytes: Int, usedHEICFallback: Bool) {
         let image = try watermarkedImage(sourceURL: sourceURL, watermarkURL: watermarkURL, settings: settings)
         let encoded = try encode(image: image, sourceURL: sourceURL, format: settings.exportFormat, quality: settings.jpegQuality)
-        let base = sourceURL.deletingPathExtension().lastPathComponent
-        let outputURL = outputFolder.appendingPathComponent(base).appendingPathExtension(encoded.ext)
         try encoded.data.write(to: outputURL, options: .atomic)
         return (outputURL, encoded.data.count, encoded.usedHEICFallback)
+    }
+
+    private static func sanitize(_ value: String) -> String {
+        value.replacingOccurrences(of: "/", with: "").replacingOccurrences(of: "\0", with: "")
     }
 
     private static func loadCGImage(_ url: URL) -> CGImage? {
@@ -131,21 +151,7 @@ struct ImageProcessor {
     }
 
     private static func encode(image: CGImage, sourceURL: URL, format: ExportFormat, quality: Double) throws -> (data: Data, ext: String, usedHEICFallback: Bool) {
-        let sourceExt = sourceURL.pathExtension.lowercased()
-        let resolved: (type: UTType, ext: String, fallback: Bool) = {
-            switch format {
-            case .jpeg: return (.jpeg, "jpg", false)
-            case .png: return (.png, "png", false)
-            case .tiff: return (.tiff, "tiff", false)
-            case .keepOriginal:
-                switch sourceExt {
-                case "jpg", "jpeg": return (.jpeg, sourceExt, false)
-                case "png": return (.png, "png", false)
-                case "tif", "tiff": return (.tiff, sourceExt, false)
-                default: return (.png, "png", sourceExt == "heic")
-                }
-            }
-        }()
+        let resolved = resolvedFormat(sourceURL: sourceURL, format: format)
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(data, resolved.type.identifier as CFString, 1, nil) else {
             throw ImageProcessorError.encodeFailed
@@ -154,5 +160,21 @@ struct ImageProcessor {
         CGImageDestinationAddImage(destination, image, options)
         guard CGImageDestinationFinalize(destination) else { throw ImageProcessorError.encodeFailed }
         return (data as Data, resolved.ext, resolved.fallback)
+    }
+
+    private static func resolvedFormat(sourceURL: URL, format: ExportFormat) -> (type: UTType, ext: String, fallback: Bool) {
+        let sourceExt = sourceURL.pathExtension.lowercased()
+        switch format {
+        case .jpeg: return (.jpeg, "jpg", false)
+        case .png: return (.png, "png", false)
+        case .tiff: return (.tiff, "tiff", false)
+        case .keepOriginal:
+            switch sourceExt {
+            case "jpg", "jpeg": return (.jpeg, sourceExt, false)
+            case "png": return (.png, "png", false)
+            case "tif", "tiff": return (.tiff, sourceExt, false)
+            default: return (.png, "png", sourceExt == "heic")
+            }
+        }
     }
 }

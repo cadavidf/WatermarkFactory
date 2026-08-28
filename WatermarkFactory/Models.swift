@@ -122,6 +122,8 @@ struct WatermarkSettings {
     var customAngle: Double
     var exportFormat: ExportFormat
     var jpegQuality: Double
+    var outputPrefix: String
+    var outputSuffix: String
 }
 
 struct ExportSummary {
