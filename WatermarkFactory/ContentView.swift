@@ -19,8 +19,15 @@ final class AppState: ObservableObject {
     @Published var spacing = 80.0 { didSet { saveSettings(); updateEstimate() } }
     @Published var rotationPattern: RotationPattern = .diagonal { didSet { saveSettings(); updateEstimate() } }
     @Published var customAngle = 30.0 { didSet { saveSettings(); updateEstimate() } }
-    @Published var exportFormat: ExportFormat = .keepOriginal { didSet { saveSettings(); updateEstimate() } }
+    @Published var exportFormat: ExportFormat = .keepOriginal {
+        didSet {
+            if optimizeForWeb && exportFormat == .jpeg && jpegQuality > 0.8 { jpegQuality = 0.8 }
+            saveSettings()
+            updateEstimate()
+        }
+    }
     @Published var jpegQuality = 0.9 { didSet { saveSettings(); updateEstimate() } }
+    @Published var optimizeForWeb = false { didSet { saveSettings(); updateEstimate() } }
     @Published var outputPrefix = "" { didSet { saveSettings(); updateEstimate() } }
     @Published var outputSuffix = "" { didSet { saveSettings(); updateEstimate() } }
     @Published var previewImage: NSImage?
@@ -50,7 +57,7 @@ final class AppState: ObservableObject {
         return nil
     }
     var settings: WatermarkSettings {
-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, outputPrefix: outputPrefix, outputSuffix: outputSuffix)
+        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, optimizeForWeb: optimizeForWeb, outputPrefix: outputPrefix, outputSuffix: outputSuffix)
     }
     var canSavePreset: Bool { watermarkURL != nil }
 
@@ -187,6 +194,13 @@ final class AppState: ObservableObject {
         }
     }
 
+    func setOptimizeForWeb(_ value: Bool) {
+        optimizeForWeb = value
+        if value && exportFormat == .jpeg && jpegQuality > 0.8 {
+            jpegQuality = 0.8
+        }
+    }
+
     func presetNamed(_ name: String) -> WatermarkPreset? {
         presets.first { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
     }
@@ -256,6 +270,7 @@ final class AppState: ObservableObject {
         customAngle = settings.customAngle
         exportFormat = settings.exportFormat
         jpegQuality = settings.jpegQuality
+        optimizeForWeb = settings.optimizeForWeb
         outputPrefix = Self.sanitizedFilenameAffix(settings.outputPrefix)
         outputSuffix = Self.sanitizedFilenameAffix(settings.outputSuffix)
         syncPresetSelections()
@@ -296,6 +311,7 @@ final class AppState: ObservableObject {
         defaults.set(customAngle, forKey: "customAngle")
         defaults.set(exportFormat.rawValue, forKey: "exportFormat")
         defaults.set(jpegQuality, forKey: "jpegQuality")
+        defaults.set(optimizeForWeb, forKey: "optimizeForWeb")
         defaults.set(outputPrefix, forKey: "outputPrefix")
         defaults.set(outputSuffix, forKey: "outputSuffix")
     }
@@ -314,6 +330,7 @@ final class AppState: ObservableObject {
         customAngle = defaults.object(forKey: "customAngle") == nil ? 30 : defaults.double(forKey: "customAngle")
         exportFormat = ExportFormat(rawValue: defaults.string(forKey: "exportFormat") ?? "") ?? .keepOriginal
         jpegQuality = defaults.object(forKey: "jpegQuality") == nil ? 0.9 : defaults.double(forKey: "jpegQuality")
+        optimizeForWeb = defaults.bool(forKey: "optimizeForWeb")
         outputPrefix = Self.sanitizedFilenameAffix(defaults.string(forKey: "outputPrefix") ?? "")
         outputSuffix = Self.sanitizedFilenameAffix(defaults.string(forKey: "outputSuffix") ?? "")
         syncPresetSelections()
@@ -528,6 +545,7 @@ struct ContentView: View {
                     ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                Toggle("Optimize for Web", isOn: Binding(get: { state.optimizeForWeb }, set: { state.setOptimizeForWeb($0) }))
                 HStack {
                     TextField("Prefix", text: Binding(get: { state.outputPrefix }, set: { state.outputPrefix = AppState.sanitizedFilenameAffix($0) }))
                     TextField("Suffix", text: Binding(get: { state.outputSuffix }, set: { state.outputSuffix = AppState.sanitizedFilenameAffix($0) }))

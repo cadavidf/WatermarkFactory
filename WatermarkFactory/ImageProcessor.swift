@@ -12,6 +12,7 @@ enum ImageProcessorError: Error {
 
 struct ImageProcessor {
     static let supportedExtensions: Set<String> = ["jpg", "jpeg", "png", "heic", "tif", "tiff"]
+    private static let webMaxPixelSize = 2048
 
     static func thumbnail(for url: URL, maxPixelSize: CGFloat = 96) -> NSImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
@@ -55,7 +56,8 @@ struct ImageProcessor {
 
     static func encodedWatermarkData(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings) throws -> Data {
         let image = try watermarkedImage(sourceURL: sourceURL, watermarkURL: watermarkURL, settings: settings)
-        return try encode(image: image, sourceURL: sourceURL, format: settings.exportFormat, quality: settings.jpegQuality).data
+        let outputImage = try optimizeForWebIfNeeded(image, settings: settings)
+        return try encode(image: outputImage, sourceURL: sourceURL, format: settings.exportFormat, quality: jpegQuality(sourceURL: sourceURL, settings: settings)).data
     }
 
     static func outputFilename(for sourceURL: URL, settings: WatermarkSettings) -> String {
@@ -78,7 +80,8 @@ struct ImageProcessor {
 
     static func export(sourceURL: URL, watermarkURL: URL, outputURL: URL, settings: WatermarkSettings) throws -> (url: URL, bytes: Int, usedHEICFallback: Bool) {
         let image = try watermarkedImage(sourceURL: sourceURL, watermarkURL: watermarkURL, settings: settings)
-        let encoded = try encode(image: image, sourceURL: sourceURL, format: settings.exportFormat, quality: settings.jpegQuality)
+        let outputImage = try optimizeForWebIfNeeded(image, settings: settings)
+        let encoded = try encode(image: outputImage, sourceURL: sourceURL, format: settings.exportFormat, quality: jpegQuality(sourceURL: sourceURL, settings: settings))
         try encoded.data.write(to: outputURL, options: .atomic)
         return (outputURL, encoded.data.count, encoded.usedHEICFallback)
     }
@@ -183,6 +186,30 @@ struct ImageProcessor {
         CGImageDestinationAddImage(destination, image, options)
         guard CGImageDestinationFinalize(destination) else { throw ImageProcessorError.encodeFailed }
         return (data as Data, resolved.ext, resolved.fallback)
+    }
+
+    private static func optimizeForWebIfNeeded(_ image: CGImage, settings: WatermarkSettings) throws -> CGImage {
+        guard settings.optimizeForWeb else { return image }
+        let longest = max(image.width, image.height)
+        guard longest > webMaxPixelSize else { return image }
+        let scale = CGFloat(webMaxPixelSize) / CGFloat(longest)
+        let width = max(1, Int((CGFloat(image.width) * scale).rounded()))
+        let height = max(1, Int((CGFloat(image.height) * scale).rounded()))
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            throw ImageProcessorError.contextFailed
+        }
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        guard let resized = context.makeImage() else { throw ImageProcessorError.contextFailed }
+        return resized
+    }
+
+    private static func jpegQuality(sourceURL: URL, settings: WatermarkSettings) -> Double {
+        guard settings.optimizeForWeb, resolvedFormat(sourceURL: sourceURL, format: settings.exportFormat).type == .jpeg else {
+            return settings.jpegQuality
+        }
+        return min(settings.jpegQuality, 0.8)
     }
 
     private static func resolvedFormat(sourceURL: URL, format: ExportFormat) -> (type: UTType, ext: String, fallback: Bool) {

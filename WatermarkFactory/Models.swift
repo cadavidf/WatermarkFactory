@@ -122,8 +122,50 @@ struct WatermarkSettings: Codable {
     var customAngle: Double
     var exportFormat: ExportFormat
     var jpegQuality: Double
+    var optimizeForWeb: Bool
     var outputPrefix: String
     var outputSuffix: String
+
+    init(sizeFraction: Double, opacity: Double, anchor: Anchor, offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputPrefix: String, outputSuffix: String) {
+        self.sizeFraction = sizeFraction
+        self.opacity = opacity
+        self.anchor = anchor
+        self.offsetX = offsetX
+        self.offsetY = offsetY
+        self.layoutMode = layoutMode
+        self.padding = padding
+        self.spacing = spacing
+        self.rotationPattern = rotationPattern
+        self.customAngle = customAngle
+        self.exportFormat = exportFormat
+        self.jpegQuality = jpegQuality
+        self.optimizeForWeb = optimizeForWeb
+        self.outputPrefix = outputPrefix
+        self.outputSuffix = outputSuffix
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case sizeFraction, opacity, anchor, offsetX, offsetY, layoutMode, padding, spacing, rotationPattern, customAngle, exportFormat, jpegQuality, optimizeForWeb, outputPrefix, outputSuffix
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sizeFraction = try container.decode(Double.self, forKey: .sizeFraction)
+        opacity = try container.decode(Double.self, forKey: .opacity)
+        anchor = try container.decode(Anchor.self, forKey: .anchor)
+        offsetX = try container.decode(Double.self, forKey: .offsetX)
+        offsetY = try container.decode(Double.self, forKey: .offsetY)
+        layoutMode = try container.decode(LayoutMode.self, forKey: .layoutMode)
+        padding = try container.decode(Double.self, forKey: .padding)
+        spacing = try container.decode(Double.self, forKey: .spacing)
+        rotationPattern = try container.decode(RotationPattern.self, forKey: .rotationPattern)
+        customAngle = try container.decode(Double.self, forKey: .customAngle)
+        exportFormat = try container.decode(ExportFormat.self, forKey: .exportFormat)
+        jpegQuality = try container.decode(Double.self, forKey: .jpegQuality)
+        optimizeForWeb = try container.decodeIfPresent(Bool.self, forKey: .optimizeForWeb) ?? false
+        outputPrefix = try container.decode(String.self, forKey: .outputPrefix)
+        outputSuffix = try container.decode(String.self, forKey: .outputSuffix)
+    }
 }
 
 struct WatermarkPreset: Identifiable, Codable {
