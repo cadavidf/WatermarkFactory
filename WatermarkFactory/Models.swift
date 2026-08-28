@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-enum WatermarkSizePreset: String, CaseIterable, Identifiable {
+enum WatermarkSizePreset: String, CaseIterable, Identifiable, Codable {
     case tiny, small, medium, large, full
     var id: String { rawValue }
     var label: String {
@@ -24,7 +24,7 @@ enum WatermarkSizePreset: String, CaseIterable, Identifiable {
     }
 }
 
-enum OpacityPreset: String, CaseIterable, Identifiable {
+enum OpacityPreset: String, CaseIterable, Identifiable, Codable {
     case ghost, subtle, balanced, bold, solid
     var id: String { rawValue }
     var label: String {
@@ -47,7 +47,7 @@ enum OpacityPreset: String, CaseIterable, Identifiable {
     }
 }
 
-enum Anchor: String, CaseIterable, Identifiable {
+enum Anchor: String, CaseIterable, Identifiable, Codable {
     case topLeft, top, topRight, left, center, right, bottomLeft, bottom, bottomRight
     var id: String { rawValue }
     var symbol: String {
@@ -65,13 +65,13 @@ enum Anchor: String, CaseIterable, Identifiable {
     }
 }
 
-enum LayoutMode: String, CaseIterable, Identifiable {
+enum LayoutMode: String, CaseIterable, Identifiable, Codable {
     case single = "Single"
     case tiled = "Tiled"
     var id: String { rawValue }
 }
 
-enum RotationPattern: String, CaseIterable, Identifiable {
+enum RotationPattern: String, CaseIterable, Identifiable, Codable {
     case none = "None (0deg)"
     case diagonal = "Diagonal (45deg)"
     case alternating = "Alternating rows (0deg/45deg)"
@@ -79,7 +79,7 @@ enum RotationPattern: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-enum ExportFormat: String, CaseIterable, Identifiable {
+enum ExportFormat: String, CaseIterable, Identifiable, Codable {
     case keepOriginal = "Keep Original"
     case jpeg = "JPEG"
     case png = "PNG"
@@ -109,7 +109,7 @@ struct ImageItem: Identifiable, Hashable {
     var filename: String { url.lastPathComponent }
 }
 
-struct WatermarkSettings {
+struct WatermarkSettings: Codable {
     var sizeFraction: Double
     var opacity: Double
     var anchor: Anchor
@@ -124,6 +124,13 @@ struct WatermarkSettings {
     var jpegQuality: Double
     var outputPrefix: String
     var outputSuffix: String
+}
+
+struct WatermarkPreset: Identifiable, Codable {
+    var id = UUID()
+    var name: String
+    var watermarkBookmark: Data
+    var settings: WatermarkSettings
 }
 
 struct ExportSummary {

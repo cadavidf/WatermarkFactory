@@ -31,6 +31,7 @@ final class AppState: ObservableObject {
     @Published var status = "Choose a folder and watermark to begin."
     @Published var progress = 0.0
     @Published var isExporting = false
+    @Published var presets: [WatermarkPreset] = []
 
     private var previewTask: Task<Void, Never>?
     private var sourceSizeURL: URL?
@@ -51,6 +52,7 @@ final class AppState: ObservableObject {
     var settings: WatermarkSettings {
         WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, outputPrefix: outputPrefix, outputSuffix: outputSuffix)
     }
+    var canSavePreset: Bool { watermarkURL != nil }
 
     func chooseFolder() {
         let panel = NSOpenPanel()
@@ -185,6 +187,37 @@ final class AppState: ObservableObject {
         }
     }
 
+    func presetNamed(_ name: String) -> WatermarkPreset? {
+        presets.first { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
+    }
+
+    func savePreset(named rawName: String, overwrite: Bool = false) {
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty,
+              let watermarkURL,
+              let bookmark = bookmarkData(for: watermarkURL) else { return }
+        let preset = WatermarkPreset(name: name, watermarkBookmark: bookmark, settings: settings)
+        if let index = presets.firstIndex(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
+            guard overwrite else { return }
+            presets[index] = preset
+        } else {
+            presets.append(preset)
+        }
+        savePresets()
+    }
+
+    func applyPreset(_ preset: WatermarkPreset) {
+        watermarkURL = resolveBookmark(preset.watermarkBookmark)
+        if let watermarkURL { saveBookmark(watermarkURL, key: "watermarkBookmark") }
+        apply(preset.settings)
+        status = "Loaded preset \"\(preset.name)\"."
+    }
+
+    func deletePreset(_ preset: WatermarkPreset) {
+        presets.removeAll { $0.id == preset.id }
+        savePresets()
+    }
+
     private func setFolder(_ url: URL) {
         folderURL = url
         saveBookmark(url, key: "folderBookmark")
@@ -208,6 +241,25 @@ final class AppState: ObservableObject {
         watermarkURL = url
         saveBookmark(url, key: "watermarkBookmark")
         updateEstimate()
+    }
+
+    private func apply(_ settings: WatermarkSettings) {
+        sizeFraction = settings.sizeFraction
+        opacity = settings.opacity
+        anchor = settings.anchor
+        offsetX = settings.offsetX
+        offsetY = settings.offsetY
+        layoutMode = settings.layoutMode
+        padding = settings.padding
+        spacing = settings.spacing
+        rotationPattern = settings.rotationPattern
+        customAngle = settings.customAngle
+        exportFormat = settings.exportFormat
+        jpegQuality = settings.jpegQuality
+        outputPrefix = Self.sanitizedFilenameAffix(settings.outputPrefix)
+        outputSuffix = Self.sanitizedFilenameAffix(settings.outputSuffix)
+        syncPresetSelections()
+        updateEstimate(delay: 0)
     }
 
     private func reloadImages() {
@@ -249,6 +301,7 @@ final class AppState: ObservableObject {
     }
 
     private func restore() {
+        restorePresets()
         if defaults.object(forKey: "sizeFraction") != nil { sizeFraction = defaults.double(forKey: "sizeFraction") }
         if defaults.object(forKey: "opacity") != nil { opacity = defaults.double(forKey: "opacity") }
         anchor = Anchor(rawValue: defaults.string(forKey: "anchor") ?? "") ?? .bottomRight
@@ -263,6 +316,7 @@ final class AppState: ObservableObject {
         jpegQuality = defaults.object(forKey: "jpegQuality") == nil ? 0.9 : defaults.double(forKey: "jpegQuality")
         outputPrefix = Self.sanitizedFilenameAffix(defaults.string(forKey: "outputPrefix") ?? "")
         outputSuffix = Self.sanitizedFilenameAffix(defaults.string(forKey: "outputSuffix") ?? "")
+        syncPresetSelections()
         folderURL = restoreBookmark("folderBookmark")
         watermarkURL = restoreBookmark("watermarkBookmark")
         let restoredImages = restoreImageBookmarks()
@@ -278,15 +332,35 @@ final class AppState: ObservableObject {
     }
 
     private func saveBookmark(_ url: URL, key: String) {
-        if let data = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) {
+        if let data = bookmarkData(for: url) {
             defaults.set(data, forKey: key)
         }
     }
 
+    private func bookmarkData(for url: URL) -> Data? {
+        try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+    }
+
     private func restoreBookmark(_ key: String) -> URL? {
         guard let data = defaults.data(forKey: key) else { return nil }
+        return resolveBookmark(data)
+    }
+
+    private func resolveBookmark(_ data: Data) -> URL? {
         var stale = false
         return try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)
+    }
+
+    private func savePresets() {
+        if let data = try? JSONEncoder().encode(presets) {
+            defaults.set(data, forKey: "watermarkPresets")
+        }
+    }
+
+    private func restorePresets() {
+        guard let data = defaults.data(forKey: "watermarkPresets"),
+              let decoded = try? JSONDecoder().decode([WatermarkPreset].self, from: data) else { return }
+        presets = decoded
     }
 
     private func saveImageBookmarks() {
@@ -312,10 +386,19 @@ final class AppState: ObservableObject {
     static func sanitizedFilenameAffix(_ value: String) -> String {
         value.replacingOccurrences(of: "/", with: "").replacingOccurrences(of: "\0", with: "")
     }
+
+    private func syncPresetSelections() {
+        sizePreset = WatermarkSizePreset.allCases.first { abs($0.value - sizeFraction) < 0.0001 }
+        opacityPreset = OpacityPreset.allCases.first { abs($0.value - opacity) < 0.0001 }
+    }
 }
 
 struct ContentView: View {
     @StateObject private var state = AppState()
+    @State private var isNamingPreset = false
+    @State private var presetName = ""
+    @State private var duplicatePresetName = ""
+    @State private var showingOverwriteConfirm = false
 
     var body: some View {
         HStack(spacing: 0) {
@@ -324,6 +407,31 @@ struct ContentView: View {
             previewPane
             Divider()
             controls
+        }
+        .sheet(isPresented: $isNamingPreset) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Save Preset").font(.headline)
+                TextField("Preset name", text: $presetName)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { submitPresetName() }
+                HStack {
+                    Spacer()
+                    Button("Cancel") { isNamingPreset = false }
+                    Button("Save") { submitPresetName() }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(presetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding()
+            .frame(width: 320)
+        }
+        .alert("Overwrite preset?", isPresented: $showingOverwriteConfirm) {
+            Button("Overwrite", role: .destructive) {
+                state.savePreset(named: duplicatePresetName, overwrite: true)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("A preset named \"\(duplicatePresetName)\" already exists.")
         }
     }
 
@@ -383,6 +491,7 @@ struct ContentView: View {
     private var controls: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                presetLibrary
                 GroupBox("Watermark image") {
                     HStack {
                         Button("Choose Watermark...") { state.chooseWatermark() }
@@ -442,6 +551,52 @@ struct ContentView: View {
             .padding()
         }
         .frame(width: 340)
+    }
+
+    private var presetLibrary: some View {
+        GroupBox("Presets") {
+            VStack(alignment: .leading, spacing: 8) {
+                Button("Save current as preset...") {
+                    presetName = ""
+                    isNamingPreset = true
+                }
+                .disabled(!state.canSavePreset)
+                if state.presets.isEmpty {
+                    Text("No saved presets.").font(.caption).foregroundStyle(.secondary)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 4) {
+                            ForEach(state.presets) { preset in
+                                HStack {
+                                    Button(preset.name) { state.applyPreset(preset) }
+                                        .buttonStyle(.plain)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    Button(role: .destructive) { state.deletePreset(preset) } label: {
+                                        Image(systemName: "trash")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .help("Delete preset")
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 140)
+                }
+            }
+        }
+    }
+
+    private func submitPresetName() {
+        let name = presetName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        isNamingPreset = false
+        if state.presetNamed(name) != nil {
+            duplicatePresetName = name
+            showingOverwriteConfirm = true
+        } else {
+            state.savePreset(named: name)
+        }
     }
 
     private var singleControls: some View {
