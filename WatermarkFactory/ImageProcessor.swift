@@ -182,10 +182,34 @@ struct ImageProcessor {
         guard let destination = CGImageDestinationCreateWithData(data, resolved.type.identifier as CFString, 1, nil) else {
             throw ImageProcessorError.encodeFailed
         }
-        let options = resolved.type == .jpeg ? [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary : nil
-        CGImageDestinationAddImage(destination, image, options)
+        var properties = scrubbedMetadata(sourceURL: sourceURL)
+        if resolved.type == .jpeg {
+            properties[kCGImageDestinationLossyCompressionQuality] = quality
+        }
+        CGImageDestinationAddImage(destination, image, properties as CFDictionary)
         guard CGImageDestinationFinalize(destination) else { throw ImageProcessorError.encodeFailed }
         return (data as Data, resolved.ext, resolved.fallback)
+    }
+
+    private static func scrubbedMetadata(sourceURL: URL) -> [CFString: Any] {
+        var properties: [CFString: Any] = [
+            kCGImagePropertyTIFFDictionary: [
+                kCGImagePropertyTIFFSoftware: "automality.com",
+                kCGImagePropertyTIFFArtist: "automality.com"
+            ],
+            kCGImagePropertyIPTCDictionary: [kCGImagePropertyIPTCByline: "automality.com"],
+            kCGImagePropertyPNGDictionary: [
+                kCGImagePropertyPNGSoftware: "automality.com",
+                kCGImagePropertyPNGAuthor: "automality.com"
+            ]
+        ]
+        guard let source = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
+              let sourceProperties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as NSDictionary?,
+              let gps = sourceProperties.object(forKey: kCGImagePropertyGPSDictionary) else {
+            return properties
+        }
+        properties[kCGImagePropertyGPSDictionary] = gps
+        return properties
     }
 
     private static func optimizeForWebIfNeeded(_ image: CGImage, settings: WatermarkSettings) throws -> CGImage {

@@ -12,7 +12,18 @@
 		1A0000052B00000000000001 /* ImageProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000062B00000000000001 /* ImageProcessor.swift */; };
 		1A0000072B00000000000001 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000082B00000000000001 /* Models.swift */; };
 		1A00001A2B00000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A00001B2B00000000000001 /* Assets.xcassets */; };
+		1A0000202B00000000000001 /* ImageProcessorMetadataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000212B00000000000001 /* ImageProcessorMetadataTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		1A0000222B00000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1A0000142B00000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1A0000102B00000000000001;
+			remoteInfo = WatermarkFactory;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		1A0000022B00000000000001 /* WatermarkFactoryApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatermarkFactoryApp.swift; sourceTree = "<group>"; };
@@ -23,10 +34,19 @@
 		1A00000A2B00000000000001 /* WatermarkFactory.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WatermarkFactory.entitlements; sourceTree = "<group>"; };
 		1A00000B2B00000000000001 /* WatermarkFactory.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WatermarkFactory.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1A00001B2B00000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		1A0000212B00000000000001 /* ImageProcessorMetadataTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageProcessorMetadataTests.swift; sourceTree = "<group>"; };
+		1A0000232B00000000000001 /* WatermarkFactoryTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WatermarkFactoryTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		1A00000C2B00000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1A0000242B00000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -40,6 +60,7 @@
 			isa = PBXGroup;
 			children = (
 				1A00000E2B00000000000001 /* WatermarkFactory */,
+				1A0000252B00000000000001 /* WatermarkFactoryTests */,
 				1A00000F2B00000000000001 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -62,8 +83,17 @@
 			isa = PBXGroup;
 			children = (
 				1A00000B2B00000000000001 /* WatermarkFactory.app */,
+				1A0000232B00000000000001 /* WatermarkFactoryTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		1A0000252B00000000000001 /* WatermarkFactoryTests */ = {
+			isa = PBXGroup;
+			children = (
+				1A0000212B00000000000001 /* ImageProcessorMetadataTests.swift */,
+			);
+			path = WatermarkFactoryTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -86,6 +116,23 @@
 			productReference = 1A00000B2B00000000000001 /* WatermarkFactory.app */;
 			productType = "com.apple.product-type.application";
 		};
+		1A0000262B00000000000001 /* WatermarkFactoryTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1A0000272B00000000000001 /* Build configuration list for PBXNativeTarget "WatermarkFactoryTests" */;
+			buildPhases = (
+				1A0000282B00000000000001 /* Sources */,
+				1A0000242B00000000000001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1A0000292B00000000000001 /* PBXTargetDependency */,
+			);
+			name = WatermarkFactoryTests;
+			productName = WatermarkFactoryTests;
+			productReference = 1A0000232B00000000000001 /* WatermarkFactoryTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -98,6 +145,10 @@
 				TargetAttributes = {
 					1A0000102B00000000000001 = {
 						CreatedOnToolsVersion = 15.4;
+					};
+					1A0000262B00000000000001 = {
+						CreatedOnToolsVersion = 15.4;
+						TestTargetID = 1A0000102B00000000000001;
 					};
 				};
 			};
@@ -115,6 +166,7 @@
 			projectRoot = "";
 			targets = (
 				1A0000102B00000000000001 /* WatermarkFactory */,
+				1A0000262B00000000000001 /* WatermarkFactoryTests */,
 			);
 		};
 /* End PBXProject section */
@@ -142,7 +194,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		1A0000282B00000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A0000202B00000000000001 /* ImageProcessorMetadataTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		1A0000292B00000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1A0000102B00000000000001 /* WatermarkFactory */;
+			targetProxy = 1A0000222B00000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1A0000162B00000000000001 /* Debug */ = {
@@ -306,6 +374,46 @@
 			};
 			name = Release;
 		};
+		1A00002A2B00000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.local.WatermarkFactoryTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WatermarkFactory.app/Contents/MacOS/WatermarkFactory";
+			};
+			name = Debug;
+		};
+		1A00002B2B00000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.local.WatermarkFactoryTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WatermarkFactory.app/Contents/MacOS/WatermarkFactory";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -323,6 +431,15 @@
 			buildConfigurations = (
 				1A0000182B00000000000001 /* Debug */,
 				1A0000192B00000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1A0000272B00000000000001 /* Build configuration list for PBXNativeTarget "WatermarkFactoryTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A00002A2B00000000000001 /* Debug */,
+				1A00002B2B00000000000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
