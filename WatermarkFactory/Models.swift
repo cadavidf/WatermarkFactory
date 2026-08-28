@@ -123,10 +123,12 @@ struct WatermarkSettings: Codable {
     var exportFormat: ExportFormat
     var jpegQuality: Double
     var optimizeForWeb: Bool
+    var outputWidth: Int
+    var outputHeight: Int
     var outputPrefix: String
     var outputSuffix: String
 
-    init(sizeFraction: Double, opacity: Double, anchor: Anchor, offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputPrefix: String, outputSuffix: String) {
+    init(sizeFraction: Double, opacity: Double, anchor: Anchor, offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputWidth: Int = 0, outputHeight: Int = 0, outputPrefix: String, outputSuffix: String) {
         self.sizeFraction = sizeFraction
         self.opacity = opacity
         self.anchor = anchor
@@ -140,12 +142,14 @@ struct WatermarkSettings: Codable {
         self.exportFormat = exportFormat
         self.jpegQuality = jpegQuality
         self.optimizeForWeb = optimizeForWeb
+        self.outputWidth = outputWidth
+        self.outputHeight = outputHeight
         self.outputPrefix = outputPrefix
         self.outputSuffix = outputSuffix
     }
 
     private enum CodingKeys: String, CodingKey {
-        case sizeFraction, opacity, anchor, offsetX, offsetY, layoutMode, padding, spacing, rotationPattern, customAngle, exportFormat, jpegQuality, optimizeForWeb, outputPrefix, outputSuffix
+        case sizeFraction, opacity, anchor, offsetX, offsetY, layoutMode, padding, spacing, rotationPattern, customAngle, exportFormat, jpegQuality, optimizeForWeb, outputWidth, outputHeight, outputPrefix, outputSuffix
     }
 
     init(from decoder: Decoder) throws {
@@ -163,6 +167,8 @@ struct WatermarkSettings: Codable {
         exportFormat = try container.decode(ExportFormat.self, forKey: .exportFormat)
         jpegQuality = try container.decode(Double.self, forKey: .jpegQuality)
         optimizeForWeb = try container.decodeIfPresent(Bool.self, forKey: .optimizeForWeb) ?? false
+        outputWidth = try container.decodeIfPresent(Int.self, forKey: .outputWidth) ?? 0
+        outputHeight = try container.decodeIfPresent(Int.self, forKey: .outputHeight) ?? 0
         outputPrefix = try container.decode(String.self, forKey: .outputPrefix)
         outputSuffix = try container.decode(String.self, forKey: .outputSuffix)
     }
@@ -173,6 +179,44 @@ struct WatermarkPreset: Identifiable, Codable {
     var name: String
     var watermarkBookmark: Data
     var settings: WatermarkSettings
+}
+
+struct PlatformExportPreset: Identifiable {
+    let id: String
+    let name: String
+    let width: Int
+    let height: Int
+    let jpegQuality: Double
+    let note: String
+
+    var sizeLabel: String { "\(width)x\(height) JPEG" }
+
+    static let all: [PlatformExportPreset] = [
+        PlatformExportPreset(
+            id: "fincaraiz",
+            name: "FincaRaiz",
+            width: 860,
+            height: 482,
+            jpegQuality: 0.85,
+            note: "FincaRaiz: 860x482px landscape, max 4.9MB - per fincaraiz.com.co guidance. Quality is an estimate; actual size depends on image content."
+        ),
+        PlatformExportPreset(
+            id: "metrocuadrado",
+            name: "Metrocuadrado",
+            width: 1600,
+            height: 1200,
+            jpegQuality: 0.85,
+            note: "Metrocuadrado: inferred 1600x1200px safe default; no exact official pixel spec published. Quality is an estimate; actual size depends on image content."
+        ),
+        PlatformExportPreset(
+            id: "ciencuadras",
+            name: "100Cuadras",
+            width: 1200,
+            height: 1200,
+            jpegQuality: 0.85,
+            note: "100Cuadras: 1200x1200px square, max 2MB - per Ciencuadras guidance. Quality is an estimate; actual size depends on image content."
+        )
+    ]
 }
 
 struct ExportSummary {

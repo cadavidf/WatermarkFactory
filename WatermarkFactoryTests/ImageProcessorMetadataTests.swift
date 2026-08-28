@@ -109,30 +109,45 @@ final class ImageProcessorMetadataTests: XCTestCase {
         }
     }
 
+    func testExactOutputSizeUsesRequestedPlatformPixels() throws {
+        let source = tempDir.appendingPathComponent("source.jpg")
+        let output = tempDir.appendingPathComponent("output.jpg")
+        let watermark = tempDir.appendingPathComponent("watermark.png")
+        try writeImage(source, type: .jpeg, width: 80, height: 40)
+        try writeImage(watermark, type: .png)
+
+        let settings = WatermarkSettings(sizeFraction: 0.2, opacity: 0, anchor: .center, offsetX: 0, offsetY: 0, layoutMode: .single, padding: 0, spacing: 0, rotationPattern: .none, customAngle: 0, exportFormat: .jpeg, jpegQuality: 0.85, outputWidth: 1200, outputHeight: 1200, outputPrefix: "", outputSuffix: "")
+        _ = try ImageProcessor.export(sourceURL: source, watermarkURL: watermark, outputURL: output, settings: settings)
+
+        let image = try XCTUnwrap(CGImageSourceCreateWithURL(output as CFURL, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) })
+        XCTAssertEqual(image.width, 1200)
+        XCTAssertEqual(image.height, 1200)
+    }
+
     private func export(_ source: URL, to output: URL, format: ExportFormat) throws {
         let watermark = tempDir.appendingPathComponent("watermark.png")
         try writeImage(watermark, type: .png)
         _ = try ImageProcessor.export(sourceURL: source, watermarkURL: watermark, outputURL: output, settings: WatermarkSettings(sizeFraction: 0.2, opacity: 0, anchor: .center, offsetX: 0, offsetY: 0, layoutMode: .single, padding: 0, spacing: 0, rotationPattern: .none, customAngle: 0, exportFormat: format, jpegQuality: 0.9, outputPrefix: "", outputSuffix: ""))
     }
 
-    private func writeImage(_ url: URL, type: UTType, properties: [CFString: Any] = [:]) throws {
+    private func writeImage(_ url: URL, type: UTType, width: Int = 4, height: Int = 4, properties: [CFString: Any] = [:]) throws {
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(data, type.identifier as CFString, 1, nil) else {
             XCTFail("Could not create image destination")
             return
         }
-        CGImageDestinationAddImage(destination, try makeImage(), properties as CFDictionary)
+        CGImageDestinationAddImage(destination, try makeImage(width: width, height: height), properties as CFDictionary)
         XCTAssertTrue(CGImageDestinationFinalize(destination))
         try (data as Data).write(to: url)
     }
 
-    private func makeImage() throws -> CGImage {
+    private func makeImage(width: Int, height: Int) throws -> CGImage {
         guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
-              let context = CGContext(data: nil, width: 4, height: 4, bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+              let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
             throw ImageProcessorError.contextFailed
         }
         context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
-        context.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         guard let image = context.makeImage() else { throw ImageProcessorError.contextFailed }
         return image
     }

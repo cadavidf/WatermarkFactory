@@ -56,7 +56,7 @@ struct ImageProcessor {
 
     static func encodedWatermarkData(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings) throws -> Data {
         let image = try watermarkedImage(sourceURL: sourceURL, watermarkURL: watermarkURL, settings: settings)
-        let outputImage = try optimizeForWebIfNeeded(image, settings: settings)
+        let outputImage = try resizedForExport(image, settings: settings)
         return try encode(image: outputImage, sourceURL: sourceURL, format: settings.exportFormat, quality: jpegQuality(sourceURL: sourceURL, settings: settings)).data
     }
 
@@ -80,7 +80,7 @@ struct ImageProcessor {
 
     static func export(sourceURL: URL, watermarkURL: URL, outputURL: URL, settings: WatermarkSettings) throws -> (url: URL, bytes: Int, usedHEICFallback: Bool) {
         let image = try watermarkedImage(sourceURL: sourceURL, watermarkURL: watermarkURL, settings: settings)
-        let outputImage = try optimizeForWebIfNeeded(image, settings: settings)
+        let outputImage = try resizedForExport(image, settings: settings)
         let encoded = try encode(image: outputImage, sourceURL: sourceURL, format: settings.exportFormat, quality: jpegQuality(sourceURL: sourceURL, settings: settings))
         try encoded.data.write(to: outputURL, options: .atomic)
         return (outputURL, encoded.data.count, encoded.usedHEICFallback)
@@ -210,6 +210,28 @@ struct ImageProcessor {
         }
         properties[kCGImagePropertyGPSDictionary] = gps
         return properties
+    }
+
+    private static func resizedForExport(_ image: CGImage, settings: WatermarkSettings) throws -> CGImage {
+        let exact = try exactOutputSizeIfNeeded(image, settings: settings)
+        return try optimizeForWebIfNeeded(exact, settings: settings)
+    }
+
+    private static func exactOutputSizeIfNeeded(_ image: CGImage, settings: WatermarkSettings) throws -> CGImage {
+        guard settings.outputWidth > 0, settings.outputHeight > 0 else { return image }
+        let width = settings.outputWidth
+        let height = settings.outputHeight
+        let scale = max(CGFloat(width) / CGFloat(image.width), CGFloat(height) / CGFloat(image.height))
+        let scaledSize = CGSize(width: CGFloat(image.width) * scale, height: CGFloat(image.height) * scale)
+        let origin = CGPoint(x: (CGFloat(width) - scaledSize.width) / 2, y: (CGFloat(height) - scaledSize.height) / 2)
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            throw ImageProcessorError.contextFailed
+        }
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(origin: origin, size: scaledSize))
+        guard let resized = context.makeImage() else { throw ImageProcessorError.contextFailed }
+        return resized
     }
 
     private static func optimizeForWebIfNeeded(_ image: CGImage, settings: WatermarkSettings) throws -> CGImage {

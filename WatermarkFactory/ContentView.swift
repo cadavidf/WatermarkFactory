@@ -28,6 +28,8 @@ final class AppState: ObservableObject {
     }
     @Published var jpegQuality = 0.9 { didSet { saveSettings(); updateEstimate() } }
     @Published var optimizeForWeb = false { didSet { saveSettings(); updateEstimate() } }
+    @Published var outputWidth = 0 { didSet { saveSettings(); updateEstimate() } }
+    @Published var outputHeight = 0 { didSet { saveSettings(); updateEstimate() } }
     @Published var outputPrefix = "" { didSet { saveSettings(); updateEstimate() } }
     @Published var outputSuffix = "" { didSet { saveSettings(); updateEstimate() } }
     @Published var previewImage: NSImage?
@@ -57,7 +59,7 @@ final class AppState: ObservableObject {
         return nil
     }
     var settings: WatermarkSettings {
-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, optimizeForWeb: optimizeForWeb, outputPrefix: outputPrefix, outputSuffix: outputSuffix)
+        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, optimizeForWeb: optimizeForWeb, outputWidth: outputWidth, outputHeight: outputHeight, outputPrefix: outputPrefix, outputSuffix: outputSuffix)
     }
     var canSavePreset: Bool { watermarkURL != nil }
 
@@ -232,6 +234,14 @@ final class AppState: ObservableObject {
         savePresets()
     }
 
+    func applyPlatformPreset(_ preset: PlatformExportPreset) {
+        outputWidth = preset.width
+        outputHeight = preset.height
+        exportFormat = .jpeg
+        jpegQuality = preset.jpegQuality
+        status = "Applied \(preset.name) export preset."
+    }
+
     private func setFolder(_ url: URL) {
         folderURL = url
         saveBookmark(url, key: "folderBookmark")
@@ -271,6 +281,8 @@ final class AppState: ObservableObject {
         exportFormat = settings.exportFormat
         jpegQuality = settings.jpegQuality
         optimizeForWeb = settings.optimizeForWeb
+        outputWidth = settings.outputWidth
+        outputHeight = settings.outputHeight
         outputPrefix = Self.sanitizedFilenameAffix(settings.outputPrefix)
         outputSuffix = Self.sanitizedFilenameAffix(settings.outputSuffix)
         syncPresetSelections()
@@ -312,6 +324,8 @@ final class AppState: ObservableObject {
         defaults.set(exportFormat.rawValue, forKey: "exportFormat")
         defaults.set(jpegQuality, forKey: "jpegQuality")
         defaults.set(optimizeForWeb, forKey: "optimizeForWeb")
+        defaults.set(outputWidth, forKey: "outputWidth")
+        defaults.set(outputHeight, forKey: "outputHeight")
         defaults.set(outputPrefix, forKey: "outputPrefix")
         defaults.set(outputSuffix, forKey: "outputSuffix")
     }
@@ -331,6 +345,8 @@ final class AppState: ObservableObject {
         exportFormat = ExportFormat(rawValue: defaults.string(forKey: "exportFormat") ?? "") ?? .keepOriginal
         jpegQuality = defaults.object(forKey: "jpegQuality") == nil ? 0.9 : defaults.double(forKey: "jpegQuality")
         optimizeForWeb = defaults.bool(forKey: "optimizeForWeb")
+        outputWidth = defaults.object(forKey: "outputWidth") == nil ? 0 : defaults.integer(forKey: "outputWidth")
+        outputHeight = defaults.object(forKey: "outputHeight") == nil ? 0 : defaults.integer(forKey: "outputHeight")
         outputPrefix = Self.sanitizedFilenameAffix(defaults.string(forKey: "outputPrefix") ?? "")
         outputSuffix = Self.sanitizedFilenameAffix(defaults.string(forKey: "outputSuffix") ?? "")
         syncPresetSelections()
@@ -547,6 +563,11 @@ struct ContentView: View {
                 .pickerStyle(.segmented)
                 Toggle("Optimize for Web", isOn: Binding(get: { state.optimizeForWeb }, set: { state.setOptimizeForWeb($0) }))
                 HStack {
+                    TextField("Width", value: $state.outputWidth, format: .number)
+                    TextField("Height", value: $state.outputHeight, format: .number)
+                }
+                Text(state.outputWidth > 0 && state.outputHeight > 0 ? "Output size \(state.outputWidth)x\(state.outputHeight) px" : "Output size original").font(.caption).foregroundStyle(.secondary)
+                HStack {
                     TextField("Prefix", text: Binding(get: { state.outputPrefix }, set: { state.outputPrefix = AppState.sanitizedFilenameAffix($0) }))
                     TextField("Suffix", text: Binding(get: { state.outputSuffix }, set: { state.outputSuffix = AppState.sanitizedFilenameAffix($0) }))
                 }
@@ -574,6 +595,21 @@ struct ContentView: View {
     private var presetLibrary: some View {
         GroupBox("Presets") {
             VStack(alignment: .leading, spacing: 8) {
+                Text("Platform presets").font(.caption).foregroundStyle(.secondary)
+                ForEach(PlatformExportPreset.all) { preset in
+                    Button {
+                        state.applyPlatformPreset(preset)
+                    } label: {
+                        HStack {
+                            Text(preset.name)
+                            Spacer()
+                            Text(preset.sizeLabel).foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .help(preset.note)
+                }
+                Divider()
                 Button("Save current as preset...") {
                     presetName = ""
                     isNamingPreset = true
