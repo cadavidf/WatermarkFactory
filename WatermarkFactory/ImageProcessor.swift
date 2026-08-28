@@ -23,6 +23,29 @@ struct ImageProcessor {
         return NSImage(cgImage: image, size: .zero)
     }
 
+    static func imageSize(for url: URL) -> CGSize? {
+        guard let image = loadCGImage(url) else { return nil }
+        return CGSize(width: image.width, height: image.height)
+    }
+
+    static func watermarkFrame(sourceSize: CGSize, watermarkSize: CGSize, settings: WatermarkSettings) -> CGRect {
+        let targetLongestSide = min(sourceSize.width, sourceSize.height) * settings.sizeFraction
+        let scale = targetLongestSide / max(watermarkSize.width, watermarkSize.height)
+        return rect(for: CGSize(width: watermarkSize.width * scale, height: watermarkSize.height * scale), canvas: sourceSize, anchor: settings.anchor, padding: settings.padding, offsetX: settings.offsetX, offsetY: settings.offsetY)
+    }
+
+    static func clampedWatermarkOffsets(sourceSize: CGSize, watermarkSize: CGSize, settings: WatermarkSettings, offsetX: Double, offsetY: Double) -> (x: Double, y: Double) {
+        var proposed = settings
+        proposed.offsetX = offsetX
+        proposed.offsetY = offsetY
+        let frame = watermarkFrame(sourceSize: sourceSize, watermarkSize: watermarkSize, settings: proposed)
+        let visible = CGFloat(0.2)
+        let x = min(max(frame.minX, -frame.width * (1 - visible)), sourceSize.width - frame.width * visible)
+        let y = min(max(frame.minY, -frame.height * (1 - visible)), sourceSize.height - frame.height * visible)
+        let base = rect(for: frame.size, canvas: sourceSize, anchor: settings.anchor, padding: settings.padding, offsetX: 0, offsetY: 0)
+        return (Double(x - base.minX), Double(base.minY - y))
+    }
+
     static func watermarkedImage(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings) throws -> CGImage {
         guard let source = loadCGImage(sourceURL), let watermark = loadCGImage(watermarkURL) else {
             throw ImageProcessorError.loadFailed

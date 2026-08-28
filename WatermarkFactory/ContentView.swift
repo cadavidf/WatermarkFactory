@@ -12,8 +12,8 @@ final class AppState: ObservableObject {
     @Published var sizeFraction = 0.35 { didSet { saveSettings(); updateEstimate() } }
     @Published var opacity = 0.5 { didSet { saveSettings(); updateEstimate() } }
     @Published var anchor: Anchor = .bottomRight { didSet { saveSettings(); updateEstimate() } }
-    @Published var offsetX = 24.0 { didSet { saveSettings(); updateEstimate() } }
-    @Published var offsetY = 24.0 { didSet { saveSettings(); updateEstimate() } }
+    @Published var offsetX = 24.0 { didSet { saveSettings(); if !suppressOffsetPreview { updateEstimate() } } }
+    @Published var offsetY = 24.0 { didSet { saveSettings(); if !suppressOffsetPreview { updateEstimate() } } }
     @Published var layoutMode: LayoutMode = .single { didSet { saveSettings(); updateEstimate() } }
     @Published var padding = 16.0 { didSet { saveSettings(); updateEstimate() } }
     @Published var spacing = 80.0 { didSet { saveSettings(); updateEstimate() } }
@@ -24,6 +24,8 @@ final class AppState: ObservableObject {
     @Published var outputPrefix = "" { didSet { saveSettings(); updateEstimate() } }
     @Published var outputSuffix = "" { didSet { saveSettings(); updateEstimate() } }
     @Published var previewImage: NSImage?
+    @Published var sourceImageSize: CGSize?
+    @Published var watermarkImageSize: CGSize?
     @Published var estimatedSize = ""
     @Published var estimatedFilename = ""
     @Published var status = "Choose a folder and watermark to begin."
@@ -31,6 +33,9 @@ final class AppState: ObservableObject {
     @Published var isExporting = false
 
     private var previewTask: Task<Void, Never>?
+    private var sourceSizeURL: URL?
+    private var watermarkSizeURL: URL?
+    private var suppressOffsetPreview = false
     private let defaults = UserDefaults.standard
 
     init() {
@@ -83,9 +88,17 @@ final class AppState: ObservableObject {
         updateEstimate()
     }
 
-    func updateEstimate() {
+    func updateEstimate(delay: UInt64 = 100_000_000) {
         previewTask?.cancel()
         let settings = settings
+        if selected?.url != sourceSizeURL {
+            sourceSizeURL = selected?.url
+            sourceImageSize = selected.flatMap { ImageProcessor.imageSize(for: $0.url) }
+        }
+        if watermarkURL != watermarkSizeURL {
+            watermarkSizeURL = watermarkURL
+            watermarkImageSize = watermarkURL.flatMap(ImageProcessor.imageSize)
+        }
         guard let source = selected?.url, let watermark = watermarkURL else {
             previewImage = selected.flatMap { ImageProcessor.thumbnail(for: $0.url, maxPixelSize: 900) }
             estimatedSize = ""
@@ -94,7 +107,7 @@ final class AppState: ObservableObject {
         }
         let filename = ImageProcessor.outputFilename(for: source, settings: settings)
         previewTask = Task.detached {
-            try? await Task.sleep(nanoseconds: 100_000_000)
+            if delay > 0 { try? await Task.sleep(nanoseconds: delay) }
             if Task.isCancelled { return }
             let image = try? ImageProcessor.watermarkedImage(sourceURL: source, watermarkURL: watermark, settings: settings)
             let data = try? ImageProcessor.encodedWatermarkData(sourceURL: source, watermarkURL: watermark, settings: settings)
@@ -106,6 +119,22 @@ final class AppState: ObservableObject {
                 }
             }
         }
+    }
+
+    func dragWatermark(startX: Double, startY: Double, delta: CGSize, displayScale: CGFloat) {
+        guard let sourceImageSize, let watermarkImageSize, displayScale > 0 else { return }
+        let clamped = ImageProcessor.clampedWatermarkOffsets(
+            sourceSize: sourceImageSize,
+            watermarkSize: watermarkImageSize,
+            settings: settings,
+            offsetX: startX + Double(delta.width / displayScale),
+            offsetY: startY + Double(delta.height / displayScale)
+        )
+        suppressOffsetPreview = true
+        offsetX = clamped.x
+        offsetY = clamped.y
+        suppressOffsetPreview = false
+        updateEstimate(delay: 0)
     }
 
     func exportAll() {
@@ -328,7 +357,7 @@ struct ContentView: View {
             ZStack {
                 Color(NSColor.windowBackgroundColor)
                 if let image = state.previewImage {
-                    Image(nsImage: image).resizable().scaledToFit().padding()
+                    WatermarkPreview(image: image, state: state)
                 } else {
                     Text("Select an image to preview.").foregroundStyle(.secondary)
                 }
@@ -464,6 +493,72 @@ struct ContentView: View {
         if let preset = preset as? WatermarkSizePreset { return preset.label }
         if let preset = preset as? OpacityPreset { return preset.label }
         return ""
+    }
+}
+
+struct WatermarkPreview: View {
+    let image: NSImage
+    @ObservedObject var state: AppState
+    @State private var dragStart: CGPoint?
+    private let padding: CGFloat = 16
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(padding)
+                if let rect = displayedWatermarkRect(in: proxy.size) {
+                    Rectangle()
+                        .fill(.clear)
+                        .overlay(
+                            Rectangle()
+                                .stroke(Color.accentColor.opacity(dragStart == nil ? 0.25 : 0.8), lineWidth: dragStart == nil ? 1 : 2)
+                        )
+                        .frame(width: rect.width, height: rect.height)
+                        .position(x: rect.midX, y: rect.midY)
+                        .contentShape(Rectangle())
+                        .onHover { hovering in (hovering ? NSCursor.openHand : NSCursor.arrow).set() }
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { value in
+                                    let start = dragStart ?? CGPoint(x: state.offsetX, y: state.offsetY)
+                                    dragStart = start
+                                    NSCursor.closedHand.set()
+                                    state.dragWatermark(startX: Double(start.x), startY: Double(start.y), delta: value.translation, displayScale: displayScale(in: proxy.size))
+                                }
+                                .onEnded { _ in
+                                    dragStart = nil
+                                    NSCursor.openHand.set()
+                                }
+                        )
+                }
+            }
+        }
+    }
+
+    private func displayedWatermarkRect(in size: CGSize) -> CGRect? {
+        guard state.layoutMode == .single,
+              let sourceSize = state.sourceImageSize,
+              let watermarkSize = state.watermarkImageSize else { return nil }
+        let scale = displayScale(in: size)
+        guard scale > 0 else { return nil }
+        let imageSize = CGSize(width: sourceSize.width * scale, height: sourceSize.height * scale)
+        let origin = CGPoint(x: (size.width - imageSize.width) / 2, y: (size.height - imageSize.height) / 2)
+        let frame = ImageProcessor.watermarkFrame(sourceSize: sourceSize, watermarkSize: watermarkSize, settings: state.settings)
+        return CGRect(
+            x: origin.x + frame.minX * scale,
+            y: origin.y + (sourceSize.height - frame.maxY) * scale,
+            width: frame.width * scale,
+            height: frame.height * scale
+        )
+    }
+
+    private func displayScale(in size: CGSize) -> CGFloat {
+        guard let sourceSize = state.sourceImageSize, sourceSize.width > 0, sourceSize.height > 0 else { return 0 }
+        let available = CGSize(width: max(0, size.width - padding * 2), height: max(0, size.height - padding * 2))
+        return min(available.width / sourceSize.width, available.height / sourceSize.height)
     }
 }
 
