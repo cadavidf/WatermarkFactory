@@ -93,10 +93,10 @@ enum ExportFormat: String, CaseIterable, Identifiable, Codable {
     var id: String { rawValue }
     var hint: String {
         switch self {
-        case .keepOriginal: "Preserves source type where possible; HEIC falls back to PNG."
-        case .jpeg: "Smaller file, no transparency."
-        case .png: "Lossless, supports transparency."
-        case .tiff: "Largest file, lossless, editing-grade."
+        case .keepOriginal: "Preserves the source type where possible; HEIC falls back to PNG. Use this when you are matching an existing delivery workflow."
+        case .jpeg: "Best for photos going to listing sites: small files, fast uploads, no transparency needed."
+        case .png: "Use only if you need transparency or plan to edit further. Files are much larger, and most listing portals do not need this."
+        case .tiff: "Archival or print-quality only. Files are very large and not intended for web upload."
         }
     }
     var fileExtension: String? {
