@@ -68,12 +68,14 @@ struct ImageProcessor {
         resolvedFormat(sourceURL: sourceURL, format: format).type == .jpeg
     }
 
-    static func outputFilename(for sourceURL: URL, settings: WatermarkSettings) -> String {
-        "\(sanitize(settings.outputPrefix))\(sourceURL.deletingPathExtension().lastPathComponent)\(sanitize(settings.outputSuffix)).\(resolvedFormat(sourceURL: sourceURL, format: settings.exportFormat).ext)"
+    static func outputFilename(for sourceURL: URL, settings: WatermarkSettings, order: Int? = nil, numberedCount: Int = 0) -> String {
+        let prefix = sanitize(settings.outputPrefix)
+        let sequence = order.map { String(format: "%0\(numberedCount >= 10 ? String(numberedCount).count : 1)d_", $0) } ?? ""
+        return "\(prefix)\(sequence)\(sourceURL.deletingPathExtension().lastPathComponent)\(sanitize(settings.outputSuffix)).\(resolvedFormat(sourceURL: sourceURL, format: settings.exportFormat).ext)"
     }
 
-    static func uniqueOutputURL(for sourceURL: URL, outputFolder: URL, settings: WatermarkSettings, usedURLs: inout Set<URL>) -> URL {
-        let filename = outputFilename(for: sourceURL, settings: settings)
+    static func uniqueOutputURL(for sourceURL: URL, outputFolder: URL, settings: WatermarkSettings, order: Int? = nil, numberedCount: Int = 0, usedURLs: inout Set<URL>) -> URL {
+        let filename = outputFilename(for: sourceURL, settings: settings, order: order, numberedCount: numberedCount)
         let base = (filename as NSString).deletingPathExtension
         let ext = (filename as NSString).pathExtension
         var candidate = outputFolder.appendingPathComponent(filename)

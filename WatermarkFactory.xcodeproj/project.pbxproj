@@ -13,6 +13,7 @@
 		1A0000072B00000000000001 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000082B00000000000001 /* Models.swift */; };
 		1A00001A2B00000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A00001B2B00000000000001 /* Assets.xcassets */; };
 		1A0000202B00000000000001 /* ImageProcessorMetadataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000212B00000000000001 /* ImageProcessorMetadataTests.swift */; };
+		1A00002C2B00000000000001 /* AutomalityUI in Frameworks */ = {isa = PBXBuildFile; productRef = 1A00002E2B00000000000001 /* AutomalityUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,6 +44,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1A00002C2B00000000000001 /* AutomalityUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -114,6 +116,9 @@
 			name = WatermarkFactory;
 			productName = WatermarkFactory;
 			productReference = 1A00000B2B00000000000001 /* WatermarkFactory.app */;
+			packageProductDependencies = (
+				1A00002E2B00000000000001 /* AutomalityUI */,
+			);
 			productType = "com.apple.product-type.application";
 		};
 		1A0000262B00000000000001 /* WatermarkFactoryTests */ = {
@@ -161,6 +166,9 @@
 				Base,
 			);
 			mainGroup = 1A00000D2B00000000000001;
+			packageReferences = (
+				1A00002D2B00000000000001 /* XCLocalSwiftPackageReference "../AutomalityUI" */,
+			);
 			productRefGroup = 1A00000F2B00000000000001 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -445,6 +453,21 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		1A00002D2B00000000000001 /* XCLocalSwiftPackageReference "../AutomalityUI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../AutomalityUI;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1A00002E2B00000000000001 /* AutomalityUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1A00002D2B00000000000001 /* XCLocalSwiftPackageReference "../AutomalityUI" */;
+			productName = AutomalityUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 1A0000142B00000000000001 /* Project object */;
 }

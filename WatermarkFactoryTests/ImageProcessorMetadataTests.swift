@@ -124,6 +124,14 @@ final class ImageProcessorMetadataTests: XCTestCase {
         XCTAssertEqual(image.height, 1200)
     }
 
+    func testOutputFilenameInsertsOrderAfterPrefix() {
+        let source = tempDir.appendingPathComponent("beach.jpg")
+        let settings = WatermarkSettings(sizeFraction: 0.2, opacity: 0, anchor: .center, offsetX: 0, offsetY: 0, layoutMode: .single, padding: 0, spacing: 0, rotationPattern: .none, customAngle: 0, exportFormat: .jpeg, jpegQuality: 0.9, outputPrefix: "wm_", outputSuffix: "")
+
+        XCTAssertEqual(ImageProcessor.outputFilename(for: source, settings: settings, order: 3, numberedCount: 12), "wm_03_beach.jpg")
+        XCTAssertEqual(ImageProcessor.outputFilename(for: source, settings: settings, numberedCount: 12), "wm_beach.jpg")
+    }
+
     private func export(_ source: URL, to output: URL, format: ExportFormat) throws {
         let watermark = tempDir.appendingPathComponent("watermark.png")
         try writeImage(watermark, type: .png)

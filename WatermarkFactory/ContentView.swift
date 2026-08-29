@@ -1,12 +1,28 @@
 import AppKit
+import AutomalityUI
 import SwiftUI
+import UniformTypeIdentifiers
 
 @MainActor
 final class AppState: ObservableObject {
+    enum Stage: Int, CaseIterable {
+        case selectImages, watermark, orderRename, export
+
+        var title: String {
+            switch self {
+            case .selectImages: "Select Images"
+            case .watermark: "Watermark"
+            case .orderRename: "Order & Rename"
+            case .export: "Export"
+            }
+        }
+    }
+
     @Published var folderURL: URL?
     @Published var watermarkURL: URL?
     @Published var images: [ImageItem] = []
     @Published var selected: ImageItem?
+    @Published var stage: Stage = .selectImages
     @Published var sizePreset: WatermarkSizePreset? = .medium
     @Published var opacityPreset: OpacityPreset? = .balanced
     @Published var sizeFraction = 0.35 { didSet { saveSettings(); updateEstimate() } }
@@ -42,6 +58,7 @@ final class AppState: ObservableObject {
     @Published var progress = 0.0
     @Published var isExporting = false
     @Published var presets: [WatermarkPreset] = []
+    @Published var orderedImageURLs: [URL] = [] { didSet { saveImageOrder() } }
 
     private var previewTask: Task<Void, Never>?
     private var sourceSizeURL: URL?
@@ -60,6 +77,18 @@ final class AppState: ObservableObject {
         maxFileSizeKB > 0 && (exportFormat == .png || exportFormat == .tiff)
     }
     var canExport: Bool { watermarkURL != nil && !images.isEmpty && !isExporting && !maxFileSizeBlocksExport }
+    var orderedItems: [ImageItem] {
+        let numbered = orderedImageURLs.compactMap { url in images.first { $0.url == url } }
+        let numberedURLs = Set(orderedImageURLs)
+        return numbered + images.filter { !numberedURLs.contains($0.url) }
+    }
+    var numberedCount: Int { orderedImageURLs.filter { url in images.contains { $0.url == url } }.count }
+    var orderSummary: String { "\(numberedCount) of \(images.count) images numbered" }
+    var nextAvailableStage: Stage {
+        if images.isEmpty { return .selectImages }
+        if watermarkURL == nil { return .watermark }
+        return .export
+    }
     var exportHint: String? {
         if images.isEmpty { return "Choose a folder or images before export." }
         if watermarkURL == nil { return "Choose a watermark image before export." }
@@ -107,6 +136,50 @@ final class AppState: ObservableObject {
         updateEstimate()
     }
 
+    func advance(to stage: Stage) {
+        guard stage.rawValue <= nextAvailableStage.rawValue else { return }
+        self.stage = stage
+    }
+
+    func advanceIfReady() {
+        if !images.isEmpty && stage == .selectImages { stage = .watermark }
+        if watermarkURL != nil && stage == .watermark { stage = .orderRename }
+    }
+
+    func orderNumber(for item: ImageItem) -> Int? {
+        orderedImageURLs.firstIndex(of: item.url).map { $0 + 1 }
+    }
+
+    func toggleOrder(for item: ImageItem) {
+        if let index = orderedImageURLs.firstIndex(of: item.url) {
+            orderedImageURLs.remove(at: index)
+        } else {
+            orderedImageURLs.append(item.url)
+        }
+        updateEstimate(delay: 0)
+    }
+
+    func clearOrder() {
+        orderedImageURLs = []
+        updateEstimate(delay: 0)
+    }
+
+    func numberInCurrentOrder(_ items: [ImageItem]? = nil) {
+        orderedImageURLs = (items ?? images).map(\.url)
+        updateEstimate(delay: 0)
+    }
+
+    func moveOrder(from source: ImageItem, to destination: ImageItem) {
+        var items = orderedItems
+        guard let from = items.firstIndex(of: source),
+              let to = items.firstIndex(of: destination),
+              from != to else { return }
+        let moved = items.remove(at: from)
+        items.insert(moved, at: to)
+        orderedImageURLs = items.map(\.url)
+        updateEstimate(delay: 0)
+    }
+
     func updateEstimate(delay: UInt64 = 100_000_000) {
         previewTask?.cancel()
         let settings = settings
@@ -121,10 +194,10 @@ final class AppState: ObservableObject {
         guard let source = selected?.url, let watermark = watermarkURL else {
             previewImage = selected.flatMap { ImageProcessor.thumbnail(for: $0.url, maxPixelSize: 900) }
             estimatedSize = ""
-            estimatedFilename = selected.map { ImageProcessor.outputFilename(for: $0.url, settings: settings) } ?? ""
+            estimatedFilename = selected.map { ImageProcessor.outputFilename(for: $0.url, settings: settings, order: orderNumber(for: $0), numberedCount: numberedCount) } ?? ""
             return
         }
-        let filename = ImageProcessor.outputFilename(for: source, settings: settings)
+        let filename = ImageProcessor.outputFilename(for: source, settings: settings, order: selected.flatMap(orderNumber), numberedCount: numberedCount)
         previewTask = Task.detached {
             if delay > 0 { try? await Task.sleep(nanoseconds: delay) }
             if Task.isCancelled { return }
@@ -161,8 +234,10 @@ final class AppState: ObservableObject {
         isExporting = true
         progress = 0
         status = "Exporting 0 of \(images.count)..."
-        let items = images
+        let items = orderedItems
         let settings = settings
+        let numberedOrder = Dictionary(uniqueKeysWithValues: orderedImageURLs.enumerated().map { ($0.element, $0.offset + 1) })
+        let numberedCount = numberedCount
         Task.detached {
             var summary = ExportSummary(success: 0, failed: [], bytes: 0, usedHEICFallback: false)
             var usedOutputURLs = Set<URL>()
@@ -177,7 +252,7 @@ final class AppState: ObservableObject {
                 do {
                     let output = item.url.deletingLastPathComponent().appendingPathComponent("Watermarked", isDirectory: true)
                     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-                    let outputURL = ImageProcessor.uniqueOutputURL(for: item.url, outputFolder: output, settings: settings, usedURLs: &usedOutputURLs)
+                    let outputURL = ImageProcessor.uniqueOutputURL(for: item.url, outputFolder: output, settings: settings, order: numberedOrder[item.url], numberedCount: numberedCount, usedURLs: &usedOutputURLs)
                     let result = try ImageProcessor.export(sourceURL: item.url, watermarkURL: watermark, outputURL: outputURL, settings: settings)
                     revealURL = revealURL ?? output
                     summary.success += 1
@@ -267,13 +342,16 @@ final class AppState: ObservableObject {
         images = filtered.map(ImageItem.init)
         selected = images.first
         status = images.isEmpty ? "No supported images selected." : "\(images.count) images selected."
+        pruneImageOrder()
         saveImageBookmarks()
+        advanceIfReady()
         updateEstimate()
     }
 
     private func setWatermark(_ url: URL) {
         watermarkURL = url
         saveBookmark(url, key: "watermarkBookmark")
+        advanceIfReady()
         updateEstimate()
     }
 
@@ -312,11 +390,14 @@ final class AppState: ObservableObject {
                 .map(ImageItem.init)
             selected = images.first
             status = images.isEmpty ? "No supported images found in this folder." : "\(images.count) images found."
+            pruneImageOrder()
             saveImageBookmarks()
+            advanceIfReady()
             updateEstimate()
         } catch {
             images = []
             selected = nil
+            pruneImageOrder()
             status = "Couldn't access the selected folder. Please re-choose it."
         }
     }
@@ -365,6 +446,7 @@ final class AppState: ObservableObject {
         syncPresetSelections()
         folderURL = restoreBookmark("folderBookmark")
         watermarkURL = restoreBookmark("watermarkBookmark")
+        restoreImageOrder()
         let restoredImages = restoreImageBookmarks()
         if restoredImages.isEmpty {
             reloadImages()
@@ -372,9 +454,11 @@ final class AppState: ObservableObject {
             if defaults.bool(forKey: "usedIndividualImages") { folderURL = nil }
             images = restoredImages.map(ImageItem.init)
             selected = images.first
+            pruneImageOrder()
             status = "\(images.count) images restored."
             updateEstimate()
         }
+        advanceIfReady()
     }
 
     private func saveBookmark(_ url: URL, key: String) {
@@ -424,6 +508,19 @@ final class AppState: ObservableObject {
         }
     }
 
+    private func saveImageOrder() {
+        defaults.set(orderedImageURLs.map(\.path), forKey: "orderedImagePaths")
+    }
+
+    private func restoreImageOrder() {
+        orderedImageURLs = (defaults.array(forKey: "orderedImagePaths") as? [String] ?? []).map(URL.init(fileURLWithPath:))
+    }
+
+    private func pruneImageOrder() {
+        let urls = Set(images.map(\.url))
+        orderedImageURLs = orderedImageURLs.filter { urls.contains($0) }
+    }
+
     static func formatBytes(_ count: Int) -> String {
         let value = Double(count)
         return value >= 1_048_576 ? String(format: "%.1f MB", value / 1_048_576) : String(format: "%.0f KB", value / 1024)
@@ -445,20 +542,25 @@ struct ContentView: View {
     @State private var presetName = ""
     @State private var duplicatePresetName = ""
     @State private var showingOverwriteConfirm = false
-    private let sidebarWidth: CGFloat = 260
+    @State private var draggingItem: ImageItem?
     private let controlsWidth: CGFloat = 360
     private let previewMinWidth: CGFloat = 560
-    private let spacing: CGFloat = 12
-    private let panePadding: CGFloat = 16
+    private let spacing: CGFloat = AutomalitySpacing.sm
+    private let panePadding: CGFloat = AutomalitySpacing.sm
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-            Divider()
-            previewPane
-            Divider()
-            controls
+        VStack(spacing: AutomalitySpacing.sm) {
+            AutomalityProgressNav(steps: AppState.Stage.allCases.map(\.title), currentStep: Binding(
+                get: { state.stage.rawValue },
+                set: { if let stage = AppState.Stage(rawValue: $0) { state.advance(to: stage) } }
+            ))
+            .padding(.horizontal, panePadding)
+            .padding(.top, panePadding)
+
+            stageContent
         }
+        .frame(minWidth: 980, minHeight: 680)
+        .background(AutomalityColor.gray100)
         .sheet(isPresented: $isNamingPreset) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Save Preset").font(.headline)
@@ -471,6 +573,7 @@ struct ContentView: View {
                     Button("Save") { submitPresetName() }
                         .keyboardShortcut(.defaultAction)
                         .disabled(presetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .buttonStyle(.automalityPrimary)
                 }
             }
             .padding()
@@ -486,23 +589,137 @@ struct ContentView: View {
         }
     }
 
-    private var sidebar: some View {
+    @ViewBuilder
+    private var stageContent: some View {
+        switch state.stage {
+        case .selectImages:
+            selectImagesStage
+        case .watermark:
+            watermarkStage
+        case .orderRename:
+            orderRenameStage
+        case .export:
+            exportStage
+        }
+    }
+
+    private var selectImagesStage: some View {
         VStack(alignment: .leading, spacing: spacing) {
-            HStack(spacing: 8) {
+            imagePickerSection
+            imageList
+            HStack {
+                Spacer()
+                Button("Next") { state.advance(to: .watermark) }
+                    .buttonStyle(.automalityPrimary)
+                    .disabled(state.images.isEmpty)
+            }
+        }
+        .padding(panePadding)
+    }
+
+    private var watermarkStage: some View {
+        HStack(spacing: 0) {
+            previewPane
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: spacing) {
+                    savedPresetLibrary
+                    watermarkSourceSection
+                    sizeOpacitySection
+                    layoutModeSection
+                    positionPaddingSection
+                    HStack {
+                        Spacer()
+                        Button("Next") { state.advance(to: .orderRename) }
+                            .buttonStyle(.automalityPrimary)
+                            .disabled(state.watermarkURL == nil)
+                    }
+                }
+                .padding(panePadding)
+            }
+            .frame(width: controlsWidth)
+        }
+    }
+
+    private var orderRenameStage: some View {
+        VStack(alignment: .leading, spacing: spacing) {
+            HStack {
+                Text(state.orderSummary)
+                    .font(.headline)
+                Spacer()
+                Button("Clear order") { state.clearOrder() }
+                    .buttonStyle(.automalitySecondary)
+                    .disabled(state.numberedCount == 0)
+                Button("Number in current order") { state.numberInCurrentOrder(state.orderedItems) }
+                    .buttonStyle(.automalityPrimary)
+                    .disabled(state.images.isEmpty)
+                Button("Next") { state.advance(to: .export) }
+                    .buttonStyle(.automalityPrimary)
+                    .disabled(state.images.isEmpty || state.watermarkURL == nil)
+            }
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: AutomalitySpacing.sm)], spacing: AutomalitySpacing.sm) {
+                    ForEach(state.orderedItems) { item in
+                        orderTile(item)
+                    }
+                }
+                .padding(.trailing, AutomalitySpacing.hardShadow)
+                .padding(.bottom, AutomalitySpacing.hardShadow)
+            }
+        }
+        .padding(panePadding)
+    }
+
+    private var exportStage: some View {
+        HStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: spacing) {
+                    ControlSection("Export summary") {
+                        Text(state.orderSummary)
+                        ForEach(state.orderedItems.prefix(8)) { item in
+                            HStack {
+                                Text(state.orderNumber(for: item).map { "\($0)." } ?? "-")
+                                    .frame(width: 32, alignment: .trailing)
+                                    .foregroundStyle(.secondary)
+                                Text(item.filename).lineLimit(1)
+                            }
+                        }
+                        if state.images.count > 8 {
+                            Text("+ \(state.images.count - 8) more").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    platformPresets
+                    exportSection
+                }
+                .padding(panePadding)
+            }
+            .frame(width: controlsWidth)
+            Divider()
+            previewPane
+        }
+    }
+
+    private var imagePickerSection: some View {
+        ControlSection("Select Images") {
+            HStack(spacing: AutomalitySpacing.sm) {
                 Button("Choose Folder...") { state.chooseFolder() }
+                    .buttonStyle(.automalityPrimary)
                 Button("Choose Images...") { state.chooseImages() }
+                    .buttonStyle(.automalityPrimary)
             }
             if let folder = state.folderURL {
                 Text(folder.lastPathComponent).font(.caption).foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private var imageList: some View {
+        ControlSection("Images") {
             if state.images.isEmpty {
-                Spacer()
                 Text("Choose a folder or select individual images to get started.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                Spacer()
+                    .frame(maxWidth: .infinity, minHeight: 240)
             } else {
                 List(state.images, selection: Binding(get: { state.selected }, set: { if let item = $0 { state.select(item) } })) { item in
                     HStack(spacing: 8) {
@@ -511,10 +728,9 @@ struct ContentView: View {
                     }
                     .tag(item as ImageItem?)
                 }
+                .frame(minHeight: 420)
             }
         }
-        .padding(panePadding)
-        .frame(width: sidebarWidth)
     }
 
     private var previewPane: some View {
@@ -530,20 +746,20 @@ struct ContentView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .overlay(Rectangle().stroke(Color.secondary.opacity(0.12)))
+            .overlay(Rectangle().stroke(AutomalityColor.ink.opacity(0.2)))
             .clipped()
             ScrollView(.horizontal) {
                 HStack(spacing: 8) {
                     ForEach(state.images) { item in
                         Thumb(url: item.url, size: 60)
-                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(state.selected == item ? Color.accentColor : Color.secondary.opacity(0.18), lineWidth: state.selected == item ? 2 : 1))
+                            .overlay(Rectangle().stroke(state.selected == item ? AutomalityColor.teal : AutomalityColor.gray300, lineWidth: state.selected == item ? 2 : 1))
                             .onTapGesture { state.select(item) }
                     }
                 }
                 .padding(.horizontal, panePadding)
             }
             .frame(height: 76)
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(AutomalityColor.offWhite)
             Text(state.status)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -555,128 +771,117 @@ struct ContentView: View {
         .frame(minWidth: previewMinWidth)
     }
 
-    private var controls: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: spacing) {
-                presetLibrary
-                ControlSection("Watermark source") {
-                    HStack(spacing: 12) {
-                        Button("Choose Watermark...") { state.chooseWatermark() }
-                        Spacer()
-                        if let url = state.watermarkURL { Thumb(url: url, size: 56) }
-                    }
-                }
-
-                ControlSection("Size & Opacity") {
-                    presetSection("Size", presets: WatermarkSizePreset.allCases, selected: state.sizePreset?.id, valueText: state.sizePreset?.label ?? "Custom") { preset in
-                        state.sizePreset = preset
-                        state.sizeFraction = preset.value
-                    }
-                    Slider(value: Binding(get: { state.sizeFraction }, set: { state.sizePreset = nil; state.sizeFraction = $0 }), in: 0.05...1.0)
-                    Text("\(Int(state.sizeFraction * 100))%").font(.caption).foregroundStyle(.secondary)
-                    Divider()
-                    presetSection("Opacity", presets: OpacityPreset.allCases, selected: state.opacityPreset?.id, valueText: state.opacityPreset?.label ?? "Custom") { preset in
-                        state.opacityPreset = preset
-                        state.opacity = preset.value
-                    }
-                    Slider(value: Binding(get: { state.opacity }, set: { state.opacityPreset = nil; state.opacity = $0 }), in: 0...1)
-                    Text("\(Int(state.opacity * 100))%").font(.caption).foregroundStyle(.secondary)
-                }
-
-                ControlSection("Layout mode") {
-                    Picker("Layout mode", selection: $state.layoutMode) {
-                        ForEach(LayoutMode.allCases) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    if state.layoutMode == .tiled { tiledControls }
-                }
-
-                ControlSection("Position & Padding") {
-                    if state.layoutMode == .single { singleControls }
-                    Slider(value: $state.padding, in: 0...100) { Text("Padding") }
-                    Text("Padding \(Int(state.padding)) px").font(.caption).foregroundStyle(.secondary)
-                    if state.layoutMode == .tiled {
-                        Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-
-                ControlSection("Export") {
-                    Picker("Export format", selection: $state.exportFormat) {
-                        ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    Toggle("Optimize for Web", isOn: Binding(get: { state.optimizeForWeb }, set: { state.setOptimizeForWeb($0) }))
-                        .toggleStyle(.button)
-                        .buttonStyle(.bordered)
-                        .tint(state.optimizeForWeb ? .accentColor : .secondary)
-                    HStack(spacing: 8) {
-                        TextField("Width", value: $state.outputWidth, format: .number)
-                        TextField("Height", value: $state.outputHeight, format: .number)
-                    }
-                    Text(state.outputWidth > 0 && state.outputHeight > 0 ? "Output size \(state.outputWidth)x\(state.outputHeight) px" : "Output size original").font(.caption).foregroundStyle(.secondary)
-                    HStack(spacing: 8) {
-                        TextField("Prefix", text: Binding(get: { state.outputPrefix }, set: { state.outputPrefix = AppState.sanitizedFilenameAffix($0) }))
-                        TextField("Suffix", text: Binding(get: { state.outputSuffix }, set: { state.outputSuffix = AppState.sanitizedFilenameAffix($0) }))
-                    }
-                    if state.exportFormat == .jpeg {
-                        Slider(value: $state.jpegQuality, in: 0...1)
-                        Text("JPEG quality \(Int(state.jpegQuality * 100))%").font(.caption).foregroundStyle(.secondary)
-                    }
-                    Text(state.exportFormat.hint).font(.caption).foregroundStyle(.secondary)
-                    HStack(spacing: 8) {
-                        Text("Max file size")
-                        TextField("Off", value: $state.maxFileSizeKB, format: .number)
-                            .frame(width: 70)
-                        Text("KB").foregroundStyle(.secondary)
-                    }
-                    if state.maxFileSizeBlocksExport {
-                        Text("Max file size requires JPEG — switch format or clear this limit.")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    } else if state.maxFileSizeKB > 0 {
-                        Text("Quality (and, if needed, dimensions) will be reduced to fit ~\(state.maxFileSizeKB) KB per image.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    if !state.estimatedSize.isEmpty {
-                        Text("Estimated output size \(state.estimatedSize)").font(.caption)
-                    }
-                    if !state.estimatedFilename.isEmpty {
-                        Text("-> \(state.estimatedFilename)").font(.caption).foregroundStyle(.secondary)
-                    }
-                    Button("Watermark All Images") { state.exportAll() }
-                        .disabled(!state.canExport)
-                    if let hint = state.exportHint { Text(hint).font(.caption).foregroundStyle(.secondary) }
-                    if state.isExporting { ProgressView(value: state.progress) }
-                }
+    private var watermarkSourceSection: some View {
+        ControlSection("Watermark source") {
+            HStack(spacing: 12) {
+                Button("Choose Watermark...") { state.chooseWatermark() }
+                    .buttonStyle(.automalityPrimary)
+                Spacer()
+                if let url = state.watermarkURL { Thumb(url: url, size: 56) }
             }
-            .padding(panePadding)
         }
-        .frame(width: controlsWidth)
     }
 
-    private var presetLibrary: some View {
+    private var sizeOpacitySection: some View {
+        ControlSection("Size & Opacity") {
+            presetSection("Size", presets: WatermarkSizePreset.allCases, selected: state.sizePreset?.id, valueText: state.sizePreset?.label ?? "Custom") { preset in
+                state.sizePreset = preset
+                state.sizeFraction = preset.value
+            }
+            Slider(value: Binding(get: { state.sizeFraction }, set: { state.sizePreset = nil; state.sizeFraction = $0 }), in: 0.05...1.0)
+            Text("\(Int(state.sizeFraction * 100))%").font(.caption).foregroundStyle(.secondary)
+            Divider()
+            presetSection("Opacity", presets: OpacityPreset.allCases, selected: state.opacityPreset?.id, valueText: state.opacityPreset?.label ?? "Custom") { preset in
+                state.opacityPreset = preset
+                state.opacity = preset.value
+            }
+            Slider(value: Binding(get: { state.opacity }, set: { state.opacityPreset = nil; state.opacity = $0 }), in: 0...1)
+            Text("\(Int(state.opacity * 100))%").font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private var layoutModeSection: some View {
+        ControlSection("Layout mode") {
+            Picker("Layout mode", selection: $state.layoutMode) {
+                ForEach(LayoutMode.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            if state.layoutMode == .tiled { tiledControls }
+        }
+    }
+
+    private var positionPaddingSection: some View {
+        ControlSection("Position & Padding") {
+            if state.layoutMode == .single { singleControls }
+            Slider(value: $state.padding, in: 0...100) { Text("Padding") }
+            Text("Padding \(Int(state.padding)) px").font(.caption).foregroundStyle(.secondary)
+            if state.layoutMode == .tiled {
+                Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var exportSection: some View {
+        ControlSection("Export") {
+            Picker("Export format", selection: $state.exportFormat) {
+                ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            Toggle("Optimize for Web", isOn: Binding(get: { state.optimizeForWeb }, set: { state.setOptimizeForWeb($0) }))
+                .toggleStyle(.button)
+                .buttonStyle(.bordered)
+                .tint(state.optimizeForWeb ? .accentColor : .secondary)
+            HStack(spacing: 8) {
+                TextField("Width", value: $state.outputWidth, format: .number)
+                TextField("Height", value: $state.outputHeight, format: .number)
+            }
+            Text(state.outputWidth > 0 && state.outputHeight > 0 ? "Output size \(state.outputWidth)x\(state.outputHeight) px" : "Output size original").font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                TextField("Prefix", text: Binding(get: { state.outputPrefix }, set: { state.outputPrefix = AppState.sanitizedFilenameAffix($0) }))
+                TextField("Suffix", text: Binding(get: { state.outputSuffix }, set: { state.outputSuffix = AppState.sanitizedFilenameAffix($0) }))
+            }
+            if state.exportFormat == .jpeg {
+                Slider(value: $state.jpegQuality, in: 0...1)
+                Text("JPEG quality \(Int(state.jpegQuality * 100))%").font(.caption).foregroundStyle(.secondary)
+            }
+            Text(state.exportFormat.hint).font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Text("Max file size")
+                TextField("Off", value: $state.maxFileSizeKB, format: .number)
+                    .frame(width: 70)
+                Text("KB").foregroundStyle(.secondary)
+            }
+            if state.maxFileSizeBlocksExport {
+                Text("Max file size requires JPEG — switch format or clear this limit.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            } else if state.maxFileSizeKB > 0 {
+                Text("Quality (and, if needed, dimensions) will be reduced to fit ~\(state.maxFileSizeKB) KB per image.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if !state.estimatedSize.isEmpty {
+                Text("Estimated output size \(state.estimatedSize)").font(.caption)
+            }
+            if !state.estimatedFilename.isEmpty {
+                Text("-> \(state.estimatedFilename)").font(.caption).foregroundStyle(.secondary)
+            }
+            Button("Watermark All Images") { state.exportAll() }
+                .buttonStyle(.automalityPrimary)
+                .disabled(!state.canExport)
+            if let hint = state.exportHint { Text(hint).font(.caption).foregroundStyle(.secondary) }
+            if state.isExporting { ProgressView(value: state.progress) }
+        }
+    }
+
+    private var savedPresetLibrary: some View {
         ControlSection("Presets") {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Platform presets").font(.caption).foregroundStyle(.secondary)
-                ForEach(PlatformExportPreset.all) { preset in
-                    Button {
-                        state.applyPlatformPreset(preset)
-                    } label: {
-                        HStack {
-                            Text(preset.name)
-                            Spacer()
-                            Text(preset.sizeLabel).foregroundStyle(.secondary)
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .help(preset.note)
-                }
-                Divider()
                 Button("Save current as preset...") {
                     presetName = ""
                     isNamingPreset = true
                 }
+                .buttonStyle(.automalityPrimary)
                 .disabled(!state.canSavePreset)
                 if state.presets.isEmpty {
                     Text("No saved presets.").font(.caption).foregroundStyle(.secondary)
@@ -702,6 +907,57 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    private var platformPresets: some View {
+        ControlSection("Platform presets") {
+            ForEach(PlatformExportPreset.all) { preset in
+                Button {
+                    state.applyPlatformPreset(preset)
+                } label: {
+                    HStack {
+                        Text(preset.name)
+                        Spacer()
+                        Text(preset.sizeLabel).foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .help(preset.note)
+            }
+        }
+    }
+
+    private func orderTile(_ item: ImageItem) -> some View {
+        let number = state.orderNumber(for: item)
+        return VStack(alignment: .leading, spacing: AutomalitySpacing.xs) {
+            ZStack(alignment: .topLeading) {
+                Thumb(url: item.url, size: 128)
+                    .opacity(number == nil ? 0.45 : 1)
+                if let number {
+                    Text("\(number)")
+                        .font(.headline)
+                        .foregroundStyle(AutomalityColor.offWhite)
+                        .padding(.horizontal, AutomalitySpacing.xs)
+                        .padding(.vertical, 4)
+                        .background(AutomalityColor.teal)
+                        .overlay(Rectangle().stroke(AutomalityColor.ink, lineWidth: 2))
+                        .padding(AutomalitySpacing.xs)
+                }
+            }
+            Text(item.filename)
+                .font(.caption)
+                .lineLimit(2)
+                .frame(width: 128, alignment: .leading)
+        }
+        .padding(AutomalitySpacing.xs)
+        .background(AutomalityColor.offWhite)
+        .overlay(Rectangle().stroke(number == nil ? AutomalityColor.gray300 : AutomalityColor.ink, lineWidth: 2))
+        .onTapGesture { state.toggleOrder(for: item) }
+        .onDrag {
+            draggingItem = item
+            return NSItemProvider(object: item.url.path as NSString)
+        }
+        .onDrop(of: [UTType.text], delegate: ImageOrderDropDelegate(item: item, draggingItem: $draggingItem, state: state))
     }
 
     private func submitPresetName() {
@@ -781,16 +1037,28 @@ struct ControlSection<Content: View>: View {
     }
 
     var body: some View {
-        GroupBox {
+        AutomalitySectionBox(title) {
             VStack(alignment: .leading, spacing: 12) {
                 content
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-        } label: {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.semibold)
         }
+    }
+}
+
+struct ImageOrderDropDelegate: DropDelegate {
+    let item: ImageItem
+    @Binding var draggingItem: ImageItem?
+    let state: AppState
+
+    func dropEntered(info: DropInfo) {
+        guard let draggingItem else { return }
+        state.moveOrder(from: draggingItem, to: item)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingItem = nil
+        return true
     }
 }
 
