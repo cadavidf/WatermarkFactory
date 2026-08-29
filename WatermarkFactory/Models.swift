@@ -63,6 +63,19 @@ enum Anchor: String, CaseIterable, Identifiable, Codable {
         case .bottomRight: "arrow.down.right"
         }
     }
+    var displayName: String {
+        switch self {
+        case .topLeft: "top-left"
+        case .top: "top"
+        case .topRight: "top-right"
+        case .left: "left"
+        case .center: "center"
+        case .right: "right"
+        case .bottomLeft: "bottom-left"
+        case .bottom: "bottom"
+        case .bottomRight: "bottom-right"
+        }
+    }
 }
 
 enum LayoutMode: String, CaseIterable, Identifiable, Codable {
@@ -82,6 +95,13 @@ enum RotationPattern: String, CaseIterable, Identifiable, Codable {
     case diagonal = "Diagonal (45deg)"
     case alternating = "Alternating rows (0deg/45deg)"
     case custom = "Custom angle"
+    var id: String { rawValue }
+}
+
+enum WatermarkTint: String, CaseIterable, Identifiable, Codable {
+    case original = "Original"
+    case light = "Light"
+    case dark = "Dark"
     var id: String { rawValue }
 }
 
@@ -134,8 +154,9 @@ struct WatermarkSettings: Codable {
     var outputPrefix: String
     var outputSuffix: String
     var maxFileSizeKB: Int
+    var watermarkTint: WatermarkTint
 
-    init(sizeFraction: Double, opacity: Double, anchor: Anchor, offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputWidth: Int = 0, outputHeight: Int = 0, outputPrefix: String, outputSuffix: String, maxFileSizeKB: Int = 0) {
+    init(sizeFraction: Double, opacity: Double, anchor: Anchor, offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputWidth: Int = 0, outputHeight: Int = 0, outputPrefix: String, outputSuffix: String, maxFileSizeKB: Int = 0, watermarkTint: WatermarkTint = .original) {
         self.sizeFraction = sizeFraction
         self.opacity = opacity
         self.anchor = anchor
@@ -154,10 +175,11 @@ struct WatermarkSettings: Codable {
         self.outputPrefix = outputPrefix
         self.outputSuffix = outputSuffix
         self.maxFileSizeKB = maxFileSizeKB
+        self.watermarkTint = watermarkTint
     }
 
     private enum CodingKeys: String, CodingKey {
-        case sizeFraction, opacity, anchor, offsetX, offsetY, layoutMode, padding, spacing, rotationPattern, customAngle, exportFormat, jpegQuality, optimizeForWeb, outputWidth, outputHeight, outputPrefix, outputSuffix, maxFileSizeKB
+        case sizeFraction, opacity, anchor, offsetX, offsetY, layoutMode, padding, spacing, rotationPattern, customAngle, exportFormat, jpegQuality, optimizeForWeb, outputWidth, outputHeight, outputPrefix, outputSuffix, maxFileSizeKB, watermarkTint
     }
 
     init(from decoder: Decoder) throws {
@@ -180,7 +202,18 @@ struct WatermarkSettings: Codable {
         outputPrefix = try container.decode(String.self, forKey: .outputPrefix)
         outputSuffix = try container.decode(String.self, forKey: .outputSuffix)
         maxFileSizeKB = try container.decodeIfPresent(Int.self, forKey: .maxFileSizeKB) ?? 0
+        watermarkTint = try container.decodeIfPresent(WatermarkTint.self, forKey: .watermarkTint) ?? .original
     }
+}
+
+struct SmartPlacementProposal {
+    var anchor: Anchor
+    var padding: Double
+    var offsetX: Double
+    var offsetY: Double
+    var tint: WatermarkTint
+    var note: String
+    var saliencyUnavailable: Bool
 }
 
 struct WatermarkPreset: Identifiable, Codable {

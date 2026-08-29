@@ -3,6 +3,11 @@ import CoreGraphics
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
+import Vision
+
+private extension CGRect {
+    var area: CGFloat { width * height }
+}
 
 enum ImageProcessorError: Error {
     case loadFailed
@@ -28,6 +33,77 @@ struct ImageProcessor {
     static func imageSize(for url: URL) -> CGSize? {
         guard let image = loadCGImage(url) else { return nil }
         return CGSize(width: image.width, height: image.height)
+    }
+
+    static func smartPlacementProposal(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings) -> SmartPlacementProposal? {
+        guard let source = loadCGImage(sourceURL), let watermark = loadCGImage(watermarkURL) else { return nil }
+        let sourceSize = CGSize(width: source.width, height: source.height)
+        let watermarkSize = CGSize(width: watermark.width, height: watermark.height)
+        let padding = safeMargin(for: sourceSize)
+        let saliency = saliencyRect(in: source).map { denormalized($0, in: sourceSize) }
+        let anchor = preferredAnchor(sourceSize: sourceSize, watermarkSize: watermarkSize, settings: settings, padding: padding, saliencyRect: saliency)
+        let offsetY = opticalYOffset(for: sourceSize, anchor: anchor)
+        var proposed = settings
+        proposed.anchor = anchor
+        proposed.padding = padding
+        proposed.offsetX = 0
+        proposed.offsetY = offsetY
+        let frame = watermarkFrame(sourceSize: sourceSize, watermarkSize: watermarkSize, settings: proposed)
+        let sourceLuminance = averageLuminance(in: source, rect: frame)
+        let watermarkLuminance = averageLuminance(in: watermark, rect: CGRect(x: 0, y: 0, width: watermark.width, height: watermark.height))
+        let tint = recommendedTint(sourceLuminance: sourceLuminance, watermarkLuminance: watermarkLuminance)
+        let tintText = tint == .original ? "keep original watermark" : "use \(tint.rawValue.lowercased()) tint"
+        let saliencyText = saliency == nil ? " Saliency could not be computed, so this uses margin and contrast only." : ""
+        return SmartPlacementProposal(
+            anchor: anchor,
+            padding: padding,
+            offsetX: 0,
+            offsetY: offsetY,
+            tint: tint,
+            note: "Move to \(anchor.displayName), set padding to \(Int(padding.rounded())) px, \(tintText).\(saliencyText)",
+            saliencyUnavailable: saliency == nil
+        )
+    }
+
+    static func safeMargin(for sourceSize: CGSize) -> Double {
+        Double(min(sourceSize.width, sourceSize.height) * 0.04)
+    }
+
+    static func opticalYOffset(for sourceSize: CGSize, anchor: Anchor) -> Double {
+        anchor == .center ? Double(sourceSize.height * 0.05) : 0
+    }
+
+    static func preferredAnchor(sourceSize: CGSize, watermarkSize: CGSize, settings: WatermarkSettings, padding: Double, saliencyRect: CGRect?) -> Anchor {
+        guard let saliencyRect else { return settings.anchor }
+        return Anchor.allCases.min { left, right in
+            let leftOverlap = overlapArea(for: left, saliencyRect: saliencyRect, sourceSize: sourceSize, watermarkSize: watermarkSize, settings: settings, padding: padding)
+            let rightOverlap = overlapArea(for: right, saliencyRect: saliencyRect, sourceSize: sourceSize, watermarkSize: watermarkSize, settings: settings, padding: padding)
+            if abs(leftOverlap - rightOverlap) < 0.0001 { return left == settings.anchor }
+            return leftOverlap < rightOverlap
+        } ?? settings.anchor
+    }
+
+    static func recommendedTint(sourceLuminance: Double, watermarkLuminance: Double) -> WatermarkTint {
+        if sourceLuminance < 0.5 { return .light }
+        return watermarkLuminance > 0.72 ? .dark : .original
+    }
+
+    static func averageLuminance(in image: CGImage, rect: CGRect) -> Double {
+        let bounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+        let sample = rect.intersection(bounds).integral
+        guard sample.width > 0, sample.height > 0,
+              let cropped = image.cropping(to: sample),
+              let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return 0.5 }
+        let width = cropped.width
+        let height = cropped.height
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        guard let context = CGContext(data: &bytes, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return 0.5 }
+        context.draw(cropped, in: CGRect(x: 0, y: 0, width: width, height: height))
+        var total = 0.0
+        for index in stride(from: 0, to: bytes.count, by: 4) {
+            total += (0.2126 * Double(bytes[index]) + 0.7152 * Double(bytes[index + 1]) + 0.0722 * Double(bytes[index + 2])) / 255
+        }
+        return total / Double(width * height)
     }
 
     static func watermarkFrame(sourceSize: CGSize, watermarkSize: CGSize, settings: WatermarkSettings) -> CGRect {
@@ -124,6 +200,7 @@ struct ImageProcessor {
         context.interpolationQuality = .high
         context.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
         context.setAlpha(settings.opacity)
+        let watermark = try tintedWatermark(watermark, tint: settings.watermarkTint)
 
         let targetLongestSide = min(CGFloat(width), CGFloat(height)) * settings.sizeFraction
         let scale = targetLongestSide / max(CGFloat(watermark.width), CGFloat(watermark.height))
@@ -155,6 +232,45 @@ struct ImageProcessor {
         case .topLeft, .top, .topRight: y = canvas.height - size.height - padding
         }
         return CGRect(x: x + offsetX, y: y - offsetY, width: size.width, height: size.height)
+    }
+
+    private static func saliencyRect(in image: CGImage) -> CGRect? {
+        let request = VNGenerateAttentionBasedSaliencyImageRequest()
+        let handler = VNImageRequestHandler(cgImage: image)
+        do {
+            try handler.perform([request])
+            return request.results?.first?.salientObjects?.first?.boundingBox
+        } catch {
+            return nil
+        }
+    }
+
+    private static func denormalized(_ rect: CGRect, in size: CGSize) -> CGRect {
+        CGRect(x: rect.minX * size.width, y: rect.minY * size.height, width: rect.width * size.width, height: rect.height * size.height)
+    }
+
+    private static func overlapArea(for anchor: Anchor, saliencyRect: CGRect, sourceSize: CGSize, watermarkSize: CGSize, settings: WatermarkSettings, padding: Double) -> CGFloat {
+        var proposed = settings
+        proposed.anchor = anchor
+        proposed.padding = padding
+        proposed.offsetX = 0
+        proposed.offsetY = opticalYOffset(for: sourceSize, anchor: anchor)
+        return watermarkFrame(sourceSize: sourceSize, watermarkSize: watermarkSize, settings: proposed).intersection(saliencyRect).area
+    }
+
+    private static func tintedWatermark(_ image: CGImage, tint: WatermarkTint) throws -> CGImage {
+        guard tint != .original else { return image }
+        let color = tint == .light ? NSColor(calibratedWhite: 0.96, alpha: 1).cgColor : NSColor(calibratedWhite: 0.08, alpha: 1).cgColor
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            throw ImageProcessorError.contextFailed
+        }
+        let rect = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+        context.clip(to: rect, mask: image)
+        context.setFillColor(color)
+        context.fill(rect)
+        guard let tinted = context.makeImage() else { throw ImageProcessorError.contextFailed }
+        return tinted
     }
 
     private static func drawTiles(context: CGContext, watermark: CGImage, canvas: CGSize, size: CGSize, settings: WatermarkSettings) {

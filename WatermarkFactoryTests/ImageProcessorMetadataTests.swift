@@ -132,6 +132,41 @@ final class ImageProcessorMetadataTests: XCTestCase {
         XCTAssertEqual(ImageProcessor.outputFilename(for: source, settings: settings, numberedCount: 12), "wm_beach.jpg")
     }
 
+    func testSmartPlacementMarginAndOpticalOffset() {
+        XCTAssertEqual(ImageProcessor.safeMargin(for: CGSize(width: 1000, height: 800)), 32)
+        XCTAssertEqual(ImageProcessor.opticalYOffset(for: CGSize(width: 1000, height: 800), anchor: .center), 40)
+        XCTAssertEqual(ImageProcessor.opticalYOffset(for: CGSize(width: 1000, height: 800), anchor: .topRight), 0)
+    }
+
+    func testSmartPlacementTintRecommendation() {
+        XCTAssertEqual(ImageProcessor.recommendedTint(sourceLuminance: 0.2, watermarkLuminance: 0.2), .light)
+        XCTAssertEqual(ImageProcessor.recommendedTint(sourceLuminance: 0.8, watermarkLuminance: 0.9), .dark)
+        XCTAssertEqual(ImageProcessor.recommendedTint(sourceLuminance: 0.8, watermarkLuminance: 0.2), .original)
+    }
+
+    func testSmartPlacementSamplesAverageLuminance() throws {
+        let dark = try makeImage(width: 4, height: 4, color: CGColor(red: 0, green: 0, blue: 0, alpha: 1))
+        let light = try makeImage(width: 4, height: 4, color: CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+
+        XCTAssertLessThan(ImageProcessor.averageLuminance(in: dark, rect: CGRect(x: 0, y: 0, width: 4, height: 4)), 0.01)
+        XCTAssertGreaterThan(ImageProcessor.averageLuminance(in: light, rect: CGRect(x: 0, y: 0, width: 4, height: 4)), 0.99)
+    }
+
+    func testSmartPlacementPicksLeastSalientAnchorAndKeepsCurrentTie() {
+        let settings = WatermarkSettings(sizeFraction: 0.2, opacity: 1, anchor: .topRight, offsetX: 0, offsetY: 0, layoutMode: .single, padding: 0, spacing: 0, rotationPattern: .none, customAngle: 0, exportFormat: .jpeg, jpegQuality: 0.9, outputPrefix: "", outputSuffix: "")
+        let sourceSize = CGSize(width: 1000, height: 1000)
+        let watermarkSize = CGSize(width: 100, height: 100)
+
+        XCTAssertEqual(
+            ImageProcessor.preferredAnchor(sourceSize: sourceSize, watermarkSize: watermarkSize, settings: settings, padding: 0, saliencyRect: CGRect(x: 800, y: 800, width: 200, height: 200)),
+            .topLeft
+        )
+        XCTAssertEqual(
+            ImageProcessor.preferredAnchor(sourceSize: sourceSize, watermarkSize: watermarkSize, settings: settings, padding: 0, saliencyRect: nil),
+            .topRight
+        )
+    }
+
     private func export(_ source: URL, to output: URL, format: ExportFormat) throws {
         let watermark = tempDir.appendingPathComponent("watermark.png")
         try writeImage(watermark, type: .png)
@@ -150,11 +185,15 @@ final class ImageProcessorMetadataTests: XCTestCase {
     }
 
     private func makeImage(width: Int, height: Int) throws -> CGImage {
+        try makeImage(width: width, height: height, color: CGColor(red: 1, green: 0, blue: 0, alpha: 1))
+    }
+
+    private func makeImage(width: Int, height: Int, color: CGColor) throws -> CGImage {
         guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
               let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
             throw ImageProcessorError.contextFailed
         }
-        context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
+        context.setFillColor(color)
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         guard let image = context.makeImage() else { throw ImageProcessorError.contextFailed }
         return image

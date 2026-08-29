@@ -54,6 +54,7 @@ final class AppState: ObservableObject {
     @Published var outputPrefix = "" { didSet { saveSettings(); updateEstimate() } }
     @Published var outputSuffix = "" { didSet { saveSettings(); updateEstimate() } }
     @Published var maxFileSizeKB = 0 { didSet { saveSettings(); updateEstimate() } }
+    @Published var watermarkTint: WatermarkTint = .original { didSet { saveSettings(); updateEstimate() } }
     @Published var previewImage: NSImage?
     @Published var sourceImageSize: CGSize?
     @Published var watermarkImageSize: CGSize?
@@ -62,6 +63,8 @@ final class AppState: ObservableObject {
     @Published var status = "Choose a folder and watermark to begin."
     @Published var progress = 0.0
     @Published var isExporting = false
+    @Published var isSuggestingPlacement = false
+    @Published var smartPlacementProposal: SmartPlacementProposal?
     @Published var presets: [WatermarkPreset] = []
     @Published var orderedImageURLs: [URL] = [] { didSet { saveImageOrder() } }
 
@@ -101,9 +104,10 @@ final class AppState: ObservableObject {
         return nil
     }
     var settings: WatermarkSettings {
-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, optimizeForWeb: optimizeForWeb, outputWidth: outputWidth, outputHeight: outputHeight, outputPrefix: outputPrefix, outputSuffix: outputSuffix, maxFileSizeKB: maxFileSizeKB)
+        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, optimizeForWeb: optimizeForWeb, outputWidth: outputWidth, outputHeight: outputHeight, outputPrefix: outputPrefix, outputSuffix: outputSuffix, maxFileSizeKB: maxFileSizeKB, watermarkTint: watermarkTint)
     }
     var canSavePreset: Bool { watermarkURL != nil }
+    var canSuggestPlacement: Bool { selected != nil && watermarkURL != nil && !isSuggestingPlacement }
 
     func chooseFolder() {
         let panel = NSOpenPanel()
@@ -138,6 +142,7 @@ final class AppState: ObservableObject {
 
     func select(_ item: ImageItem) {
         selected = item
+        smartPlacementProposal = nil
         updateEstimate()
     }
 
@@ -332,6 +337,35 @@ final class AppState: ObservableObject {
         status = "Applied \(preset.name) export preset."
     }
 
+    func suggestPlacement() {
+        guard let source = selected?.url, let watermark = watermarkURL else { return }
+        isSuggestingPlacement = true
+        let settings = settings
+        Task.detached {
+            let proposal = ImageProcessor.smartPlacementProposal(sourceURL: source, watermarkURL: watermark, settings: settings)
+            await MainActor.run {
+                self.smartPlacementProposal = proposal
+                self.isSuggestingPlacement = false
+                if proposal == nil { self.status = "Could not analyze this image for placement." }
+            }
+        }
+    }
+
+    func applySmartPlacement() {
+        guard let proposal = smartPlacementProposal else { return }
+        anchor = proposal.anchor
+        padding = proposal.padding
+        offsetX = proposal.offsetX
+        offsetY = proposal.offsetY
+        watermarkTint = proposal.tint
+        smartPlacementProposal = nil
+        status = "Applied suggested placement."
+    }
+
+    func dismissSmartPlacement() {
+        smartPlacementProposal = nil
+    }
+
     private func setFolder(_ url: URL) {
         folderURL = url
         saveBookmark(url, key: "folderBookmark")
@@ -379,6 +413,7 @@ final class AppState: ObservableObject {
         outputPrefix = Self.sanitizedFilenameAffix(settings.outputPrefix)
         outputSuffix = Self.sanitizedFilenameAffix(settings.outputSuffix)
         maxFileSizeKB = settings.maxFileSizeKB
+        watermarkTint = settings.watermarkTint
         syncPresetSelections()
         updateEstimate(delay: 0)
     }
@@ -426,6 +461,7 @@ final class AppState: ObservableObject {
         defaults.set(outputPrefix, forKey: "outputPrefix")
         defaults.set(outputSuffix, forKey: "outputSuffix")
         defaults.set(maxFileSizeKB, forKey: "maxFileSizeKB")
+        defaults.set(watermarkTint.rawValue, forKey: "watermarkTint")
     }
 
     private func restore() {
@@ -449,6 +485,7 @@ final class AppState: ObservableObject {
         outputPrefix = Self.sanitizedFilenameAffix(defaults.string(forKey: "outputPrefix") ?? "")
         outputSuffix = Self.sanitizedFilenameAffix(defaults.string(forKey: "outputSuffix") ?? "")
         maxFileSizeKB = defaults.object(forKey: "maxFileSizeKB") == nil ? 0 : defaults.integer(forKey: "maxFileSizeKB")
+        watermarkTint = WatermarkTint(rawValue: defaults.string(forKey: "watermarkTint") ?? "") ?? .original
         syncPresetSelections()
         folderURL = restoreBookmark("folderBookmark")
         watermarkURL = restoreBookmark("watermarkBookmark")
@@ -642,6 +679,7 @@ struct ContentView: View {
                     sizeOpacitySection
                     layoutModeSection
                     positionPaddingSection
+                    smartPlacementCard
                     orderRenameSection
                     platformPresets
                     exportSection
@@ -677,6 +715,7 @@ struct ContentView: View {
                     sizeOpacitySection
                     layoutModeSection
                     positionPaddingSection
+                    smartPlacementCard
                     HStack {
                         Spacer()
                         Button("Next") { state.advance(to: .orderRename) }
@@ -807,6 +846,22 @@ struct ContentView: View {
                 Spacer()
                 if let url = state.watermarkURL { Thumb(url: url, size: 56) }
             }
+            Picker("Tint", selection: $state.watermarkTint) {
+                ForEach(WatermarkTint.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            Button {
+                state.suggestPlacement()
+            } label: {
+                if state.isSuggestingPlacement {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Text("Suggest Placement")
+                }
+            }
+            .buttonStyle(.automalitySecondary)
+            .disabled(!state.canSuggestPlacement)
         }
     }
 
@@ -950,6 +1005,28 @@ struct ContentView: View {
                 }
                 .buttonStyle(.automalitySecondary)
                 .help(preset.note)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var smartPlacementCard: some View {
+        if let proposal = state.smartPlacementProposal {
+            ControlSection("Suggested Placement") {
+                Text(proposal.note)
+                    .font(.caption)
+                    .foregroundStyle(AutomalityColor.inkMuted)
+                if proposal.saliencyUnavailable {
+                    Text("Saliency was unavailable for this image.")
+                        .font(.caption)
+                        .foregroundStyle(AutomalityColor.orangeDeep)
+                }
+                HStack {
+                    Button("Dismiss") { state.dismissSmartPlacement() }
+                        .buttonStyle(.automalitySecondary)
+                    Button("Apply") { state.applySmartPlacement() }
+                        .buttonStyle(.automalityPrimary)
+                }
             }
         }
     }
@@ -1192,11 +1269,35 @@ struct WatermarkPreview: View {
                                 }
                         )
                 }
+                if let rect = displayedProposalRect(in: proxy.size) {
+                    Rectangle()
+                        .fill(AutomalityColor.teal.opacity(0.08))
+                        .overlay(
+                            Rectangle()
+                                .stroke(AutomalityColor.orangeDeep, style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                        )
+                        .frame(width: rect.width, height: rect.height)
+                        .position(x: rect.midX, y: rect.midY)
+                }
             }
         }
     }
 
     private func displayedWatermarkRect(in size: CGSize) -> CGRect? {
+        displayedWatermarkRect(in: size, settings: state.settings)
+    }
+
+    private func displayedProposalRect(in size: CGSize) -> CGRect? {
+        guard let proposal = state.smartPlacementProposal else { return nil }
+        var settings = state.settings
+        settings.anchor = proposal.anchor
+        settings.padding = proposal.padding
+        settings.offsetX = proposal.offsetX
+        settings.offsetY = proposal.offsetY
+        return displayedWatermarkRect(in: size, settings: settings)
+    }
+
+    private func displayedWatermarkRect(in size: CGSize, settings: WatermarkSettings) -> CGRect? {
         guard state.layoutMode == .single,
               let sourceSize = state.sourceImageSize,
               let watermarkSize = state.watermarkImageSize else { return nil }
@@ -1204,7 +1305,7 @@ struct WatermarkPreview: View {
         guard scale > 0 else { return nil }
         let imageSize = CGSize(width: sourceSize.width * scale, height: sourceSize.height * scale)
         let origin = CGPoint(x: (size.width - imageSize.width) / 2, y: (size.height - imageSize.height) / 2)
-        let frame = ImageProcessor.watermarkFrame(sourceSize: sourceSize, watermarkSize: watermarkSize, settings: state.settings)
+        let frame = ImageProcessor.watermarkFrame(sourceSize: sourceSize, watermarkSize: watermarkSize, settings: settings)
         return CGRect(
             x: origin.x + frame.minX * scale,
             y: origin.y + (sourceSize.height - frame.maxY) * scale,
