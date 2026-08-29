@@ -942,7 +942,7 @@ struct ContentView: View {
             .labelsHidden()
             Toggle("Optimize for Web", isOn: Binding(get: { state.optimizeForWeb }, set: { state.setOptimizeForWeb($0) }))
                 .toggleStyle(.button)
-                .buttonStyle(AutomalityChipStyle(isSelected: state.optimizeForWeb))
+                .buttonStyle(.automalityChip(isSelected: state.optimizeForWeb))
             HStack(spacing: 8) {
                 TextField("Width", value: $state.outputWidth, format: .number)
                 TextField("Height", value: $state.outputHeight, format: .number)
@@ -1153,7 +1153,7 @@ struct ContentView: View {
                     Button { state.anchor = anchor } label: {
                         Image(systemName: anchor.symbol).frame(width: 32, height: 30)
                     }
-                    .buttonStyle(AutomalityChipStyle(isSelected: state.anchor == anchor))
+                    .buttonStyle(.automalityChip(isSelected: state.anchor == anchor))
                 }
             }
             HStack(spacing: 8) {
@@ -1186,7 +1186,7 @@ struct ContentView: View {
             FlowLayout {
                 ForEach(presets) { preset in
                     Button(label(for: preset)) { action(preset) }
-                        .buttonStyle(AutomalityChipStyle(isSelected: selected == preset.id))
+                        .buttonStyle(.automalityChip(isSelected: selected == preset.id))
                 }
             }
         }
@@ -1199,22 +1199,6 @@ struct ContentView: View {
     }
 }
 
-struct AutomalityChipStyle: ButtonStyle {
-    let isSelected: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(isSelected ? AutomalityColor.offWhite : AutomalityColor.ink)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .frame(minHeight: 30)
-            .background(isSelected ? AutomalityColor.teal : AutomalityColor.offWhite)
-            .overlay(Rectangle().stroke(isSelected ? AutomalityColor.ink : AutomalityColor.gray300, lineWidth: 2))
-            .opacity(configuration.isPressed ? 0.78 : 1)
-    }
-}
-
 struct AutomalityModeToggle: View {
     @Binding var selection: FlowMode
 
@@ -1222,7 +1206,7 @@ struct AutomalityModeToggle: View {
         HStack(spacing: 0) {
             ForEach(FlowMode.allCases) { mode in
                 Button(mode.rawValue) { selection = mode }
-                    .buttonStyle(AutomalityChipStyle(isSelected: selection == mode))
+                    .buttonStyle(.automalityChip(isSelected: selection == mode))
             }
         }
         .fixedSize()
