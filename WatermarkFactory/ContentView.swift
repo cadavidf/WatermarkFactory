@@ -953,11 +953,12 @@ struct ContentView: View {
 
     private var layoutModeSection: some View {
         ControlSection("Layout mode") {
-            Picker("Layout mode", selection: $state.layoutMode) {
-                ForEach(LayoutMode.allCases) { Text($0.rawValue).tag($0) }
+            HStack(spacing: 6) {
+                ForEach(LayoutMode.allCases) { mode in
+                    Button(mode.rawValue) { state.layoutMode = mode }
+                        .buttonStyle(.automalityChip(isSelected: state.layoutMode == mode))
+                }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
             if state.layoutMode == .tiled { tiledControls }
         }
     }
@@ -976,11 +977,12 @@ struct ContentView: View {
     private var exportSection: some View {
         ControlSection("Export") {
             Text("Export format").automalityLabelText().foregroundStyle(AutomalityColor.ink)
-            Picker("Export format", selection: $state.exportFormat) {
-                ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
+            FlowLayout {
+                ForEach(ExportFormat.allCases) { format in
+                    Button(format.rawValue) { state.exportFormat = format }
+                        .buttonStyle(.automalityChip(isSelected: state.exportFormat == format))
+                }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
             Toggle("Optimize for Web", isOn: Binding(get: { state.optimizeForWeb }, set: { state.setOptimizeForWeb($0) }))
                 .toggleStyle(.button)
                 .buttonStyle(.automalityChip(isSelected: state.optimizeForWeb))
