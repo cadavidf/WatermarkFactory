@@ -872,11 +872,19 @@ struct ContentView: View {
                 if let url = state.watermarkURL { Thumb(url: url, size: 56) }
             }
             Text("Tint").automalityLabelText().foregroundStyle(AutomalityColor.ink)
-            Picker("Tint", selection: $state.watermarkTint) {
-                ForEach(WatermarkTint.allCases) { Text($0.rawValue).tag($0) }
+            HStack(spacing: 6) {
+                ForEach(WatermarkTint.allCases) { tint in
+                    Button {
+                        state.watermarkTint = tint
+                    } label: {
+                        VStack(spacing: 3) {
+                            tintSwatch(tint)
+                            Text(tint.rawValue)
+                        }
+                    }
+                    .buttonStyle(.automalityChip(isSelected: state.watermarkTint == tint))
+                }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
             Button {
                 state.suggestPlacement()
             } label: {
@@ -890,6 +898,39 @@ struct ContentView: View {
             .buttonStyle(.automalitySecondary)
             .disabled(!state.canSuggestPlacement)
         }
+    }
+
+    /// A small swatch previewing what each tint option actually does, so the
+    /// choice reads visually instead of relying on the word alone — "Light"
+    /// looks light, "Dark" looks dark, "Original" shows a split (keeps
+    /// whatever the source watermark already is).
+    @ViewBuilder
+    private func tintSwatch(_ tint: WatermarkTint) -> some View {
+        ZStack {
+            switch tint {
+            case .original:
+                GeometryReader { proxy in
+                    Path { path in
+                        path.move(to: .zero)
+                        path.addLine(to: CGPoint(x: proxy.size.width, y: 0))
+                        path.addLine(to: .zero)
+                        path.closeSubpath()
+                    }.fill(AutomalityColor.offWhite)
+                    Path { path in
+                        path.move(to: CGPoint(x: proxy.size.width, y: 0))
+                        path.addLine(to: CGPoint(x: proxy.size.width, y: proxy.size.height))
+                        path.addLine(to: CGPoint(x: 0, y: proxy.size.height))
+                        path.closeSubpath()
+                    }.fill(AutomalityColor.ink)
+                }
+            case .light:
+                AutomalityColor.offWhite
+            case .dark:
+                AutomalityColor.ink
+            }
+        }
+        .frame(width: 16, height: 16)
+        .overlay(Rectangle().stroke(AutomalityColor.gray300, lineWidth: 1))
     }
 
     private var sizeOpacitySection: some View {
@@ -1179,14 +1220,26 @@ struct ContentView: View {
     private func presetSection<P: Identifiable>(_ title: String, presets: [P], selected: P.ID?, valueText: String, action: @escaping (P) -> Void) -> some View where P.ID == String {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(title).font(.subheadline).fontWeight(.semibold)
+                Text(title).font(.subheadline).fontWeight(.semibold).foregroundStyle(AutomalityColor.ink)
                 Spacer()
                 Text(valueText).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             }
-            FlowLayout {
+            // A single aligned row, ordered smallest-to-largest / least-to-most,
+            // each chip a short label with a small icon swatch that previews
+            // what that tier actually looks like (scaled size, or scaled
+            // opacity) — not just decoration.
+            HStack(spacing: 6) {
                 ForEach(presets) { preset in
-                    Button(label(for: preset)) { action(preset) }
-                        .buttonStyle(.automalityChip(isSelected: selected == preset.id))
+                    Button {
+                        action(preset)
+                    } label: {
+                        VStack(spacing: 3) {
+                            swatch(for: preset)
+                            Text(shortLabel(for: preset))
+                        }
+                    }
+                    .buttonStyle(.automalityChip(isSelected: selected == preset.id))
+                    .help(label(for: preset))
                 }
             }
         }
@@ -1196,6 +1249,32 @@ struct ContentView: View {
         if let preset = preset as? WatermarkSizePreset { return preset.label }
         if let preset = preset as? OpacityPreset { return preset.label }
         return ""
+    }
+
+    private func shortLabel<P>(for preset: P) -> String {
+        if let preset = preset as? WatermarkSizePreset { return preset.shortLabel }
+        if let preset = preset as? OpacityPreset { return preset.shortLabel }
+        return ""
+    }
+
+    @ViewBuilder
+    private func swatch<P>(for preset: P) -> some View {
+        if let preset = preset as? WatermarkSizePreset {
+            // Size: the swatch itself scales from small to large across tiers.
+            let side: CGFloat = 6 + CGFloat(WatermarkSizePreset.allCases.firstIndex(of: preset) ?? 0) * 2.5
+            Rectangle()
+                .fill(AutomalityColor.ink)
+                .frame(width: side, height: side)
+                .frame(width: 16, height: 16)
+        } else if let preset = preset as? OpacityPreset {
+            // Opacity: a fixed-size swatch whose fill opacity previews the tier.
+            Rectangle()
+                .fill(AutomalityColor.ink.opacity(preset.value))
+                .overlay(Rectangle().stroke(AutomalityColor.gray300, lineWidth: 1))
+                .frame(width: 16, height: 16)
+        } else {
+            Color.clear.frame(width: 16, height: 16)
+        }
     }
 }
 

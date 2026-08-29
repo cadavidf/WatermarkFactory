@@ -13,6 +13,18 @@ enum WatermarkSizePreset: String, CaseIterable, Identifiable, Codable {
         case .full: "Full (75%)"
         }
     }
+    /// Compact clothing-size-style abbreviation for the chip itself — the
+    /// full name+percentage still shows in the section's value readout and
+    /// as a tooltip, so the chip row can stay a single aligned line.
+    var shortLabel: String {
+        switch self {
+        case .tiny: "XS"
+        case .small: "S"
+        case .medium: "M"
+        case .large: "L"
+        case .full: "XL"
+        }
+    }
     var value: Double {
         switch self {
         case .tiny: 0.10
@@ -34,6 +46,17 @@ enum OpacityPreset: String, CaseIterable, Identifiable, Codable {
         case .balanced: "Balanced (50%)"
         case .bold: "Bold (75%)"
         case .solid: "Solid (100%)"
+        }
+    }
+    /// Compact percentage label for the chip itself — same "short, aligned,
+    /// in order" treatment as the size chips.
+    var shortLabel: String {
+        switch self {
+        case .ghost: "10%"
+        case .subtle: "25%"
+        case .balanced: "50%"
+        case .bold: "75%"
+        case .solid: "100%"
         }
     }
     var value: Double {
