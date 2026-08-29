@@ -696,3 +696,68 @@ a proposal — NOT applied automatically:
   additive: the mode toggle, the Skip/optional labeling, the Suggest
   Placement button, the manual tint picker).
 - Commit incrementally (Part A, then B, then C) rather than one giant commit.
+
+## Addendum: fix missing security-scoped access for previews (v3.3)
+
+**Bug (confirmed via code read)**: `WatermarkFactory` is sandboxed with the
+`com.apple.security.files.user-selected.read-write` entitlement, meaning every
+read of a user-selected file (outside the app's own container) requires an
+active `startAccessingSecurityScopedResource()` session for that URL at the
+moment of the read. Today, that call only happens in two places:
+`exportAll()` (around the batch export loop) and `reloadImages()` (only for
+the instant it lists a folder's contents). **Every other read path —
+`Thumb`'s thumbnail generation, `updateEstimate()`'s live preview/estimated-
+size generation, `ImageProcessor.imageSize`/`watermarkedImage` calls used for
+the preview canvas — has no active access session**, so those reads can
+silently fail (return nil), especially after an app relaunch when images are
+restored purely from security-scoped bookmarks with no fresh NSOpenPanel
+interaction. This is very likely the cause of a real bug report: after
+relaunch, the status bar correctly said "1 images restored" but the preview
+area showed "Select an image to preview" — the restored URL couldn't actually
+be read for the thumbnail.
+
+**The fix**: adopt the standard sandboxing pattern for URLs the app needs
+*repeated, ongoing* read access to (not just a one-shot batch operation like
+export) — start access once when a URL enters use and keep that access session
+open for as long as the app is using that URL, rather than start/stop around
+each individual read:
+- When a folder is chosen/restored (`setFolder`, `reloadImages`, `restore()`'s
+  folder-bookmark path) or individual images are chosen/restored
+  (`setImages`, `restore()`'s image-bookmark path), or a watermark is chosen/
+  restored (`setWatermark`, `restore()`'s watermark-bookmark path): call
+  `startAccessingSecurityScopedResource()` on each URL and **keep it active**
+  (don't stop immediately) — track which URLs currently have an open access
+  session (e.g. a `Set<URL>` or per-URL flag in `AppState`).
+- Stop access for a URL only when it's no longer in use: the folder/images are
+  replaced by a new selection, the watermark is replaced, or on app
+  termination (best-effort cleanup, e.g. via `NSApplication` termination
+  notification or simply relying on process exit — don't over-engineer
+  cleanup-on-quit, sandboxed access is automatically released when the process
+  exits regardless).
+- `exportAll()`'s existing start/stop-per-item pattern during the batch loop
+  is fine to leave as-is (it's already correct for that one-shot operation)
+  but should not conflict with or double-release access already held by the
+  "keep it open" mechanism above — guard against double-stopping the same URL
+  (e.g. don't call stop from both places for the same URL; check the tracked
+  open-access set before stopping, or simply rely on the long-lived session
+  covering export reads too and only stop what export itself explicitly
+  started).
+- This must work correctly across the exact repro sequence: launch app fresh
+  → images/watermark restore from bookmarks → preview renders correctly
+  without requiring the user to re-pick anything. Add this as a scenario in
+  README.md's "Design notes"/known-limitations section if a full automated
+  test of the actual sandboxed relaunch flow isn't practical in XCTest (real
+  security-scoped bookmark behavior is hard to unit test in isolation) — but
+  DO add a unit test for the access-tracking logic itself (e.g. "starting
+  access for a URL twice doesn't double-count", "stopping access for a URL
+  not currently tracked is a no-op", "replacing the current image set stops
+  access for URLs no longer in the new set") using a lightweight fake/mock
+  rather than real file URLs if that's the practical boundary.
+- Verify manually if possible (not required for the automated test gate, but
+  note in your summary whether you did): build, run, pick a folder+watermark,
+  quit, relaunch, confirm the preview renders without any user action beyond
+  launching.
+
+This is a correctness bug fix — no other functional/visual behavior should
+change. Verify both the app build and `WatermarkFactoryTests` pass (derived
+data under /tmp).

@@ -771,7 +771,7 @@ struct ContentView: View {
 
     private var imagePickerSection: some View {
         ControlSection("Select Images") {
-            HStack(spacing: AutomalitySpacing.sm) {
+            FlowLayout {
                 Button("Choose Folder...") { state.chooseFolder() }
                     .buttonStyle(.automalityPrimary)
                 Button("Choose Images...") { state.chooseImages() }
@@ -1024,7 +1024,7 @@ struct ContentView: View {
                         .font(.caption)
                         .foregroundStyle(AutomalityColor.orangeDeep)
                 }
-                HStack {
+                FlowLayout {
                     Button("Dismiss") { state.dismissSmartPlacement() }
                         .buttonStyle(.automalitySecondary)
                     Button("Apply") { state.applySmartPlacement() }
