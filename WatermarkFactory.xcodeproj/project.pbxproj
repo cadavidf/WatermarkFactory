@@ -11,6 +11,7 @@
 		1A0000032B00000000000001 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000042B00000000000001 /* ContentView.swift */; };
 		1A0000052B00000000000001 /* ImageProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000062B00000000000001 /* ImageProcessor.swift */; };
 		1A0000072B00000000000001 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000082B00000000000001 /* Models.swift */; };
+		1A00002F2B00000000000001 /* SecurityScopedAccessTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000302B00000000000001 /* SecurityScopedAccessTracker.swift */; };
 		1A00001A2B00000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A00001B2B00000000000001 /* Assets.xcassets */; };
 		1A0000202B00000000000001 /* ImageProcessorMetadataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000212B00000000000001 /* ImageProcessorMetadataTests.swift */; };
 		1A00002C2B00000000000001 /* AutomalityUI in Frameworks */ = {isa = PBXBuildFile; productRef = 1A00002E2B00000000000001 /* AutomalityUI */; };
@@ -31,6 +32,7 @@
 		1A0000042B00000000000001 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		1A0000062B00000000000001 /* ImageProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageProcessor.swift; sourceTree = "<group>"; };
 		1A0000082B00000000000001 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		1A0000302B00000000000001 /* SecurityScopedAccessTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityScopedAccessTracker.swift; sourceTree = "<group>"; };
 		1A0000092B00000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		1A00000A2B00000000000001 /* WatermarkFactory.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WatermarkFactory.entitlements; sourceTree = "<group>"; };
 		1A00000B2B00000000000001 /* WatermarkFactory.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WatermarkFactory.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -74,6 +76,7 @@
 				1A0000042B00000000000001 /* ContentView.swift */,
 				1A0000062B00000000000001 /* ImageProcessor.swift */,
 				1A0000082B00000000000001 /* Models.swift */,
+				1A0000302B00000000000001 /* SecurityScopedAccessTracker.swift */,
 				1A00001B2B00000000000001 /* Assets.xcassets */,
 				1A0000092B00000000000001 /* Info.plist */,
 				1A00000A2B00000000000001 /* WatermarkFactory.entitlements */,
@@ -198,6 +201,7 @@
 				1A0000032B00000000000001 /* ContentView.swift in Sources */,
 				1A0000052B00000000000001 /* ImageProcessor.swift in Sources */,
 				1A0000072B00000000000001 /* Models.swift in Sources */,
+				1A00002F2B00000000000001 /* SecurityScopedAccessTracker.swift in Sources */,
 				1A0000012B00000000000001 /* WatermarkFactoryApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

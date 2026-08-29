@@ -16,8 +16,8 @@ final class AppState: ObservableObject {
             switch self {
             case .selectImages: "Select Images"
             case .watermark: "Watermark"
-            case .orderRename: "Reorder (optional)"
-            case .export: "Rename (optional)"
+            case .orderRename: "Order & Rename (optional)"
+            case .export: "Export"
             }
         }
     }
@@ -72,10 +72,17 @@ final class AppState: ObservableObject {
     private var sourceSizeURL: URL?
     private var watermarkSizeURL: URL?
     private var suppressOffsetPreview = false
+    private let sourceAccess = SecurityScopedAccessTracker()
+    private let watermarkAccess = SecurityScopedAccessTracker()
     private let defaults = UserDefaults.standard
 
     init() {
         restore()
+    }
+
+    deinit {
+        sourceAccess.stopAll()
+        watermarkAccess.stopAll()
     }
 
     /// A max-file-size target only makes sense with lossy JPEG output. PNG/TIFF are
@@ -319,7 +326,12 @@ final class AppState: ObservableObject {
 
     func applyPreset(_ preset: WatermarkPreset) {
         watermarkURL = resolveBookmark(preset.watermarkBookmark)
-        if let watermarkURL { saveBookmark(watermarkURL, key: "watermarkBookmark") }
+        if let watermarkURL {
+            watermarkAccess.replace(with: [watermarkURL])
+            saveBookmark(watermarkURL, key: "watermarkBookmark")
+        } else {
+            watermarkAccess.stopAll()
+        }
         apply(preset.settings)
         status = "Loaded preset \"\(preset.name)\"."
     }
@@ -367,6 +379,7 @@ final class AppState: ObservableObject {
     }
 
     private func setFolder(_ url: URL) {
+        sourceAccess.replace(with: [url])
         folderURL = url
         saveBookmark(url, key: "folderBookmark")
         reloadImages()
@@ -378,6 +391,7 @@ final class AppState: ObservableObject {
         let filtered = urls
             .filter { ImageProcessor.supportedExtensions.contains($0.pathExtension.lowercased()) }
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+        sourceAccess.replace(with: filtered)
         images = filtered.map(ImageItem.init)
         selected = images.first
         status = images.isEmpty ? "No supported images selected." : "\(images.count) images selected."
@@ -388,6 +402,7 @@ final class AppState: ObservableObject {
     }
 
     private func setWatermark(_ url: URL) {
+        watermarkAccess.replace(with: [url])
         watermarkURL = url
         saveBookmark(url, key: "watermarkBookmark")
         advanceIfReady()
@@ -420,14 +435,14 @@ final class AppState: ObservableObject {
 
     private func reloadImages() {
         guard let folderURL else { return }
-        let access = folderURL.startAccessingSecurityScopedResource()
-        defer { if access { folderURL.stopAccessingSecurityScopedResource() } }
+        sourceAccess.start(folderURL)
         do {
             defaults.set(false, forKey: "usedIndividualImages")
-            images = try FileManager.default.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: nil)
+            let found = try FileManager.default.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: nil)
                 .filter { ImageProcessor.supportedExtensions.contains($0.pathExtension.lowercased()) }
                 .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
-                .map(ImageItem.init)
+            sourceAccess.replace(with: [folderURL] + found)
+            images = found.map(ImageItem.init)
             selected = images.first
             status = images.isEmpty ? "No supported images found in this folder." : "\(images.count) images found."
             pruneImageOrder()
@@ -435,6 +450,7 @@ final class AppState: ObservableObject {
             advanceIfReady()
             updateEstimate()
         } catch {
+            sourceAccess.stopAll()
             images = []
             selected = nil
             pruneImageOrder()
@@ -489,12 +505,18 @@ final class AppState: ObservableObject {
         syncPresetSelections()
         folderURL = restoreBookmark("folderBookmark")
         watermarkURL = restoreBookmark("watermarkBookmark")
+        if let watermarkURL {
+            watermarkAccess.replace(with: [watermarkURL])
+        } else {
+            watermarkAccess.stopAll()
+        }
         restoreImageOrder()
         let restoredImages = restoreImageBookmarks()
         if restoredImages.isEmpty {
             reloadImages()
         } else {
             if defaults.bool(forKey: "usedIndividualImages") { folderURL = nil }
+            sourceAccess.replace(with: (folderURL.map { [$0] } ?? []) + restoredImages)
             images = restoredImages.map(ImageItem.init)
             selected = images.first
             pruneImageOrder()

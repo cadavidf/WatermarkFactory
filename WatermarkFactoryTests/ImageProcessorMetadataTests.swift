@@ -167,6 +167,56 @@ final class ImageProcessorMetadataTests: XCTestCase {
         )
     }
 
+    func testSecurityScopedAccessStartIsIdempotent() {
+        let url = URL(fileURLWithPath: "/fake/image.jpg")
+        var started: [URL] = []
+        var stopped: [URL] = []
+        let tracker = SecurityScopedAccessTracker(
+            startAccess: { started.append($0); return true },
+            stopAccess: { stopped.append($0) }
+        )
+
+        tracker.start(url)
+        tracker.start(url)
+
+        XCTAssertEqual(started, [url])
+        XCTAssertTrue(stopped.isEmpty)
+        XCTAssertEqual(tracker.active, [url])
+    }
+
+    func testSecurityScopedAccessStopMissingIsNoOp() {
+        let url = URL(fileURLWithPath: "/fake/image.jpg")
+        var stopped: [URL] = []
+        let tracker = SecurityScopedAccessTracker(
+            startAccess: { _ in true },
+            stopAccess: { stopped.append($0) }
+        )
+
+        tracker.stop(url)
+
+        XCTAssertTrue(stopped.isEmpty)
+        XCTAssertTrue(tracker.active.isEmpty)
+    }
+
+    func testSecurityScopedAccessReplaceStopsRemovedURLsOnly() {
+        let kept = URL(fileURLWithPath: "/fake/kept.jpg")
+        let removed = URL(fileURLWithPath: "/fake/removed.jpg")
+        let added = URL(fileURLWithPath: "/fake/added.jpg")
+        var started: [URL] = []
+        var stopped: [URL] = []
+        let tracker = SecurityScopedAccessTracker(
+            startAccess: { started.append($0); return true },
+            stopAccess: { stopped.append($0) }
+        )
+
+        tracker.replace(with: [kept, removed])
+        tracker.replace(with: [kept, added])
+
+        XCTAssertEqual(Set(started), [kept, removed, added])
+        XCTAssertEqual(stopped, [removed])
+        XCTAssertEqual(tracker.active, [kept, added])
+    }
+
     private func export(_ source: URL, to output: URL, format: ExportFormat) throws {
         let watermark = tempDir.appendingPathComponent("watermark.png")
         try writeImage(watermark, type: .png)

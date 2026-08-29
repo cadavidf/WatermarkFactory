@@ -29,3 +29,4 @@ Exports are written with a fresh ImageIO metadata dictionary. WatermarkFactory p
 - `Keep Original` preserves JPEG, PNG, and TIFF extensions. HEIC sources export as PNG because this app intentionally avoids extra encoders.
 - The output size estimate is computed from the currently selected preview image, not the entire batch.
 - The app uses the standard macOS sandbox user-selected read/write entitlement only.
+- Restored folders, image files, and watermarks keep long-lived security-scoped access while they are in use, so previews should render after relaunch without requiring the user to re-pick files. The actual sandbox relaunch behavior is manual-tested because XCTest cannot reliably simulate user-selected security-scoped bookmarks.
