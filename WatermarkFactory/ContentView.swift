@@ -631,7 +631,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Save Preset").font(.headline)
                 TextField("Preset name", text: $presetName)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.automality)
                     .onSubmit { submitPresetName() }
                 HStack {
                     Spacer()
@@ -657,7 +657,8 @@ struct ContentView: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: AutomalitySpacing.sm) {
-            AutomalityModeToggle(selection: $state.flowMode)
+            AutomalitySegmentedControl(selection: $state.flowMode)
+                .fixedSize()
             if state.flowMode == .guided {
                 AutomalityProgressNav(steps: AppState.Stage.allCases.map(\.title), currentStep: Binding(
                     get: { state.stage.rawValue },
@@ -872,18 +873,8 @@ struct ContentView: View {
                 if let url = state.watermarkURL { Thumb(url: url, size: 56) }
             }
             Text("Tint").automalityLabelText().foregroundStyle(AutomalityColor.ink)
-            HStack(spacing: 6) {
-                ForEach(WatermarkTint.allCases) { tint in
-                    Button {
-                        state.watermarkTint = tint
-                    } label: {
-                        VStack(spacing: 3) {
-                            tintSwatch(tint)
-                            Text(tint.rawValue)
-                        }
-                    }
-                    .buttonStyle(.automalityChip(isSelected: state.watermarkTint == tint))
-                }
+            AutomalitySegmentedControl(selection: $state.watermarkTint) { tint in
+                AnyView(tintSwatch(tint))
             }
             Button {
                 state.suggestPlacement()
@@ -939,26 +930,21 @@ struct ContentView: View {
                 state.sizePreset = preset
                 state.sizeFraction = preset.value
             }
-            Slider(value: Binding(get: { state.sizeFraction }, set: { state.sizePreset = nil; state.sizeFraction = $0 }), in: 0.05...1.0)
+            AutomalitySlider(value: Binding(get: { state.sizeFraction }, set: { state.sizePreset = nil; state.sizeFraction = $0 }), in: 0.05...1.0)
             Text("\(Int(state.sizeFraction * 100))%").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             Divider()
             presetSection("Opacity", presets: OpacityPreset.allCases, selected: state.opacityPreset?.id, valueText: state.opacityPreset?.label ?? "Custom") { preset in
                 state.opacityPreset = preset
                 state.opacity = preset.value
             }
-            Slider(value: Binding(get: { state.opacity }, set: { state.opacityPreset = nil; state.opacity = $0 }), in: 0...1)
+            AutomalitySlider(value: Binding(get: { state.opacity }, set: { state.opacityPreset = nil; state.opacity = $0 }), in: 0...1)
             Text("\(Int(state.opacity * 100))%").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
         }
     }
 
     private var layoutModeSection: some View {
         ControlSection("Layout mode") {
-            HStack(spacing: 6) {
-                ForEach(LayoutMode.allCases) { mode in
-                    Button(mode.rawValue) { state.layoutMode = mode }
-                        .buttonStyle(.automalityChip(isSelected: state.layoutMode == mode))
-                }
-            }
+            AutomalitySegmentedControl(selection: $state.layoutMode)
             if state.layoutMode == .tiled { tiledControls }
         }
     }
@@ -966,7 +952,7 @@ struct ContentView: View {
     private var positionPaddingSection: some View {
         ControlSection("Position & Padding") {
             if state.layoutMode == .single { singleControls }
-            Slider(value: $state.padding, in: 0...100) { Text("Padding") }
+            AutomalitySlider(value: $state.padding, in: 0...100)
             Text("Padding \(Int(state.padding)) px").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             if state.layoutMode == .tiled {
                 Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
@@ -977,32 +963,31 @@ struct ContentView: View {
     private var exportSection: some View {
         ControlSection("Export") {
             Text("Export format").automalityLabelText().foregroundStyle(AutomalityColor.ink)
-            FlowLayout {
-                ForEach(ExportFormat.allCases) { format in
-                    Button(format.rawValue) { state.exportFormat = format }
-                        .buttonStyle(.automalityChip(isSelected: state.exportFormat == format))
-                }
-            }
+            AutomalitySegmentedControl(selection: $state.exportFormat)
             Toggle("Optimize for Web", isOn: Binding(get: { state.optimizeForWeb }, set: { state.setOptimizeForWeb($0) }))
-                .toggleStyle(.button)
-                .buttonStyle(.automalityChip(isSelected: state.optimizeForWeb))
+                .toggleStyle(.automality)
             HStack(spacing: 8) {
                 TextField("Width", value: $state.outputWidth, format: .number)
+                    .textFieldStyle(.automalityData)
                 TextField("Height", value: $state.outputHeight, format: .number)
+                    .textFieldStyle(.automalityData)
             }
             Text(state.outputWidth > 0 && state.outputHeight > 0 ? "Output size \(state.outputWidth)x\(state.outputHeight) px" : "Output size original").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             HStack(spacing: 8) {
                 TextField("Prefix", text: Binding(get: { state.outputPrefix }, set: { state.outputPrefix = AppState.sanitizedFilenameAffix($0) }))
+                    .textFieldStyle(.automality)
                 TextField("Suffix", text: Binding(get: { state.outputSuffix }, set: { state.outputSuffix = AppState.sanitizedFilenameAffix($0) }))
+                    .textFieldStyle(.automality)
             }
             if state.exportFormat == .jpeg {
-                Slider(value: $state.jpegQuality, in: 0...1)
+                AutomalitySlider(value: $state.jpegQuality, in: 0...1)
                 Text("JPEG quality \(Int(state.jpegQuality * 100))%").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             }
             Text(state.exportFormat.hint).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             HStack(spacing: 8) {
                 Text("Max file size")
                 TextField("Off", value: $state.maxFileSizeKB, format: .number)
+                    .textFieldStyle(.automalityData)
                     .frame(width: 70)
                 Text("KB").foregroundStyle(AutomalityColor.inkMuted)
             }
@@ -1200,21 +1185,27 @@ struct ContentView: View {
                 }
             }
             HStack(spacing: 8) {
-                TextField("X", value: $state.offsetX, format: .number).frame(width: 70)
-                TextField("Y", value: $state.offsetY, format: .number).frame(width: 70)
+                TextField("X", value: $state.offsetX, format: .number)
+                    .textFieldStyle(.automalityData)
+                    .frame(width: 70)
+                TextField("Y", value: $state.offsetY, format: .number)
+                    .textFieldStyle(.automalityData)
+                    .frame(width: 70)
             }
         }
     }
 
     private var tiledControls: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Slider(value: $state.spacing, in: 0...400) { Text("Spacing") }
+            AutomalitySlider(value: $state.spacing, in: 0...400)
             Text("Spacing \(Int(state.spacing)) px").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             Picker("Rotation", selection: $state.rotationPattern) {
                 ForEach(RotationPattern.allCases) { Text($0.rawValue).tag($0) }
             }
             if state.rotationPattern == .custom {
-                TextField("Degrees", value: $state.customAngle, format: .number).frame(width: 90)
+                TextField("Degrees", value: $state.customAngle, format: .number)
+                    .textFieldStyle(.automalityData)
+                    .frame(width: 90)
             }
         }
     }
@@ -1277,20 +1268,6 @@ struct ContentView: View {
         } else {
             Color.clear.frame(width: 16, height: 16)
         }
-    }
-}
-
-struct AutomalityModeToggle: View {
-    @Binding var selection: FlowMode
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(FlowMode.allCases) { mode in
-                Button(mode.rawValue) { selection = mode }
-                    .buttonStyle(.automalityChip(isSelected: selection == mode))
-            }
-        }
-        .fixedSize()
     }
 }
 
