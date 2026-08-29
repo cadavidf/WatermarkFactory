@@ -3,6 +3,10 @@ import AutomalityUI
 import SwiftUI
 import UniformTypeIdentifiers
 
+extension AutomalityColor {
+    static let inkMuted = ink.opacity(0.68)
+}
+
 @MainActor
 final class AppState: ObservableObject {
     enum Stage: Int, CaseIterable {
@@ -680,12 +684,12 @@ struct ContentView: View {
                             HStack {
                                 Text(state.orderNumber(for: item).map { "\($0)." } ?? "-")
                                     .frame(width: 32, alignment: .trailing)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(AutomalityColor.inkMuted)
                                 Text(item.filename).lineLimit(1)
                             }
                         }
                         if state.images.count > 8 {
-                            Text("+ \(state.images.count - 8) more").font(.caption).foregroundStyle(.secondary)
+                            Text("+ \(state.images.count - 8) more").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
                         }
                     }
                     platformPresets
@@ -708,7 +712,7 @@ struct ContentView: View {
                     .buttonStyle(.automalityPrimary)
             }
             if let folder = state.folderURL {
-                Text(folder.lastPathComponent).font(.caption).foregroundStyle(.secondary)
+                Text(folder.lastPathComponent).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             }
         }
     }
@@ -718,7 +722,7 @@ struct ContentView: View {
             if state.images.isEmpty {
                 Text("Choose a folder or select individual images to get started.")
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AutomalityColor.inkMuted)
                     .frame(maxWidth: .infinity, minHeight: 240)
             } else {
                 List(state.images, selection: Binding(get: { state.selected }, set: { if let item = $0 { state.select(item) } })) { item in
@@ -736,13 +740,13 @@ struct ContentView: View {
     private var previewPane: some View {
         VStack(spacing: spacing) {
             ZStack {
-                Color(NSColor.textBackgroundColor)
+                AutomalityColor.gray100
                 if let image = state.previewImage {
                     WatermarkPreview(image: image, state: state)
                 } else {
                     Text("Select an image to preview.")
                         .font(.title3)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AutomalityColor.inkMuted)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -762,7 +766,7 @@ struct ContentView: View {
             .background(AutomalityColor.offWhite)
             Text(state.status)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AutomalityColor.inkMuted)
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, panePadding)
@@ -789,14 +793,14 @@ struct ContentView: View {
                 state.sizeFraction = preset.value
             }
             Slider(value: Binding(get: { state.sizeFraction }, set: { state.sizePreset = nil; state.sizeFraction = $0 }), in: 0.05...1.0)
-            Text("\(Int(state.sizeFraction * 100))%").font(.caption).foregroundStyle(.secondary)
+            Text("\(Int(state.sizeFraction * 100))%").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             Divider()
             presetSection("Opacity", presets: OpacityPreset.allCases, selected: state.opacityPreset?.id, valueText: state.opacityPreset?.label ?? "Custom") { preset in
                 state.opacityPreset = preset
                 state.opacity = preset.value
             }
             Slider(value: Binding(get: { state.opacity }, set: { state.opacityPreset = nil; state.opacity = $0 }), in: 0...1)
-            Text("\(Int(state.opacity * 100))%").font(.caption).foregroundStyle(.secondary)
+            Text("\(Int(state.opacity * 100))%").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
         }
     }
 
@@ -814,9 +818,9 @@ struct ContentView: View {
         ControlSection("Position & Padding") {
             if state.layoutMode == .single { singleControls }
             Slider(value: $state.padding, in: 0...100) { Text("Padding") }
-            Text("Padding \(Int(state.padding)) px").font(.caption).foregroundStyle(.secondary)
+            Text("Padding \(Int(state.padding)) px").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             if state.layoutMode == .tiled {
-                Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(.secondary)
+                Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             }
         }
     }
@@ -829,47 +833,46 @@ struct ContentView: View {
             .pickerStyle(.segmented)
             Toggle("Optimize for Web", isOn: Binding(get: { state.optimizeForWeb }, set: { state.setOptimizeForWeb($0) }))
                 .toggleStyle(.button)
-                .buttonStyle(.bordered)
-                .tint(state.optimizeForWeb ? .accentColor : .secondary)
+                .buttonStyle(AutomalityChipStyle(isSelected: state.optimizeForWeb))
             HStack(spacing: 8) {
                 TextField("Width", value: $state.outputWidth, format: .number)
                 TextField("Height", value: $state.outputHeight, format: .number)
             }
-            Text(state.outputWidth > 0 && state.outputHeight > 0 ? "Output size \(state.outputWidth)x\(state.outputHeight) px" : "Output size original").font(.caption).foregroundStyle(.secondary)
+            Text(state.outputWidth > 0 && state.outputHeight > 0 ? "Output size \(state.outputWidth)x\(state.outputHeight) px" : "Output size original").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             HStack(spacing: 8) {
                 TextField("Prefix", text: Binding(get: { state.outputPrefix }, set: { state.outputPrefix = AppState.sanitizedFilenameAffix($0) }))
                 TextField("Suffix", text: Binding(get: { state.outputSuffix }, set: { state.outputSuffix = AppState.sanitizedFilenameAffix($0) }))
             }
             if state.exportFormat == .jpeg {
                 Slider(value: $state.jpegQuality, in: 0...1)
-                Text("JPEG quality \(Int(state.jpegQuality * 100))%").font(.caption).foregroundStyle(.secondary)
+                Text("JPEG quality \(Int(state.jpegQuality * 100))%").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             }
-            Text(state.exportFormat.hint).font(.caption).foregroundStyle(.secondary)
+            Text(state.exportFormat.hint).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             HStack(spacing: 8) {
                 Text("Max file size")
                 TextField("Off", value: $state.maxFileSizeKB, format: .number)
                     .frame(width: 70)
-                Text("KB").foregroundStyle(.secondary)
+                Text("KB").foregroundStyle(AutomalityColor.inkMuted)
             }
             if state.maxFileSizeBlocksExport {
                 Text("Max file size requires JPEG — switch format or clear this limit.")
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(AutomalityColor.orangeDeep)
             } else if state.maxFileSizeKB > 0 {
                 Text("Quality (and, if needed, dimensions) will be reduced to fit ~\(state.maxFileSizeKB) KB per image.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AutomalityColor.inkMuted)
             }
             if !state.estimatedSize.isEmpty {
                 Text("Estimated output size \(state.estimatedSize)").font(.caption)
             }
             if !state.estimatedFilename.isEmpty {
-                Text("-> \(state.estimatedFilename)").font(.caption).foregroundStyle(.secondary)
+                Text("-> \(state.estimatedFilename)").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             }
             Button("Watermark All Images") { state.exportAll() }
                 .buttonStyle(.automalityPrimary)
                 .disabled(!state.canExport)
-            if let hint = state.exportHint { Text(hint).font(.caption).foregroundStyle(.secondary) }
+            if let hint = state.exportHint { Text(hint).font(.caption).foregroundStyle(AutomalityColor.inkMuted) }
             if state.isExporting { ProgressView(value: state.progress) }
         }
     }
@@ -884,7 +887,7 @@ struct ContentView: View {
                 .buttonStyle(.automalityPrimary)
                 .disabled(!state.canSavePreset)
                 if state.presets.isEmpty {
-                    Text("No saved presets.").font(.caption).foregroundStyle(.secondary)
+                    Text("No saved presets.").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
                 } else {
                     ScrollView {
                         VStack(spacing: 4) {
@@ -918,10 +921,10 @@ struct ContentView: View {
                     HStack {
                         Text(preset.name)
                         Spacer()
-                        Text(preset.sizeLabel).foregroundStyle(.secondary)
+                        Text(preset.sizeLabel).foregroundStyle(AutomalityColor.inkMuted)
                     }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.automalitySecondary)
                 .help(preset.note)
             }
         }
@@ -979,8 +982,7 @@ struct ContentView: View {
                     Button { state.anchor = anchor } label: {
                         Image(systemName: anchor.symbol).frame(width: 32, height: 30)
                     }
-                    .buttonStyle(.bordered)
-                    .tint(state.anchor == anchor ? .accentColor : .secondary)
+                    .buttonStyle(AutomalityChipStyle(isSelected: state.anchor == anchor))
                 }
             }
             HStack(spacing: 8) {
@@ -993,7 +995,7 @@ struct ContentView: View {
     private var tiledControls: some View {
         VStack(alignment: .leading, spacing: 8) {
             Slider(value: $state.spacing, in: 0...400) { Text("Spacing") }
-            Text("Spacing \(Int(state.spacing)) px").font(.caption).foregroundStyle(.secondary)
+            Text("Spacing \(Int(state.spacing)) px").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             Picker("Rotation", selection: $state.rotationPattern) {
                 ForEach(RotationPattern.allCases) { Text($0.rawValue).tag($0) }
             }
@@ -1008,13 +1010,12 @@ struct ContentView: View {
             HStack {
                 Text(title).font(.subheadline).fontWeight(.semibold)
                 Spacer()
-                Text(valueText).font(.caption).foregroundStyle(.secondary)
+                Text(valueText).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             }
             FlowLayout {
                 ForEach(presets) { preset in
                     Button(label(for: preset)) { action(preset) }
-                        .buttonStyle(.bordered)
-                        .tint(selected == preset.id ? .accentColor : .secondary)
+                        .buttonStyle(AutomalityChipStyle(isSelected: selected == preset.id))
                 }
             }
         }
@@ -1024,6 +1025,22 @@ struct ContentView: View {
         if let preset = preset as? WatermarkSizePreset { return preset.label }
         if let preset = preset as? OpacityPreset { return preset.label }
         return ""
+    }
+}
+
+struct AutomalityChipStyle: ButtonStyle {
+    let isSelected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(isSelected ? AutomalityColor.offWhite : AutomalityColor.ink)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(minHeight: 30)
+            .background(isSelected ? AutomalityColor.teal : AutomalityColor.offWhite)
+            .overlay(Rectangle().stroke(isSelected ? AutomalityColor.ink : AutomalityColor.gray300, lineWidth: 2))
+            .opacity(configuration.isPressed ? 0.78 : 1)
     }
 }
 
@@ -1080,7 +1097,7 @@ struct WatermarkPreview: View {
                         .fill(.clear)
                         .overlay(
                             Rectangle()
-                                .stroke(Color.accentColor.opacity(dragStart == nil ? 0.25 : 0.8), lineWidth: dragStart == nil ? 1 : 2)
+                                .stroke(AutomalityColor.teal.opacity(dragStart == nil ? 0.25 : 0.8), lineWidth: dragStart == nil ? 1 : 2)
                         )
                         .frame(width: rect.width, height: rect.height)
                         .position(x: rect.midX, y: rect.midY)
@@ -1135,7 +1152,7 @@ struct Thumb: View {
 
     var body: some View {
         ZStack {
-            Color.gray.opacity(0.12)
+            AutomalityColor.gray100
             if let image { Image(nsImage: image).resizable().scaledToFit() }
         }
         .frame(width: size, height: size)
