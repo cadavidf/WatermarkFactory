@@ -32,6 +32,7 @@ final class AppState: ObservableObject {
     @Published var outputHeight = 0 { didSet { saveSettings(); updateEstimate() } }
     @Published var outputPrefix = "" { didSet { saveSettings(); updateEstimate() } }
     @Published var outputSuffix = "" { didSet { saveSettings(); updateEstimate() } }
+    @Published var maxFileSizeKB = 0 { didSet { saveSettings(); updateEstimate() } }
     @Published var previewImage: NSImage?
     @Published var sourceImageSize: CGSize?
     @Published var watermarkImageSize: CGSize?
@@ -52,14 +53,21 @@ final class AppState: ObservableObject {
         restore()
     }
 
-    var canExport: Bool { watermarkURL != nil && !images.isEmpty && !isExporting }
+    /// A max-file-size target only makes sense with lossy JPEG output. PNG/TIFF are
+    /// explicit lossless choices that can't be quality-adjusted down, so block export
+    /// rather than silently ignoring the size target or silently switching format.
+    var maxFileSizeBlocksExport: Bool {
+        maxFileSizeKB > 0 && (exportFormat == .png || exportFormat == .tiff)
+    }
+    var canExport: Bool { watermarkURL != nil && !images.isEmpty && !isExporting && !maxFileSizeBlocksExport }
     var exportHint: String? {
         if images.isEmpty { return "Choose a folder or images before export." }
         if watermarkURL == nil { return "Choose a watermark image before export." }
+        if maxFileSizeBlocksExport { return "Max file size requires JPEG — switch format or clear this limit." }
         return nil
     }
     var settings: WatermarkSettings {
-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, optimizeForWeb: optimizeForWeb, outputWidth: outputWidth, outputHeight: outputHeight, outputPrefix: outputPrefix, outputSuffix: outputSuffix)
+        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, optimizeForWeb: optimizeForWeb, outputWidth: outputWidth, outputHeight: outputHeight, outputPrefix: outputPrefix, outputSuffix: outputSuffix, maxFileSizeKB: maxFileSizeKB)
     }
     var canSavePreset: Bool { watermarkURL != nil }
 
@@ -175,6 +183,7 @@ final class AppState: ObservableObject {
                     summary.success += 1
                     summary.bytes += result.bytes
                     summary.usedHEICFallback = summary.usedHEICFallback || result.usedHEICFallback
+                    if !result.metSizeTarget { summary.unmetSizeTarget.append(item.filename) }
                 } catch {
                     summary.failed.append(item.filename)
                 }
@@ -190,6 +199,7 @@ final class AppState: ObservableObject {
                 self.isExporting = false
                 var text = "\(summary.success) of \(items.count) images watermarked, total output size ~\(Self.formatBytes(summary.bytes))."
                 if summary.usedHEICFallback { text += " HEIC was exported as PNG." }
+                if !summary.unmetSizeTarget.isEmpty { text += " \(summary.unmetSizeTarget.count) couldn't reach the max file size target and were shipped at their closest achievable size." }
                 if !summary.failed.isEmpty { text += " Failed: \(summary.failed.joined(separator: ", "))." }
                 self.status = text
             }
@@ -285,6 +295,7 @@ final class AppState: ObservableObject {
         outputHeight = settings.outputHeight
         outputPrefix = Self.sanitizedFilenameAffix(settings.outputPrefix)
         outputSuffix = Self.sanitizedFilenameAffix(settings.outputSuffix)
+        maxFileSizeKB = settings.maxFileSizeKB
         syncPresetSelections()
         updateEstimate(delay: 0)
     }
@@ -328,6 +339,7 @@ final class AppState: ObservableObject {
         defaults.set(outputHeight, forKey: "outputHeight")
         defaults.set(outputPrefix, forKey: "outputPrefix")
         defaults.set(outputSuffix, forKey: "outputSuffix")
+        defaults.set(maxFileSizeKB, forKey: "maxFileSizeKB")
     }
 
     private func restore() {
@@ -349,6 +361,7 @@ final class AppState: ObservableObject {
         outputHeight = defaults.object(forKey: "outputHeight") == nil ? 0 : defaults.integer(forKey: "outputHeight")
         outputPrefix = Self.sanitizedFilenameAffix(defaults.string(forKey: "outputPrefix") ?? "")
         outputSuffix = Self.sanitizedFilenameAffix(defaults.string(forKey: "outputSuffix") ?? "")
+        maxFileSizeKB = defaults.object(forKey: "maxFileSizeKB") == nil ? 0 : defaults.integer(forKey: "maxFileSizeKB")
         syncPresetSelections()
         folderURL = restoreBookmark("folderBookmark")
         watermarkURL = restoreBookmark("watermarkBookmark")
@@ -610,6 +623,21 @@ struct ContentView: View {
                         Text("JPEG quality \(Int(state.jpegQuality * 100))%").font(.caption).foregroundStyle(.secondary)
                     }
                     Text(state.exportFormat.hint).font(.caption).foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Text("Max file size")
+                        TextField("Off", value: $state.maxFileSizeKB, format: .number)
+                            .frame(width: 70)
+                        Text("KB").foregroundStyle(.secondary)
+                    }
+                    if state.maxFileSizeBlocksExport {
+                        Text("Max file size requires JPEG — switch format or clear this limit.")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    } else if state.maxFileSizeKB > 0 {
+                        Text("Quality (and, if needed, dimensions) will be reduced to fit ~\(state.maxFileSizeKB) KB per image.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     if !state.estimatedSize.isEmpty {
                         Text("Estimated output size \(state.estimatedSize)").font(.caption)
                     }

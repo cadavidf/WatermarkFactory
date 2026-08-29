@@ -127,8 +127,9 @@ struct WatermarkSettings: Codable {
     var outputHeight: Int
     var outputPrefix: String
     var outputSuffix: String
+    var maxFileSizeKB: Int
 
-    init(sizeFraction: Double, opacity: Double, anchor: Anchor, offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputWidth: Int = 0, outputHeight: Int = 0, outputPrefix: String, outputSuffix: String) {
+    init(sizeFraction: Double, opacity: Double, anchor: Anchor, offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputWidth: Int = 0, outputHeight: Int = 0, outputPrefix: String, outputSuffix: String, maxFileSizeKB: Int = 0) {
         self.sizeFraction = sizeFraction
         self.opacity = opacity
         self.anchor = anchor
@@ -146,10 +147,11 @@ struct WatermarkSettings: Codable {
         self.outputHeight = outputHeight
         self.outputPrefix = outputPrefix
         self.outputSuffix = outputSuffix
+        self.maxFileSizeKB = maxFileSizeKB
     }
 
     private enum CodingKeys: String, CodingKey {
-        case sizeFraction, opacity, anchor, offsetX, offsetY, layoutMode, padding, spacing, rotationPattern, customAngle, exportFormat, jpegQuality, optimizeForWeb, outputWidth, outputHeight, outputPrefix, outputSuffix
+        case sizeFraction, opacity, anchor, offsetX, offsetY, layoutMode, padding, spacing, rotationPattern, customAngle, exportFormat, jpegQuality, optimizeForWeb, outputWidth, outputHeight, outputPrefix, outputSuffix, maxFileSizeKB
     }
 
     init(from decoder: Decoder) throws {
@@ -171,6 +173,7 @@ struct WatermarkSettings: Codable {
         outputHeight = try container.decodeIfPresent(Int.self, forKey: .outputHeight) ?? 0
         outputPrefix = try container.decode(String.self, forKey: .outputPrefix)
         outputSuffix = try container.decode(String.self, forKey: .outputSuffix)
+        maxFileSizeKB = try container.decodeIfPresent(Int.self, forKey: .maxFileSizeKB) ?? 0
     }
 }
 
@@ -224,4 +227,5 @@ struct ExportSummary {
     var failed: [String]
     var bytes: Int
     var usedHEICFallback: Bool
+    var unmetSizeTarget: [String] = []
 }

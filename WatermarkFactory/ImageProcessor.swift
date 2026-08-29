@@ -13,6 +13,7 @@ enum ImageProcessorError: Error {
 struct ImageProcessor {
     static let supportedExtensions: Set<String> = ["jpg", "jpeg", "png", "heic", "tif", "tiff"]
     private static let webMaxPixelSize = 2048
+    private static let minSizeTargetLongestEdge = 400
 
     static func thumbnail(for url: URL, maxPixelSize: CGFloat = 96) -> NSImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
@@ -57,7 +58,14 @@ struct ImageProcessor {
     static func encodedWatermarkData(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings) throws -> Data {
         let image = try watermarkedImage(sourceURL: sourceURL, watermarkURL: watermarkURL, settings: settings)
         let outputImage = try resizedForExport(image, settings: settings)
-        return try encode(image: outputImage, sourceURL: sourceURL, format: settings.exportFormat, quality: jpegQuality(sourceURL: sourceURL, settings: settings)).data
+        return try encodeFittingTarget(image: outputImage, sourceURL: sourceURL, settings: settings).data
+    }
+
+    /// Whether the currently-resolved output format for this source/setting combo
+    /// can honor a max-file-size target at all (only lossy JPEG output can be
+    /// quality-adjusted down to hit an arbitrary size cap).
+    static func formatAllowsMaxFileSize(sourceURL: URL, format: ExportFormat) -> Bool {
+        resolvedFormat(sourceURL: sourceURL, format: format).type == .jpeg
     }
 
     static func outputFilename(for sourceURL: URL, settings: WatermarkSettings) -> String {
@@ -78,12 +86,12 @@ struct ImageProcessor {
         return candidate
     }
 
-    static func export(sourceURL: URL, watermarkURL: URL, outputURL: URL, settings: WatermarkSettings) throws -> (url: URL, bytes: Int, usedHEICFallback: Bool) {
+    static func export(sourceURL: URL, watermarkURL: URL, outputURL: URL, settings: WatermarkSettings) throws -> (url: URL, bytes: Int, usedHEICFallback: Bool, metSizeTarget: Bool) {
         let image = try watermarkedImage(sourceURL: sourceURL, watermarkURL: watermarkURL, settings: settings)
         let outputImage = try resizedForExport(image, settings: settings)
-        let encoded = try encode(image: outputImage, sourceURL: sourceURL, format: settings.exportFormat, quality: jpegQuality(sourceURL: sourceURL, settings: settings))
+        let encoded = try encodeFittingTarget(image: outputImage, sourceURL: sourceURL, settings: settings)
         try encoded.data.write(to: outputURL, options: .atomic)
-        return (outputURL, encoded.data.count, encoded.usedHEICFallback)
+        return (outputURL, encoded.data.count, encoded.usedHEICFallback, encoded.metTarget)
     }
 
     private static func sanitize(_ value: String) -> String {
@@ -189,6 +197,68 @@ struct ImageProcessor {
         CGImageDestinationAddImage(destination, image, properties as CFDictionary)
         guard CGImageDestinationFinalize(destination) else { throw ImageProcessorError.encodeFailed }
         return (data as Data, resolved.ext, resolved.fallback)
+    }
+
+    /// Encodes `image`, honoring `settings.maxFileSizeKB` when set: binary-searches
+    /// JPEG quality to land at or under the target, and falls back to iterative
+    /// downscaling if quality alone can't reach it. `metTarget` is false when the
+    /// target couldn't be reached even at the minimum size floor (the caller still
+    /// gets the closest achievable output, never a failure).
+    private static func encodeFittingTarget(image: CGImage, sourceURL: URL, settings: WatermarkSettings) throws -> (data: Data, ext: String, usedHEICFallback: Bool, metTarget: Bool) {
+        let baseQuality = jpegQuality(sourceURL: sourceURL, settings: settings)
+        guard settings.maxFileSizeKB > 0,
+              resolvedFormat(sourceURL: sourceURL, format: settings.exportFormat).type == .jpeg else {
+            let result = try encode(image: image, sourceURL: sourceURL, format: settings.exportFormat, quality: baseQuality)
+            return (result.data, result.ext, result.usedHEICFallback, true)
+        }
+
+        let targetBytes = settings.maxFileSizeKB * 1024
+        var currentImage = image
+
+        while true {
+            let atHigh = try encode(image: currentImage, sourceURL: sourceURL, format: settings.exportFormat, quality: 0.95)
+            if atHigh.data.count <= targetBytes {
+                return (atHigh.data, atHigh.ext, atHigh.usedHEICFallback, true)
+            }
+            let atLow = try encode(image: currentImage, sourceURL: sourceURL, format: settings.exportFormat, quality: 0.2)
+            if atLow.data.count > targetBytes {
+                let longest = max(currentImage.width, currentImage.height)
+                if longest <= minSizeTargetLongestEdge {
+                    // Can't shrink further; ship the closest achievable result.
+                    return (atLow.data, atLow.ext, atLow.usedHEICFallback, false)
+                }
+                currentImage = try downscale(currentImage, factor: 0.9)
+                continue
+            }
+            // Target is reachable at this resolution somewhere between low and high quality.
+            var low = 0.2
+            var high = 0.95
+            var best = atLow
+            for _ in 0..<6 {
+                let mid = (low + high) / 2
+                let midResult = try encode(image: currentImage, sourceURL: sourceURL, format: settings.exportFormat, quality: mid)
+                if midResult.data.count <= targetBytes {
+                    best = midResult
+                    low = mid
+                } else {
+                    high = mid
+                }
+            }
+            return (best.data, best.ext, best.usedHEICFallback, true)
+        }
+    }
+
+    private static func downscale(_ image: CGImage, factor: CGFloat) throws -> CGImage {
+        let width = max(1, Int((CGFloat(image.width) * factor).rounded()))
+        let height = max(1, Int((CGFloat(image.height) * factor).rounded()))
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            throw ImageProcessorError.contextFailed
+        }
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        guard let resized = context.makeImage() else { throw ImageProcessorError.contextFailed }
+        return resized
     }
 
     private static func scrubbedMetadata(sourceURL: URL) -> [CFString: Any] {

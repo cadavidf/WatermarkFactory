@@ -391,3 +391,49 @@ C2PA or AI-provenance manifest chunks) as follows:
     it needs real test coverage, not just manual verification.
 - Note the exact tag choices and their rationale in README.md under a new
   "Metadata handling" section.
+
+## Addendum: preview before watermark chosen + max file size target (v2.0)
+
+### Part A — show images before a watermark is selected
+Currently the center preview / filmstrip may only render once a watermark image
+is chosen. Fix this: as soon as a source folder or individual images are picked,
+the sidebar thumbnails, filmstrip, and center preview must all show the plain
+source image immediately (no watermark overlay, since there isn't one yet) —
+never a blank/placeholder state just because no watermark has been picked. Once
+the user picks a watermark, the preview updates live to show it composited, same
+as before. The Export button can stay disabled with a hint until a watermark is
+chosen (that's correct — you can't watermark without one) but *seeing* the
+images must never depend on having picked a watermark.
+
+### Part B — user-settable max output file size (KB)
+Add a **"Max file size"** numeric field (in KB) to the Export controls, near the
+existing format/quality controls, default empty/off (no cap). Example target:
+`200 KB`. When set:
+- Applies per-image at export time: after compositing, if the encoded output
+  would exceed the target, iteratively reduce JPEG quality (binary search
+  between e.g. 20%–95%) until it fits, or as close as reasonably achievable.
+- If quality alone can't hit the target even at the low end (e.g. a very large
+  source image with a tiny KB target), fall back to also downscaling the pixel
+  dimensions in steps (e.g. 90% of previous size each step) and re-encoding,
+  repeating until it fits or a sane minimum size floor is hit (don't downscale
+  below ~400px longest edge — if it still doesn't fit at that floor, ship the
+  smallest achievable result and flag that file in the completion summary as
+  "couldn't reach target size" rather than looping forever or failing the
+  batch).
+- Format interaction: a max-KB target only makes sense with a lossy format.
+  If the user has `PNG` or `TIFF` selected (lossless, can't be quality-adjusted
+  down) AND a max file size is set, show an inline warning next to the field
+  ("Max file size requires JPEG — switch format or clear this limit") and
+  disable Export until resolved, rather than silently ignoring the size target
+  or silently switching their format choice for them.
+- Interacts with existing "Optimize for Web" toggle and platform presets: if
+  both a 2048px cap (or platform preset's fixed dimensions) AND a max-KB target
+  are active, both constraints apply — resize/crop first per those rules, then
+  the quality/further-downscale loop still applies on top to hit the KB target.
+- Update the live "estimated output size" readout to reflect the actual quality/
+  size the target-fitting logic would produce for the current preview image,
+  so the user can see it's working before running the full batch.
+- Persist the max-file-size value in the same session/settings persistence as
+  other export controls.
+- Completion summary should note how many images (if any) couldn't fully reach
+  the target and were shipped at their closest achievable size.
