@@ -71,6 +71,12 @@ enum LayoutMode: String, CaseIterable, Identifiable, Codable {
     var id: String { rawValue }
 }
 
+enum FlowMode: String, CaseIterable, Identifiable, Codable {
+    case guided = "Guided"
+    case compact = "Compact"
+    var id: String { rawValue }
+}
+
 enum RotationPattern: String, CaseIterable, Identifiable, Codable {
     case none = "None (0deg)"
     case diagonal = "Diagonal (45deg)"

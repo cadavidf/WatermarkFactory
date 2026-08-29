@@ -16,12 +16,13 @@ final class AppState: ObservableObject {
             switch self {
             case .selectImages: "Select Images"
             case .watermark: "Watermark"
-            case .orderRename: "Order & Rename"
-            case .export: "Export"
+            case .orderRename: "Reorder (optional)"
+            case .export: "Rename (optional)"
             }
         }
     }
 
+    @Published var flowMode: FlowMode = .guided { didSet { defaults.set(flowMode.rawValue, forKey: "flowMode") } }
     @Published var folderURL: URL?
     @Published var watermarkURL: URL?
     @Published var images: [ImageItem] = []
@@ -429,6 +430,7 @@ final class AppState: ObservableObject {
 
     private func restore() {
         restorePresets()
+        flowMode = FlowMode(rawValue: defaults.string(forKey: "flowMode") ?? "") ?? .guided
         if defaults.object(forKey: "sizeFraction") != nil { sizeFraction = defaults.double(forKey: "sizeFraction") }
         if defaults.object(forKey: "opacity") != nil { opacity = defaults.double(forKey: "opacity") }
         anchor = Anchor(rawValue: defaults.string(forKey: "anchor") ?? "") ?? .bottomRight
@@ -554,14 +556,15 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: AutomalitySpacing.sm) {
-            AutomalityProgressNav(steps: AppState.Stage.allCases.map(\.title), currentStep: Binding(
-                get: { state.stage.rawValue },
-                set: { if let stage = AppState.Stage(rawValue: $0) { state.advance(to: stage) } }
-            ))
-            .padding(.horizontal, panePadding)
-            .padding(.top, panePadding)
+            header
+                .padding(.horizontal, panePadding)
+                .padding(.top, panePadding)
 
-            stageContent
+            if state.flowMode == .guided {
+                stageContent
+            } else {
+                compactContent
+            }
         }
         .frame(minWidth: 980, minHeight: 680)
         .background(AutomalityColor.gray100)
@@ -593,6 +596,18 @@ struct ContentView: View {
         }
     }
 
+    private var header: some View {
+        HStack(alignment: .top, spacing: AutomalitySpacing.sm) {
+            AutomalityModeToggle(selection: $state.flowMode)
+            if state.flowMode == .guided {
+                AutomalityProgressNav(steps: AppState.Stage.allCases.map(\.title), currentStep: Binding(
+                    get: { state.stage.rawValue },
+                    set: { if let stage = AppState.Stage(rawValue: $0) { state.advance(to: stage) } }
+                ))
+            }
+        }
+    }
+
     @ViewBuilder
     private var stageContent: some View {
         switch state.stage {
@@ -604,6 +619,36 @@ struct ContentView: View {
             orderRenameStage
         case .export:
             exportStage
+        }
+    }
+
+    private var compactContent: some View {
+        HStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: spacing) {
+                    imagePickerSection
+                    imageList
+                }
+                .padding(panePadding)
+            }
+            .frame(width: 300)
+            Divider()
+            previewPane
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: spacing) {
+                    savedPresetLibrary
+                    watermarkSourceSection
+                    sizeOpacitySection
+                    layoutModeSection
+                    positionPaddingSection
+                    orderRenameSection
+                    platformPresets
+                    exportSection
+                }
+                .padding(panePadding)
+            }
+            .frame(width: controlsWidth)
         }
     }
 
@@ -647,29 +692,8 @@ struct ContentView: View {
 
     private var orderRenameStage: some View {
         VStack(alignment: .leading, spacing: spacing) {
-            HStack {
-                Text(state.orderSummary)
-                    .font(.headline)
-                Spacer()
-                Button("Clear order") { state.clearOrder() }
-                    .buttonStyle(.automalitySecondary)
-                    .disabled(state.numberedCount == 0)
-                Button("Number in current order") { state.numberInCurrentOrder(state.orderedItems) }
-                    .buttonStyle(.automalityPrimary)
-                    .disabled(state.images.isEmpty)
-                Button("Next") { state.advance(to: .export) }
-                    .buttonStyle(.automalityPrimary)
-                    .disabled(state.images.isEmpty || state.watermarkURL == nil)
-            }
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: AutomalitySpacing.sm)], spacing: AutomalitySpacing.sm) {
-                    ForEach(state.orderedItems) { item in
-                        orderTile(item)
-                    }
-                }
-                .padding(.trailing, AutomalitySpacing.hardShadow)
-                .padding(.bottom, AutomalitySpacing.hardShadow)
-            }
+            orderRenameHeader
+            orderGrid(minimumTileWidth: 140)
         }
         .padding(panePadding)
     }
@@ -930,6 +954,43 @@ struct ContentView: View {
         }
     }
 
+    private var orderRenameSection: some View {
+        ControlSection("Order & Rename") {
+            orderRenameHeader
+            orderGrid(minimumTileWidth: 96)
+                .frame(minHeight: 180, maxHeight: 320)
+        }
+    }
+
+    private var orderRenameHeader: some View {
+        HStack {
+            Text(state.orderSummary)
+                .font(.headline)
+            Spacer()
+            Button("Clear order") { state.clearOrder() }
+                .buttonStyle(.automalitySecondary)
+                .disabled(state.numberedCount == 0)
+            Button("Number in current order") { state.numberInCurrentOrder(state.orderedItems) }
+                .buttonStyle(.automalityPrimary)
+                .disabled(state.images.isEmpty)
+            Button("Skip") { state.advance(to: .export) }
+                .buttonStyle(.automalitySecondary)
+                .disabled(state.images.isEmpty || state.watermarkURL == nil)
+        }
+    }
+
+    private func orderGrid(minimumTileWidth: CGFloat) -> some View {
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: minimumTileWidth), spacing: AutomalitySpacing.sm)], spacing: AutomalitySpacing.sm) {
+                ForEach(state.orderedItems) { item in
+                    orderTile(item)
+                }
+            }
+            .padding(.trailing, AutomalitySpacing.hardShadow)
+            .padding(.bottom, AutomalitySpacing.hardShadow)
+        }
+    }
+
     private func orderTile(_ item: ImageItem) -> some View {
         let number = state.orderNumber(for: item)
         return VStack(alignment: .leading, spacing: AutomalitySpacing.xs) {
@@ -1041,6 +1102,20 @@ struct AutomalityChipStyle: ButtonStyle {
             .background(isSelected ? AutomalityColor.teal : AutomalityColor.offWhite)
             .overlay(Rectangle().stroke(isSelected ? AutomalityColor.ink : AutomalityColor.gray300, lineWidth: 2))
             .opacity(configuration.isPressed ? 0.78 : 1)
+    }
+}
+
+struct AutomalityModeToggle: View {
+    @Binding var selection: FlowMode
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(FlowMode.allCases) { mode in
+                Button(mode.rawValue) { selection = mode }
+                    .buttonStyle(AutomalityChipStyle(isSelected: selection == mode))
+            }
+        }
+        .fixedSize()
     }
 }
 
