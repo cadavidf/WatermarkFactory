@@ -437,3 +437,262 @@ existing format/quality controls, default empty/off (no cap). Example target:
   other export controls.
 - Completion summary should note how many images (if any) couldn't fully reach
   the target and were shipped at their closest achievable size.
+
+## Addendum: Automality design system adoption + Order & Rename stage (v3.0)
+
+### Part A — adopt AutomalityUI
+Add the local `AutomalityUI` Swift Package (at `~/Dev/AutomalityUI`, built
+separately per its own SPEC.md) as a local path dependency of this Xcode
+project. Restyle the existing UI to use it in place of default SwiftUI/system
+styling:
+- All primary action buttons (Choose Folder/Images/Watermark, Watermark All
+  Images, Save Preset) use `AutomalityButtonStyle`.
+- Each existing `ControlSection` (Watermark source / Size & Opacity / Position
+  & Padding / Layout mode / Export / Presets) is rebuilt on `AutomalitySectionBox`
+  so related controls read as a visually connected, labeled group — this is
+  the "bounding box that shows what relates to what" the design pass is for.
+- Replace ad hoc colors/spacing introduced by earlier iterative feature passes
+  with the token set from AutomalityUI (8pt grid, teal/ink/offWhite palette,
+  hard shadows, no rounded corners beyond the 2pt input allowance).
+- Do not restyle the live preview canvas's own content (the composited photo
+  preview) — only the chrome/controls around it.
+
+### Part B — stage progress navigation
+Add an `AutomalityProgressNav` across the top of the window with four stages:
+**1. Select Images → 2. Watermark → 3. Order & Rename → 4. Export**. This
+replaces (or sits above, if layout requires) the current always-visible
+three-pane layout — the app becomes stage-driven: each stage shows the
+relevant pane(s) for that step, and the nav lets the user jump back to any
+already-visited stage (never forward-skip past the current furthest-reached
+stage, per AutomalityProgressNav's own navigation rule). Concretely:
+- **Stage 1 (Select Images)**: folder/image picker + thumbnail list (today's
+  sidebar), advances automatically (or via a "Next" button) once at least one
+  image is loaded.
+- **Stage 2 (Watermark)**: today's watermark controls + live preview +
+  filmstrip, advances once a watermark is chosen (Export itself still isn't
+  triggered here — this stage is just for dialing in appearance).
+  Reordering/renaming doesn't belong here.
+- **Stage 3 (Order & Rename)**: the new feature described in Part C below.
+- **Stage 4 (Export)**: today's Export section (format/quality/max file
+  size/prefix/suffix/platform presets/Watermark All Images button) plus a
+  summary of the chosen order so the user can confirm before running the
+  batch.
+- Settings/presets persistence, live preview, and all existing functional
+  behavior from v1.x/v2.0 must keep working exactly as before — this is a
+  navigation/layout restructuring, not a rewrite of underlying logic. Reuse
+  the existing `AppState` and view logic; wrap/reorganize, don't reimplement.
+
+### Part C — Order & Rename stage (new feature)
+On Stage 3, show all loaded images in a grid (thumbnail per image, using the
+existing `Thumb` view). The user assigns an export order two ways, both
+available and interoperable:
+- **Click-to-number**: clicking an unordered thumbnail stamps it with the next
+  sequence number (starting at 1) as a visible badge overlay on the thumbnail.
+  Clicking an already-numbered thumbnail again removes its number and shifts
+  every later number down by one (so numbers stay contiguous, no gaps).
+- **Drag-and-drop reorder**: images can also be dragged to reposition within
+  the grid; the grid's visual left-to-right/top-to-bottom position IS the
+  order (numbers renumber automatically to match position after a drag).
+  Combine cleanly with click-to-number: dragging an unordered image into the
+  ordered sequence assigns it a number at that position; dragging within the
+  numbered sequence renumbers everyone between old and new position.
+- A **"Clear order"** button resets all numbering (images become unordered
+  again — export then falls back to today's default filename order, i.e. no
+  sequence number applied).
+- A **"Number in current order"** convenience button auto-assigns 1..N in the
+  grid's current display order in one click (for the common case where the
+  user just wants to number everything as currently sorted, without
+  clicking/dragging each one).
+- Images with no assigned number are visually distinct (dimmed/no badge) and
+  are still exported — see filename rule below — they just don't get a
+  sequence number prefix.
+- **Filename rule (per user decision — number is ADDED to the existing
+  filename, not a replacement)**: for a numbered image, the sequence number is
+  prepended to the existing computed output filename (which already includes
+  the user's prefix/suffix/format-extension logic from earlier versions), zero
+  -padded to the width needed for the total numbered count (e.g. 01_, 02_...
+  09_, 10_ for 10+ images; just the number if 1-9 total images, no padding
+  needed — pick a sane padding width from the count of *numbered* images, not
+  total images). Example: source `beach.jpg`, existing prefix `wm_`, assigned
+  order 3 of 12 → `wm_03_beach.jpg` (number inserted right after the existing
+  prefix, before the base filename; unordered images keep exactly today's
+  `wm_beach.jpg` filename with no number). Update `ImageProcessor.outputFilename`
+  accordingly, threading the assigned order value through.
+- Persist the assigned order (as part of session state, keyed by image URL)
+  the same way other settings persist, so it survives app relaunch as long as
+  the same images are still loaded.
+- Stage 4 (Export)'s summary should show "N of M images numbered" so the user
+  can confirm before running the batch.
+
+## Addendum: fix light/dark contrast regressions from v3.0 (v3.1)
+
+**Root cause (confirmed via code read, not guesswork)**: `AutomalityButtonStyle`
+and `AutomalityProgressNav` correctly use only fixed `AutomalityColor` tokens, so
+they render consistently regardless of system appearance — that's why the top
+progress nav is legible. But `ContentView.swift` was only partially migrated in
+v3.0: many controls still use plain system-adaptive SwiftUI colors
+(`.foregroundStyle(.secondary)`, `.buttonStyle(.bordered).tint(.secondary)`,
+`Color(NSColor.textBackgroundColor)`, `Color(NSColor.controlBackgroundColor)`),
+which resolve differently depending on whether macOS is in Light or Dark mode.
+Since every `AutomalitySectionBox` is a *fixed* light `offWhite` panel with fixed
+`ink` borders (never adapts), any leftover system-adaptive text/tint inside or
+near those boxes can end up near-invisible (confirmed: on a system in Dark Mode,
+`.secondary` resolves to a light color meant for dark backgrounds, rendering as
+faint light-gray-on-light-offWhite — exactly the washed-out "Tiny (10%)" size
+chips, "Opacity" readouts, and "1 images found." status text seen in the bug
+report screenshot).
+
+**The fix is NOT to add a dark theme** — the Automality brand spec (per its own
+design tokens) is a fixed light palette, not an adaptive one. The fix is to
+finish the migration: eliminate every remaining system-adaptive color reference
+in `ContentView.swift` so the whole app is internally consistent and renders
+identically regardless of the user's system light/dark setting (this guarantees
+correct contrast in both, since the app's own colors never change).
+
+Concretely:
+1. **Sweep every `.foregroundStyle(.secondary)` in ContentView.swift** (status
+   captions, value readouts, hints, "N images found" text, preset value labels,
+   etc.) and replace with an explicit, sufficiently-legible Automality token —
+   add a new semantic alias to AutomalityColor if useful (e.g.
+   `AutomalityColor.inkMuted` = ink at reduced opacity, ~0.6, for secondary/
+   caption text) so this doesn't need to be a one-off judgment call per site.
+2. **Fix the preset chips** (`presetSection` in ContentView.swift: Size/Opacity
+   Tiny/Small/Medium/Large/Full and Ghost/Subtle/Balanced/Bold/Solid) and the
+   9-anchor position grid and any other `.buttonStyle(.bordered).tint(...)`
+   controls — replace with a proper Automality-consistent chip style (can be a
+   new small `AutomalityChipStyle`-equivalent added to ContentView.swift itself
+   if it doesn't belong in the shared package, or promoted into AutomalityUI if
+   it's clearly reusable) with explicit selected/unselected fill+text+border
+   colors from the token set, never relying on `.secondary`/`.accentColor`.
+3. **Fix `Color(NSColor.textBackgroundColor)` / `Color(NSColor.controlBackgroundColor)`**
+   usages (live preview canvas background, filmstrip strip background) —
+   replace with fixed Automality tokens (e.g. `gray100`/`offWhite`) so these
+   panes don't flip to a jarring near-black in system Dark Mode while
+   everything else stays fixed-light. The composited photo/watermark preview
+   image itself is unaffected (it's real photo content, not a themed surface).
+4. **Verify (don't just assume) the Part A behavior from v2.0 still holds after
+   the v3.0 stage restructuring**: as soon as images are loaded, the live
+   preview area must show the plain source image (or its thumbnail) even
+   before a watermark is chosen — the screenshot shows a populated thumbnail
+   next to what looks like an empty/blank center preview pane on the Watermark
+   stage, which suggests this may have regressed during the v3.0 rework. Trace
+   `previewImage`/`updateEstimate()` through the new stage-based view and fix
+   if broken; if it turns out to be intentional/still-correct, leave it and
+   just fix the background-color issue.
+5. Placeholder/empty-state text (e.g. "Select an image to preview.") must use
+   an explicit Automality ink-family color, not `.secondary`, so it's legible
+   against the new fixed background from point 3.
+6. After the sweep, there should be **zero** remaining references to
+   `.secondary`, `.tint(.secondary)`, `Color(NSColor.textBackgroundColor)`, or
+   `Color(NSColor.controlBackgroundColor)` in ContentView.swift — grep to
+   confirm as part of verification.
+7. This is a visual/contrast bug fix — do not change any functional behavior,
+   export logic, or the stage/ordering features from v3.0 while doing this
+   pass (same constraint as the earlier pure-layout polish pass).
+
+## Addendum: Guided/Compact flow modes + Smart Placement (v3.2)
+
+Decisions locked in (do not re-litigate these, implement as stated):
+- Two full layout modes sharing the same `AppState`/logic: **Guided** (today's
+  4-stage wizard) and **Compact** (dense single-screen, no stage gating).
+- Smart Placement is suggest-then-apply — it NEVER changes settings without an
+  explicit user click on "Apply".
+- Watermark tint variants are generated at runtime from the single watermark
+  image the user provides (no second asset required from them).
+- Build all of this in one pass (not staged into a later request).
+
+### Part A — Guided ⇄ Compact mode toggle
+- Add a small Automality-styled segmented toggle (new `AutomalityModeToggle`-
+  style control, can live in AutomalityUI or directly in WatermarkFactory if
+  it's not clearly reusable elsewhere — your call) fixed at the top of the
+  window, next to/above the existing `AutomalityProgressNav`.
+- **Guided** = current v3.1 behavior exactly (4-stage wizard, nav, everything
+  already built) — no regressions.
+- **Compact** = single screen showing all three panes at once (source list /
+  live preview+filmstrip / all controls including Order & Rename and Export),
+  similar in spirit to the pre-v3.0 three-pane layout, but restyled with the
+  Automality components already built (buttons, section boxes) — this is a
+  new arrangement of existing views/state, not new functionality. Order &
+  Rename's grid can be a collapsible `AutomalitySectionBox` within this layout
+  rather than a separate stage.
+- Persist the chosen mode (UserDefaults) same as other settings, so it's
+  remembered across launches.
+- Relabel Stage 3/4 in the Guided progress nav as "Reorder *(optional)*" and
+  "Rename *(optional)*" — actually these are really one combined stage today
+  ("Order & Rename"); split the *label* to make clear numbering-order is
+  optional and doesn't block export, or add a visible "Skip" button on that
+  stage that advances to Export without assigning any order (functionally
+  this already works today since unordered images export fine — this is a
+  labeling/affordance fix, not a logic change).
+
+### Part B — Export format explainer
+On the Export stage/section, expand the existing format hint text (currently
+one line via `ExportFormat.hint`) into a slightly fuller inline explainer
+covering practical guidance for real-estate-listing use, e.g.:
+- JPEG: "Best for photos going to listing sites — small files, fast uploads,
+  no transparency needed."
+- PNG: "Use only if you need transparency or plan to edit further — much
+  larger files, most listing portals don't need this."
+- TIFF: "Archival/print-quality only — very large files, not for web upload."
+- Keep this short (1-2 sentences per format, shown for the currently selected
+  format, not all three at once) — don't turn this into a wall of text.
+
+### Part C — Smart Placement (Vision-based suggestion)
+Add a **"Suggest Placement"** button on the Watermark stage/section (both
+Guided and Compact modes), enabled once both an image and a watermark are
+loaded. On tap, analyze the *currently previewed source image* using Apple's
+`Vision` framework (already available, no new dependency, no extra
+entitlement needed — confirmed via existing sandbox entitlements) and produce
+a proposal — NOT applied automatically:
+1. **Saliency avoidance**: run `VNGenerateAttentionBasedSaliencyImageRequest`
+   on the source image to get its salient-region bounding box. Among the 9
+   anchor positions, prefer whichever anchor's watermark-placement rect has
+   the least overlap with the salient region (ties broken toward the current
+   anchor, to avoid needless suggestion churn).
+2. **Optical centering / safe margin**: compute a recommended padding value as
+   ~4% of the image's shorter dimension (a real minimum-margin rule, not a
+   fixed px default) — if the anchor is `.center`, additionally offset the
+   watermark ~5% of image height upward from literal geometric center (the
+   classic "optical center sits above true center" design rule) via the
+   Y-offset field, not a change to the centering math itself.
+3. **Tint recommendation**: sample the average luminance of the source image's
+   pixels within the proposed watermark placement rect. If dark (below a
+   reasonable midpoint threshold), recommend an offWhite/light runtime variant
+   of the watermark; if light, recommend the watermark as provided (or an
+   ink-tinted dark variant if the original watermark is itself very light and
+   would still be low-contrast against a light region). Generate the runtime
+   variant via a `CIFilter`/`CGContext` luminosity-based recolor (not a new
+   asset) — implement as a pure function so it's testable independent of the
+   Vision call.
+4. Show the proposal as a **preview overlay + explanation card** (e.g. "Move
+   to top-right, increase padding to 32px, use light-tinted watermark — avoids
+   the busiest part of your photo and improves contrast") with **Apply** and
+   **Dismiss** buttons. Apply writes the suggested anchor/offset/padding/tint
+   choice into the existing settings (reuses existing fields; tint becomes a
+   new setting — see below). Dismiss discards the proposal with no changes.
+5. **New setting**: add `watermarkTint: WatermarkTint` (`.original`, `.light`,
+   `.dark`) to `WatermarkSettings`, defaulting to `.original` (today's
+   behavior, unchanged unless the user applies a suggestion or picks a tint
+   manually). Also expose it as a small manual control (segmented picker:
+   Original/Light/Dark) near the watermark source picker, independent of
+   Smart Placement, so a user can pick a tint without running the suggestion
+   flow at all. `ImageProcessor.compose` must apply the selected tint to the
+   watermark image before compositing.
+6. Handle the no-saliency-result / analysis-failure case gracefully (Vision
+   requests can fail on some images) — fall back to just the margin/tint
+   heuristics without the saliency-avoidance step, never crash or block the
+   UI; show a brief note if saliency specifically couldn't be computed.
+7. Add unit tests for the pure, non-Vision-dependent logic: the luminance-
+   sampling → tint decision function, the optical-center offset formula, and
+   the safe-margin percentage calculation. Vision's actual saliency call
+   itself doesn't need a unit test (it's a system framework call) but the
+   "pick the anchor with least saliency overlap" comparison logic, given a
+   fake bounding box, should be unit-testable.
+
+### Verification
+- Both app build and `WatermarkFactoryTests` must pass (use a derivedDataPath
+  under /tmp).
+- Guided mode must be pixel-for-pixel unchanged in behavior from v3.1 (only
+  additive: the mode toggle, the Skip/optional labeling, the Suggest
+  Placement button, the manual tint picker).
+- Commit incrementally (Part A, then B, then C) rather than one giant commit.

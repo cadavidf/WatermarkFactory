@@ -743,12 +743,15 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: spacing) {
                     ControlSection("Export summary") {
                         Text(state.orderSummary)
+                            .foregroundStyle(AutomalityColor.ink)
                         ForEach(state.orderedItems.prefix(8)) { item in
                             HStack {
                                 Text(state.orderNumber(for: item).map { "\($0)." } ?? "-")
                                     .frame(width: 32, alignment: .trailing)
                                     .foregroundStyle(AutomalityColor.inkMuted)
-                                Text(item.filename).lineLimit(1)
+                                Text(item.filename)
+                                    .lineLimit(1)
+                                    .foregroundStyle(AutomalityColor.ink)
                             }
                         }
                         if state.images.count > 8 {
@@ -1040,19 +1043,21 @@ struct ContentView: View {
     }
 
     private var orderRenameHeader: some View {
-        HStack {
+        VStack(alignment: .leading, spacing: AutomalitySpacing.sm) {
             Text(state.orderSummary)
                 .font(.headline)
-            Spacer()
-            Button("Clear order") { state.clearOrder() }
-                .buttonStyle(.automalitySecondary)
-                .disabled(state.numberedCount == 0)
-            Button("Number in current order") { state.numberInCurrentOrder(state.orderedItems) }
-                .buttonStyle(.automalityPrimary)
-                .disabled(state.images.isEmpty)
-            Button("Skip") { state.advance(to: .export) }
-                .buttonStyle(.automalitySecondary)
-                .disabled(state.images.isEmpty || state.watermarkURL == nil)
+                .foregroundStyle(AutomalityColor.ink)
+            FlowLayout {
+                Button("Clear order") { state.clearOrder() }
+                    .buttonStyle(.automalitySecondary)
+                    .disabled(state.numberedCount == 0)
+                Button("Number in current order") { state.numberInCurrentOrder(state.orderedItems) }
+                    .buttonStyle(.automalityPrimary)
+                    .disabled(state.images.isEmpty)
+                Button("Skip") { state.advance(to: .export) }
+                    .buttonStyle(.automalitySecondary)
+                    .disabled(state.images.isEmpty || state.watermarkURL == nil)
+            }
         }
     }
 
@@ -1087,6 +1092,7 @@ struct ContentView: View {
             }
             Text(item.filename)
                 .font(.caption)
+                .foregroundStyle(AutomalityColor.inkMuted)
                 .lineLimit(2)
                 .frame(width: 128, alignment: .leading)
         }
@@ -1337,7 +1343,48 @@ struct Thumb: View {
     }
 }
 
-struct FlowLayout<Content: View>: View {
-    @ViewBuilder var content: Content
-    var body: some View { VStack(alignment: .leading) { content } }
+/// A real wrapping layout: lays children left-to-right, wrapping whole
+/// children (never breaking text mid-word) onto a new row once the current
+/// row runs out of horizontal room.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = AutomalitySpacing.xs
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var totalWidth: CGFloat = 0
+        var totalHeight: CGFloat = 0
+        var lineWidth: CGFloat = 0
+        var lineHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if lineWidth > 0, lineWidth + spacing + size.width > maxWidth {
+                totalWidth = max(totalWidth, lineWidth)
+                totalHeight += lineHeight + spacing
+                lineWidth = 0
+                lineHeight = 0
+            }
+            lineWidth += (lineWidth > 0 ? spacing : 0) + size.width
+            lineHeight = max(lineHeight, size.height)
+        }
+        totalWidth = max(totalWidth, lineWidth)
+        totalHeight += lineHeight
+        return CGSize(width: totalWidth, height: totalHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX
+        var y = bounds.minY
+        var lineHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > bounds.minX, x + size.width > bounds.maxX {
+                x = bounds.minX
+                y += lineHeight + spacing
+                lineHeight = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            lineHeight = max(lineHeight, size.height)
+        }
+    }
 }
