@@ -871,10 +871,12 @@ struct ContentView: View {
                 Spacer()
                 if let url = state.watermarkURL { Thumb(url: url, size: 56) }
             }
+            Text("Tint").automalityLabelText().foregroundStyle(AutomalityColor.ink)
             Picker("Tint", selection: $state.watermarkTint) {
                 ForEach(WatermarkTint.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
             Button {
                 state.suggestPlacement()
             } label: {
@@ -914,6 +916,7 @@ struct ContentView: View {
                 ForEach(LayoutMode.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
             if state.layoutMode == .tiled { tiledControls }
         }
     }
@@ -931,10 +934,12 @@ struct ContentView: View {
 
     private var exportSection: some View {
         ControlSection("Export") {
+            Text("Export format").automalityLabelText().foregroundStyle(AutomalityColor.ink)
             Picker("Export format", selection: $state.exportFormat) {
                 ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
             Toggle("Optimize for Web", isOn: Binding(get: { state.optimizeForWeb }, set: { state.setOptimizeForWeb($0) }))
                 .toggleStyle(.button)
                 .buttonStyle(AutomalityChipStyle(isSelected: state.optimizeForWeb))
