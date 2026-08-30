@@ -2,9 +2,11 @@ import SwiftUI
 
 @main
 struct WatermarkFactoryApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(state: .shared)
                 .frame(minWidth: 1180, minHeight: 720)
                 // Automality is a fixed light brand palette, not a dark-adaptive
                 // one (see AutomalityColor). Pinning colorScheme here isn't just
@@ -16,5 +18,18 @@ struct WatermarkFactoryApp: App {
                 // SwiftUI-level .background()/.foregroundStyle() override.
                 .environment(\.colorScheme, .light)
         }
+    }
+}
+
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var didFinishLaunching = false
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        didFinishLaunching = true
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        AppState.shared.openFromFinder(urls, autoQuitWhenDone: !didFinishLaunching)
     }
 }

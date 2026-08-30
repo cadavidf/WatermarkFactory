@@ -217,6 +217,17 @@ final class ImageProcessorMetadataTests: XCTestCase {
         XCTAssertEqual(tracker.active, [kept, added])
     }
 
+    @MainActor
+    func testOpenedURLInputPrefersFolderOtherwiseUsesFiles() {
+        let folder = URL(fileURLWithPath: "/fake/photos", isDirectory: true)
+        let first = URL(fileURLWithPath: "/fake/a.jpg")
+        let second = URL(fileURLWithPath: "/fake/b.png")
+
+        XCTAssertEqual(AppState.openedURLInput(from: [first, folder, second], isDirectory: { $0 == folder }), .folder(folder))
+        XCTAssertEqual(AppState.openedURLInput(from: [first, second], isDirectory: { _ in false }), .images([first, second]))
+        XCTAssertNil(AppState.openedURLInput(from: [], isDirectory: { _ in false }))
+    }
+
     private func export(_ source: URL, to output: URL, format: ExportFormat) throws {
         let watermark = tempDir.appendingPathComponent("watermark.png")
         try writeImage(watermark, type: .png)

@@ -9,6 +9,8 @@ extension AutomalityColor {
 
 @MainActor
 final class AppState: ObservableObject {
+    static let shared = AppState()
+
     enum Stage: Int, CaseIterable {
         case selectImages, watermark, orderRename, export
 
@@ -67,6 +69,11 @@ final class AppState: ObservableObject {
     @Published var smartPlacementProposal: SmartPlacementProposal?
     @Published var presets: [WatermarkPreset] = []
     @Published var orderedImageURLs: [URL] = [] { didSet { saveImageOrder() } }
+
+    enum OpenedURLInput: Equatable {
+        case folder(URL)
+        case images([URL])
+    }
 
     private var previewTask: Task<Void, Never>?
     private var sourceSizeURL: URL?
@@ -246,8 +253,35 @@ final class AppState: ObservableObject {
         updateEstimate(delay: 0)
     }
 
-    func exportAll() {
-        guard let watermark = watermarkURL else { return }
+    func openFromFinder(_ urls: [URL], autoQuitWhenDone: Bool) {
+        guard let input = Self.openedURLInput(from: urls) else { return }
+        open(input)
+        if canExport {
+            exportAll { success in
+                guard success, autoQuitWhenDone else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    NSApp.terminate(nil)
+                }
+            }
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
+    func open(_ input: OpenedURLInput) {
+        switch input {
+        case .folder(let url):
+            setFolder(url)
+        case .images(let urls):
+            setImages(urls)
+        }
+    }
+
+    func exportAll(completion: ((Bool) -> Void)? = nil) {
+        guard let watermark = watermarkURL else {
+            completion?(false)
+            return
+        }
         isExporting = true
         progress = 0
         status = "Exporting 0 of \(images.count)..."
@@ -294,6 +328,7 @@ final class AppState: ObservableObject {
                 if !summary.unmetSizeTarget.isEmpty { text += " \(summary.unmetSizeTarget.count) couldn't reach the max file size target and were shipped at their closest achievable size." }
                 if !summary.failed.isEmpty { text += " Failed: \(summary.failed.joined(separator: ", "))." }
                 self.status = text
+                completion?(summary.success == items.count && summary.failed.isEmpty)
             }
         }
     }
@@ -595,6 +630,13 @@ final class AppState: ObservableObject {
         value.replacingOccurrences(of: "/", with: "").replacingOccurrences(of: "\0", with: "")
     }
 
+    static func openedURLInput(from urls: [URL], isDirectory: (URL) -> Bool = { url in
+        (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+    }) -> OpenedURLInput? {
+        if let folder = urls.first(where: isDirectory) { return .folder(folder) }
+        return urls.isEmpty ? nil : .images(urls)
+    }
+
     private func syncPresetSelections() {
         sizePreset = WatermarkSizePreset.allCases.first { abs($0.value - sizeFraction) < 0.0001 }
         opacityPreset = OpacityPreset.allCases.first { abs($0.value - opacity) < 0.0001 }
@@ -602,7 +644,7 @@ final class AppState: ObservableObject {
 }
 
 struct ContentView: View {
-    @StateObject private var state = AppState()
+    @ObservedObject private var state: AppState
     @State private var isNamingPreset = false
     @State private var presetName = ""
     @State private var duplicatePresetName = ""
@@ -612,6 +654,10 @@ struct ContentView: View {
     private let previewMinWidth: CGFloat = 560
     private let spacing: CGFloat = AutomalitySpacing.sm
     private let panePadding: CGFloat = AutomalitySpacing.sm
+
+    init(state: AppState = .shared) {
+        self.state = state
+    }
 
     var body: some View {
         VStack(spacing: AutomalitySpacing.sm) {
