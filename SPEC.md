@@ -1055,3 +1055,101 @@ phase; do not touch video/AVFoundation in this pass).
 - `xcodebuild ... build` and `... test` tails, same as Phase 1's
   verification section.
 
+
+## Chat flow mode — Phase 2: tiered local backend, no Ollama dependency
+
+Replaces Phase 1's Ollama-backed `IntentParser` (kept working until this
+lands, then removed) with three tiers the user picks between on first use
+of Chat mode. **No "bring your own OpenAI-compatible endpoint" tier in this
+pass** — explicitly deferred; that needs Keychain-backed credential storage
+and its own appsec-mode review later.
+
+### Tiers, in preference order
+1. **Apple Foundation Models** (macOS 26+, Apple Intelligence-enabled Mac,
+   user has it turned on) — zero download, zero setup, silently used if
+   available. Check via `SystemLanguageModel.default.availability` from
+   Apple's `FoundationModels` framework (or the `MLXFoundationModels`
+   bridge product in `mlx-swift-lm` if it wraps this more conveniently —
+   inspect that package's actual API before committing to one or the
+   other, don't guess).
+2. **Downloaded local model** (MLX Swift, Apple Silicon only) — one-time
+   ~1.8GB download of `mlx-community/Llama-3.2-3B-Instruct-4bit` via
+   `LLMRegistry.llama3_2_3B_4bit`, run in-process afterward. Chosen for
+   officially-documented Spanish + English support (Meta lists Spanish
+   among Llama 3.2's 8 supported languages) — this app needs to handle
+   Spanish-language chat input, not just English.
+3. **Scripted fallback** (already built in Phase 1/1b, `ChatFlowView`'s
+   `applyScripted`) — always available, zero dependency, no changes needed
+   here beyond keeping it reachable.
+
+### Package dependency
+Add `https://github.com/ml-explore/mlx-swift-lm` as an SPM dependency,
+products `MLXLLM` and `MLXLMCommon` (and `MLXFoundationModels` if tier 1's
+check is cleaner through it — verify at implementation time). This is
+Apple Silicon-only; on Intel Macs, tiers 1-2 are simply unavailable and the
+app goes straight to tier 3 — check `#if arch(arm64)` or the equivalent
+runtime capability check, don't let this crash on an Intel build.
+
+### `IntentBackend` abstraction
+Define a protocol so `ChatFlowView` doesn't care which tier is active:
+```swift
+protocol IntentBackend {
+    func parse(message: String, unansweredSlots: [String]) async throws -> IntentSlots
+}
+```
+`FoundationModelBackend` and `MLXBackend` both conform, reusing the same
+system prompt / `IntentSlots` JSON contract `IntentParser.systemPrompt`
+already defines in Phase 1 (don't redesign the prompt or slot schema —
+only the transport/inference layer changes). Move `IntentParser`'s
+existing prompt-building logic into a shared place both backends call.
+
+### Onboarding flow (new, in `ChatFlowView` or a small new
+`ChatBackendSetupView`)
+- On first navigation to the Chat tab in a session: silently check tier 1.
+  If available, use it — no prompt, ever.
+- Else, check if the MLX model is already cached on disk from a prior
+  session (`LLMModelFactory`/`HubClient`'s local cache — check its API for
+  how to test this without triggering a download). If cached, use it
+  silently too.
+- Else, show a one-time sheet: "Chat mode uses a small local AI model to
+  understand what you type (~1.8GB one-time download, runs fully on this
+  Mac afterward)." with two choices: **"Download and start"** / **"Skip —
+  use simple click-through questions instead."**
+  - Download: show real progress from the loader's progress handler
+    (percentage or bytes/total, whichever the API actually exposes — don't
+    fake a progress bar), a Cancel button that aborts cleanly, and on
+    completion transitions straight into the first chat question.
+  - Skip: proceeds with the scripted tier for this session.
+- Persist the resulting choice in `UserDefaults`
+  (`chatBackendPreference: "foundationModel" | "mlxDownloaded" |
+  "scriptedOnly"`) so the sheet doesn't reappear on next launch. Add a
+  small, low-emphasis "Change chat AI settings..." link somewhere in the
+  Chat panel (footer is fine) so the user can revisit this later — e.g. a
+  Skip user who changes their mind, or to re-trigger a download that was
+  cancelled.
+
+### Removal
+Delete `WatermarkFactory/IntentParser.swift`'s Ollama HTTP-calling code
+(`URLSession` POST to `localhost:11434`, `OllamaRequest`/`OllamaResponse`)
+once `FoundationModelBackend`/`MLXBackend` replace it — keep
+`IntentParser.decodeSlots`/`systemPrompt`/`slotNames` if they're reused by
+the new backends, delete the rest. Update `IntentParserTests` accordingly;
+its existing JSON-decoding/preset tests should still pass unchanged since
+`IntentSlots`/`IntentPreset` aren't touched by this phase.
+
+### Verification
+- This phase's live paths (real Foundation Model call, real ~1.8GB MLX
+  download + inference, the progress UI, cancel-mid-download) are
+  **manual-only** — note explicitly in your summary which parts you could
+  not verify by running `xcodebuild test`, same as this file's existing
+  "manual verification only" notes elsewhere. Do not claim these work
+  end-to-end without having actually run them.
+- What CAN be unit-tested without live downloads: `ChatBackendPreference`
+  persistence round-trip, the tier-selection logic given mocked
+  availability states (Foundation Model available / MLX cached / neither),
+  and that `IntentBackend` conformances compile and satisfy the protocol
+  (a fake/mock `IntentBackend` fed to `ChatFlowView` to test its UI logic
+  without a real model, if the view's structure allows injecting one —
+  refactor for that testability if it doesn't already).
+- All existing tests (23 as of Phase 1b) must still pass.
+
