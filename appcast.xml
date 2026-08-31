@@ -3,6 +3,19 @@
     <channel>
         <title>WatermarkFactory</title>
         <item>
+            <title>1.2.2</title>
+            <pubDate>Mon, 31 Aug 2026 12:07:09 -0500</pubDate>
+            <sparkle:version>15</sparkle:version>
+            <sparkle:shortVersionString>1.2.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <ul>
+                    <li>The intensity matrix's drag handle is now orange for better visibility.</li>
+                </ul>
+            ]]></description>
+            <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.2.2/WatermarkFactory.dmg" length="2374105" type="application/octet-stream" sparkle:edSignature="cybQkXifEQJX/WAlK6GvBLXcEd0GRO0WUNepsTi4lGlHWTadYwfAts7OjDgFyp4rRwDJjnV9vb/9QUXdLR5AAg=="/>
+        </item>
+        <item>
             <title>1.2.1</title>
             <pubDate>Mon, 31 Aug 2026 12:02:03 -0500</pubDate>
             <sparkle:version>14</sparkle:version>
@@ -30,19 +43,6 @@
                 </ul>
             ]]></description>
             <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.2.0/WatermarkFactory.dmg" length="2345978" type="application/octet-stream" sparkle:edSignature="TrVdjj1raldvAq/HgVpLaLDeN8hliZGfTF0UZaK2NYmITjfvDrxHGKP88Y43XHWEBWomxXgA+NXZ++RHStIuDA=="/>
-        </item>
-        <item>
-            <title>1.1.9</title>
-            <pubDate>Mon, 31 Aug 2026 11:36:45 -0500</pubDate>
-            <sparkle:version>12</sparkle:version>
-            <sparkle:shortVersionString>1.1.9</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <description><![CDATA[
-                <ul>
-                    <li>After your first successful export, WatermarkFactory now offers to walk you through adding a Finder right-click Quick Action for next time -- in-app step-by-step instructions, no automatic filesystem changes.</li>
-                </ul>
-            ]]></description>
-            <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.1.9/WatermarkFactory.dmg" length="2333353" type="application/octet-stream" sparkle:edSignature="k0gUE4fLSNJAyXEUX94QI020He0ftCZ0pO+blTFVo/9C4VtUXqCFowhbEspc9dpx9Vh2ctnDliB5n+evl6gFCw=="/>
         </item>
         <item>
             <title>1.1.2</title>
