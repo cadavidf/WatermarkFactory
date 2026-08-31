@@ -787,10 +787,16 @@ struct ContentView: View {
             AutomalitySegmentedControl(options: FlowMode.allCases, selection: $state.flowMode, label: \.label)
                 .fixedSize()
             if state.flowMode == .guided {
-                AutomalityProgressNav(steps: AppState.Stage.allCases.map(\.title), currentStep: Binding(
-                    get: { state.stage.rawValue },
-                    set: { if let stage = AppState.Stage(rawValue: $0) { state.advance(to: stage) } }
-                ))
+                // Scrolls rather than clips/truncates if 5 steps plus
+                // longer localized titles don't fit the window width --
+                // Next stays outside the scroll area so it's never the
+                // thing that goes offscreen.
+                ScrollView(.horizontal, showsIndicators: false) {
+                    AutomalityProgressNav(steps: AppState.Stage.allCases.map(\.title), currentStep: Binding(
+                        get: { state.stage.rawValue },
+                        set: { if let stage = AppState.Stage(rawValue: $0) { state.advance(to: stage) } }
+                    ))
+                }
                 Spacer()
                 nextButton
             } else {
