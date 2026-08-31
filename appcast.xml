@@ -3,6 +3,19 @@
     <channel>
         <title>WatermarkFactory</title>
         <item>
+            <title>1.2.4</title>
+            <pubDate>Mon, 31 Aug 2026 12:14:38 -0500</pubDate>
+            <sparkle:version>17</sparkle:version>
+            <sparkle:shortVersionString>1.2.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <ul>
+                    <li>Watermark All Images moved to the top-right header on the Export stage -- orange, always visible, no more scrolling to the bottom of the settings to find it.</li>
+                </ul>
+            ]]></description>
+            <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.2.4/WatermarkFactory.dmg" length="2392474" type="application/octet-stream" sparkle:edSignature="/6Gy9/o6J6RuggdaVBpruA3LNxeoRtHrikNanBykAprlxZt0hk+HImvgPFs4nVkToZQD3CuA3DDPnPwEOYRkBg=="/>
+        </item>
+        <item>
             <title>1.2.3</title>
             <pubDate>Mon, 31 Aug 2026 12:11:48 -0500</pubDate>
             <sparkle:version>16</sparkle:version>
@@ -28,21 +41,6 @@
                 </ul>
             ]]></description>
             <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.2.2/WatermarkFactory.dmg" length="2374105" type="application/octet-stream" sparkle:edSignature="cybQkXifEQJX/WAlK6GvBLXcEd0GRO0WUNepsTi4lGlHWTadYwfAts7OjDgFyp4rRwDJjnV9vb/9QUXdLR5AAg=="/>
-        </item>
-        <item>
-            <title>1.2.1</title>
-            <pubDate>Mon, 31 Aug 2026 12:02:03 -0500</pubDate>
-            <sparkle:version>14</sparkle:version>
-            <sparkle:shortVersionString>1.2.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <description><![CDATA[
-                <ul>
-                    <li>Watermark Intensity is now a real 2D matrix: drag to set size and layout style (Single/Rotated/Tiled/Tiled+Rotated) together, opacity stays independently adjustable and shows live on the drag handle.</li>
-                    <li>Discrete is now less opaque, Protective is fully opaque -- both per direct feedback.</li>
-                    <li>Single (non-tiled) watermarks can now be rotated, not just tiled ones.</li>
-                </ul>
-            ]]></description>
-            <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.2.1/WatermarkFactory.dmg" length="2374067" type="application/octet-stream" sparkle:edSignature="ou7IaeEDNXLeCNerTglTJ7oU11dt4/71CvOMSQCNrPMb3c/4mB4PuDWNwXBdslUABb8ARPoBMgKytpchH78gDA=="/>
         </item>
         <item>
             <title>1.1.2</title>
