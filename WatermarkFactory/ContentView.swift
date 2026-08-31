@@ -12,12 +12,13 @@ final class AppState: ObservableObject {
     static let shared = AppState()
 
     enum Stage: Int, CaseIterable {
-        case selectImages, watermark, orderRename, export
+        case selectImages, watermark, position, orderRename, export
 
         var title: String {
             switch self {
             case .selectImages: "Select Images"
             case .watermark: "Watermark"
+            case .position: "Position"
             case .orderRename: "Order & Rename (optional)"
             case .export: "Export"
             }
@@ -184,7 +185,7 @@ final class AppState: ObservableObject {
 
     func advanceIfReady() {
         if !images.isEmpty && stage == .selectImages { stage = .watermark }
-        if watermarkURL != nil && stage == .watermark { stage = .orderRename }
+        if watermarkURL != nil && stage == .watermark { stage = .position }
     }
 
     func orderNumber(for item: ImageItem) -> Int? {
@@ -779,12 +780,18 @@ struct ContentView: View {
             // spotlight, which stays on Choose Watermark until one's
             // actually picked.
             if state.watermarkURL == nil {
+                // Skips both Watermark AND Position -- there's nothing to
+                // position without a watermark chosen, so Position isn't a
+                // meaningful stop on the way past.
                 Button("Skip") { state.advance(to: .orderRename) }
                     .buttonStyle(.automalityPrimary)
             } else {
-                Button("Next") { state.advance(to: .orderRename) }
+                Button("Next") { state.advance(to: .position) }
                     .buttonStyle(.automalityAccent)
             }
+        case .position:
+            Button("Next") { state.advance(to: .orderRename) }
+                .buttonStyle(.automalityAccent)
         case .orderRename:
             Button("Next") { state.advance(to: .export) }
                 .buttonStyle(.automalityAccent)
@@ -800,6 +807,8 @@ struct ContentView: View {
             selectImagesStage
         case .watermark:
             watermarkStage
+        case .position:
+            positionStage
         case .orderRename:
             orderRenameStage
         case .export:
@@ -878,18 +887,28 @@ struct ContentView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: spacing) {
                     watermarkSourceSection
-                    // Choosing the watermark is its own step -- everything
-                    // about placing it (size, opacity, position/padding,
-                    // tiling, presets) only makes sense once there's
-                    // something to place, so it stays hidden until then
-                    // rather than showing a wall of controls with nothing
-                    // to apply them to.
-                    if state.watermarkURL != nil {
-                        savedPresetLibrary
-                        sizeOpacitySection
-                        layoutModeSection
-                        positionPaddingSection
-                    }
+                }
+                .padding(panePadding)
+            }
+            .frame(width: controlsWidth)
+        }
+    }
+
+    /// Size/opacity/layout/position/padding/presets -- everything about
+    /// where and how the watermark sits, kept as its own numbered step
+    /// (not just a reveal inside the Watermark stage) so the progress nav
+    /// actually reflects "choose the watermark" and "place it" as the two
+    /// separate decisions they are.
+    private var positionStage: some View {
+        HStack(spacing: 0) {
+            previewPane
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: spacing) {
+                    savedPresetLibrary
+                    sizeOpacitySection
+                    layoutModeSection
+                    positionPaddingSection
                 }
                 .padding(panePadding)
             }
