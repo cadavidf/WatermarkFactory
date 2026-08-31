@@ -33,6 +33,16 @@ final class AppState: ObservableObject {
     @Published var stage: Stage = .selectImages
     @Published var sizePreset: WatermarkSizePreset? = .medium
     @Published var opacityPreset: OpacityPreset? = .balanced
+    // Continuous 0...5 position across WatermarkIntensityPreset's six named
+    // steps (Discrete...Protective) -- the "how loud" single control.
+    // Defaults to Subtle (13% / 40% opacity), the researched professional-
+    // branding sweet spot. Setting sizeFraction/opacity/layoutMode below
+    // doesn't write back here (they're the independent fine-tuning
+    // sliders), so this only reflects deliberate intensity-control use,
+    // not just any settings change.
+    @Published var intensitySliderPosition = WatermarkIntensityPreset.subtle.sliderPosition {
+        didSet { applyIntensity() }
+    }
     @Published var sizeFraction = 0.35 { didSet { saveSettings(); updateEstimate() } }
     @Published var opacity = 0.5 { didSet { saveSettings(); updateEstimate() } }
     @Published var anchor: Anchor = .bottomRight { didSet { saveSettings(); updateEstimate() } }
@@ -60,6 +70,7 @@ final class AppState: ObservableObject {
     @Published var maxFileSizeKB = 0 { didSet { saveSettings(); updateEstimate() } }
     @Published var watermarkTint: WatermarkTint = .original { didSet { saveSettings(); updateEstimate() } }
     @Published var previewImage: NSImage?
+    @Published var isDemoPreview = false
     @Published var sourceImageSize: CGSize?
     @Published var watermarkImageSize: CGSize?
     @Published var estimatedSize = ""
@@ -233,27 +244,43 @@ final class AppState: ObservableObject {
             watermarkSizeURL = watermarkURL
             watermarkImageSize = watermarkURL.flatMap(ImageProcessor.imageSize)
         }
-        guard let source = selected?.url, let watermark = watermarkURL else {
-            previewImage = selected.flatMap { ImageProcessor.thumbnail(for: $0.url, maxPixelSize: 900) }
+        guard let source = selected?.url else {
+            previewImage = nil
             estimatedSize = ""
-            estimatedFilename = selected.map { ImageProcessor.outputFilename(for: $0.url, settings: settings, order: orderNumber(for: $0), numberedCount: numberedCount) } ?? ""
+            estimatedFilename = ""
             return
         }
-        let filename = ImageProcessor.outputFilename(for: source, settings: settings, order: selected.flatMap(orderNumber), numberedCount: numberedCount)
+        // No watermark chosen yet: preview with Automality's own bundled
+        // mark instead of nothing, so the intensity slider/presets are
+        // actually visible and meaningful before the user has anything of
+        // their own to try them on. Purely a demo -- isDemoPreview tells
+        // the UI to badge this clearly, and it never substitutes for a
+        // real watermark in export (canExport still requires watermarkURL).
+        isDemoPreview = watermarkURL == nil
+        guard let watermark = watermarkURL ?? Self.demoWatermarkURL else {
+            previewImage = ImageProcessor.thumbnail(for: source, maxPixelSize: 900)
+            estimatedSize = ""
+            estimatedFilename = ImageProcessor.outputFilename(for: source, settings: settings, order: orderNumber(for: selected!), numberedCount: numberedCount)
+            return
+        }
+        let realWatermark = watermarkURL != nil
+        let filename = realWatermark ? ImageProcessor.outputFilename(for: source, settings: settings, order: selected.flatMap(orderNumber), numberedCount: numberedCount) : ""
         previewTask = Task.detached {
             if delay > 0 { try? await Task.sleep(nanoseconds: delay) }
             if Task.isCancelled { return }
             let image = try? ImageProcessor.watermarkedImage(sourceURL: source, watermarkURL: watermark, settings: settings)
-            let data = try? ImageProcessor.encodedWatermarkData(sourceURL: source, watermarkURL: watermark, settings: settings)
+            let data = realWatermark ? try? ImageProcessor.encodedWatermarkData(sourceURL: source, watermarkURL: watermark, settings: settings) : nil
             await MainActor.run {
                 if !Task.isCancelled {
                     self.previewImage = image.map { NSImage(cgImage: $0, size: .zero) }
-                    self.estimatedSize = data.map { "~" + Self.formatBytes($0.count) } ?? ""
+                    self.estimatedSize = realWatermark ? (data.map { "~" + Self.formatBytes($0.count) } ?? "") : ""
                     self.estimatedFilename = filename
                 }
             }
         }
     }
+
+    static let demoWatermarkURL: URL? = Bundle.main.url(forResource: "automality-watermark", withExtension: "png")
 
     func dragWatermark(startX: Double, startY: Double, delta: CGSize, displayScale: CGFloat) {
         guard let sourceImageSize, let watermarkImageSize, displayScale > 0 else { return }
@@ -468,6 +495,13 @@ final class AppState: ObservableObject {
         saveBookmark(url, key: "watermarkBookmark")
         advanceIfReady()
         updateEstimate()
+    }
+
+    private func applyIntensity() {
+        let resolved = WatermarkIntensityPreset.interpolated(at: intensitySliderPosition)
+        sizeFraction = resolved.sizeFraction
+        opacity = resolved.opacity
+        layoutMode = resolved.layoutMode
     }
 
     private func apply(_ settings: WatermarkSettings) {
@@ -905,6 +939,7 @@ struct ContentView: View {
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: spacing) {
+                    intensitySection
                     savedPresetLibrary
                     sizeOpacitySection
                     layoutModeSection
@@ -1005,6 +1040,16 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .overlay(Rectangle().stroke(AutomalityColor.ink.opacity(0.2)))
+            .overlay(alignment: .top) {
+                if state.isDemoPreview {
+                    Text("Previewing with Automality's mark — choose your own watermark to replace it")
+                        .font(.caption)
+                        .foregroundStyle(AutomalityColor.offWhite)
+                        .padding(.horizontal, AutomalitySpacing.sm)
+                        .padding(.vertical, 6)
+                        .background(AutomalityColor.tealDeep.opacity(0.85))
+                }
+            }
             .clipped()
             ScrollView(.horizontal) {
                 HStack(spacing: 8) {
@@ -1086,6 +1131,32 @@ struct ContentView: View {
         }
         .frame(width: 16, height: 16)
         .overlay(Rectangle().stroke(AutomalityColor.gray300, lineWidth: 1))
+    }
+
+    /// "How loud should this be" as one control -- six named steps ordered
+    /// low to high intrusiveness (Discrete...Protective), each setting
+    /// size+opacity+layout together, plus a continuous slider that
+    /// interpolates between them for fine adjustment. The granular Size &
+    /// Opacity section below stays available for anyone who wants an exact
+    /// custom combination this ladder doesn't cover.
+    private var intensitySection: some View {
+        ControlSection("Watermark Intensity") {
+            FlowLayout {
+                ForEach(WatermarkIntensityPreset.allCases) { preset in
+                    Button(preset.label) { state.intensitySliderPosition = preset.sliderPosition }
+                        .buttonStyle(.automalityChip(isSelected: state.intensitySliderPosition == preset.sliderPosition))
+                }
+            }
+            AutomalitySlider(value: $state.intensitySliderPosition, in: 0...Double(WatermarkIntensityPreset.allCases.count - 1))
+            Text(currentIntensityPurpose)
+                .font(.caption)
+                .foregroundStyle(AutomalityColor.inkMuted)
+        }
+    }
+
+    private var currentIntensityPurpose: String {
+        let resolved = WatermarkIntensityPreset.interpolated(at: state.intensitySliderPosition)
+        return WatermarkIntensityPreset.allCases.first { $0.label == resolved.nearestLabel }?.purpose ?? ""
     }
 
     private var sizeOpacitySection: some View {

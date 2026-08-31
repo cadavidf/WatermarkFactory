@@ -36,6 +36,97 @@ enum WatermarkSizePreset: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+/// A single named step covering size + opacity + layout together, ordered
+/// low-to-high intrusiveness -- Discrete (barely there) through Protective
+/// (large, high-opacity, tiled, hard to crop or clone out). Distinct from
+/// WatermarkSizePreset/OpacityPreset, which stay as independent fine-tuning
+/// sliders for anyone who wants an exact custom combination; this is the
+/// "just tell me how loud" single control most people actually want.
+/// Sizing grounded in real market data (10-15% of canvas width is the
+/// professional-branding sweet spot, larger coverage is the anti-theft use
+/// case) -- see SPEC.md's watermark-intensity section for sources.
+enum WatermarkIntensityPreset: String, CaseIterable, Identifiable, Codable {
+    case discrete, subtle, balanced, confident, bold, protective
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .discrete: "Discrete"
+        case .subtle: "Subtle"
+        case .balanced: "Balanced"
+        case .confident: "Confident"
+        case .bold: "Bold"
+        case .protective: "Protective"
+        }
+    }
+
+    /// One line explaining what each step is actually for, shown under the
+    /// chip row -- "intrusiveness" alone doesn't tell you when you'd want
+    /// which end.
+    var purpose: String {
+        switch self {
+        case .discrete: "Barely there — for polished work you're proud to have made, not worried about."
+        case .subtle: "The professional default — visible on inspection, invisible at a glance."
+        case .balanced: "Noticeable without dominating the photo."
+        case .confident: "Clearly branded — good for social posts and previews."
+        case .bold: "Hard to ignore — makes ownership unmistakable."
+        case .protective: "Large, high-opacity, tiled — resists cropping or cloning out. For proofs and preview-only shares."
+        }
+    }
+
+    var sizeFraction: Double {
+        switch self {
+        case .discrete: 0.08
+        case .subtle: 0.13
+        case .balanced: 0.20
+        case .confident: 0.30
+        case .bold: 0.45
+        case .protective: 0.60
+        }
+    }
+
+    var opacity: Double {
+        switch self {
+        case .discrete: 0.20
+        case .subtle: 0.40
+        case .balanced: 0.55
+        case .confident: 0.70
+        case .bold: 0.85
+        case .protective: 0.95
+        }
+    }
+
+    var layoutMode: LayoutMode {
+        self == .protective ? .tiled : .single
+    }
+
+    /// Continuous position 0...5 for the slider -- lets it sit between two
+    /// named steps rather than only snapping to one of the six.
+    var sliderPosition: Double { Double(Self.allCases.firstIndex(of: self) ?? 0) }
+
+    /// Interpolates size/opacity between the two nearest named steps for a
+    /// given continuous slider position, snapping layoutMode/label to
+    /// whichever step is closer -- the slider is for feel, not for hitting
+    /// an exact number, so a nearest-step snap for the categorical fields
+    /// is the right compromise rather than fabricating layout states that
+    /// don't correspond to any named preset.
+    static func interpolated(at position: Double) -> (sizeFraction: Double, opacity: Double, layoutMode: LayoutMode, nearestLabel: String) {
+        let clamped = min(max(position, 0), Double(allCases.count - 1))
+        let lowerIndex = Int(clamped.rounded(.down))
+        let upperIndex = min(lowerIndex + 1, allCases.count - 1)
+        let t = clamped - Double(lowerIndex)
+        let lower = allCases[lowerIndex]
+        let upper = allCases[upperIndex]
+        let nearest = t < 0.5 ? lower : upper
+        return (
+            sizeFraction: lower.sizeFraction + (upper.sizeFraction - lower.sizeFraction) * t,
+            opacity: lower.opacity + (upper.opacity - lower.opacity) * t,
+            layoutMode: nearest.layoutMode,
+            nearestLabel: nearest.label
+        )
+    }
+}
+
 enum OpacityPreset: String, CaseIterable, Identifiable, Codable {
     case ghost, subtle, balanced, bold, solid
     var id: String { rawValue }
