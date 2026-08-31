@@ -74,6 +74,7 @@ final class AppState: ObservableObject {
     @Published var outputSuffix = "" { didSet { saveSettings(); updateEstimate() } }
     @Published var maxFileSizeKB = 0 { didSet { saveSettings(); updateEstimate() } }
     @Published var watermarkTint: WatermarkTint = .original { didSet { saveSettings(); updateEstimate() } }
+    @Published var metadataPrivacy: MetadataPrivacyLevel = .keepOriginalPrecision { didSet { saveSettings(); updateEstimate() } }
     @Published var previewImage: NSImage?
     @Published var isDemoPreview = false
     @Published var sourceImageSize: CGSize?
@@ -149,7 +150,7 @@ final class AppState: ObservableObject {
         return nil
     }
     var settings: WatermarkSettings {
-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, additionalAnchors: additionalAnchors, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, optimizeForWeb: optimizeForWeb, outputWidth: outputWidth, outputHeight: outputHeight, outputPrefix: outputPrefix, outputSuffix: outputSuffix, maxFileSizeKB: maxFileSizeKB, watermarkTint: watermarkTint)
+        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, additionalAnchors: additionalAnchors, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, optimizeForWeb: optimizeForWeb, outputWidth: outputWidth, outputHeight: outputHeight, outputPrefix: outputPrefix, outputSuffix: outputSuffix, maxFileSizeKB: maxFileSizeKB, watermarkTint: watermarkTint, metadataPrivacy: metadataPrivacy)
     }
     var canSavePreset: Bool { watermarkURL != nil }
     var canSuggestPlacement: Bool { selected != nil && watermarkURL != nil && !isSuggestingPlacement }
@@ -573,6 +574,7 @@ final class AppState: ObservableObject {
         outputSuffix = Self.sanitizedFilenameAffix(settings.outputSuffix)
         maxFileSizeKB = settings.maxFileSizeKB
         watermarkTint = settings.watermarkTint
+        metadataPrivacy = settings.metadataPrivacy
         syncPresetSelections()
         updateEstimate(delay: 0)
     }
@@ -623,6 +625,7 @@ final class AppState: ObservableObject {
         defaults.set(outputSuffix, forKey: "outputSuffix")
         defaults.set(maxFileSizeKB, forKey: "maxFileSizeKB")
         defaults.set(watermarkTint.rawValue, forKey: "watermarkTint")
+        defaults.set(metadataPrivacy.rawValue, forKey: "metadataPrivacy")
     }
 
     private func restore() {
@@ -649,6 +652,7 @@ final class AppState: ObservableObject {
         outputSuffix = Self.sanitizedFilenameAffix(defaults.string(forKey: "outputSuffix") ?? "")
         maxFileSizeKB = defaults.object(forKey: "maxFileSizeKB") == nil ? 0 : defaults.integer(forKey: "maxFileSizeKB")
         watermarkTint = WatermarkTint(rawValue: defaults.string(forKey: "watermarkTint") ?? "") ?? .original
+        metadataPrivacy = MetadataPrivacyLevel(rawValue: defaults.string(forKey: "metadataPrivacy") ?? "") ?? .keepOriginalPrecision
         syncPresetSelections()
         folderURL = restoreBookmark("folderBookmark")
         watermarkURL = restoreBookmark("watermarkBookmark")
@@ -1304,6 +1308,13 @@ struct ContentView: View {
             AutomalitySegmentedControl(options: ExportFormat.allCases, selection: $state.exportFormat, label: \.label)
             Toggle("Optimize for Web", isOn: Binding(get: { state.optimizeForWeb }, set: { state.setOptimizeForWeb($0) }))
                 .toggleStyle(.automality)
+            // Original/hidden metadata (camera make, maker notes, AI-
+            // provenance descriptions, embedded thumbnails, author fields)
+            // is already always removed -- verified directly against a
+            // real exported file's exiftool dump, not assumed. GPS is the
+            // one field that's a genuine choice, not an oversight.
+            Text("Location metadata").automalityLabelText().foregroundStyle(AutomalityColor.ink)
+            AutomalitySegmentedControl(options: MetadataPrivacyLevel.allCases, selection: $state.metadataPrivacy, label: \.label)
             HStack(spacing: 8) {
                 TextField("Width", value: $state.outputWidth, format: .number)
                     .textFieldStyle(.automalityData)

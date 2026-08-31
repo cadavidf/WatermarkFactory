@@ -49,6 +49,80 @@ final class ImageProcessorMetadataTests: XCTestCase {
         XCTAssertNil(iptc?.object(forKey: kCGImagePropertyIPTCCopyrightNotice))
     }
 
+    func testMetadataPrivacyRemoveLocationDropsGPSEntirely() throws {
+        let source = tempDir.appendingPathComponent("source.tiff")
+        let output = tempDir.appendingPathComponent("output.tiff")
+        try writeImage(source, type: .tiff, properties: [
+            kCGImagePropertyGPSDictionary: [
+                kCGImagePropertyGPSLatitudeRef: "N",
+                kCGImagePropertyGPSLatitude: 40.7128,
+                kCGImagePropertyGPSLongitudeRef: "W",
+                kCGImagePropertyGPSLongitude: 74.0060
+            ]
+        ])
+
+        try export(source, to: output, format: .tiff, metadataPrivacy: .removeLocation)
+        let properties = try imageProperties(output)
+
+        XCTAssertNil(properties.object(forKey: kCGImagePropertyGPSDictionary), "removeLocation must drop the GPS dictionary entirely, not just blank fields inside it")
+    }
+
+    func testMetadataPrivacyReducedPrecisionRoundsCoordinatesButKeepsOtherGPSFields() throws {
+        let source = tempDir.appendingPathComponent("source.tiff")
+        let output = tempDir.appendingPathComponent("output.tiff")
+        try writeImage(source, type: .tiff, properties: [
+            kCGImagePropertyGPSDictionary: [
+                kCGImagePropertyGPSLatitudeRef: "N",
+                kCGImagePropertyGPSLatitude: 40.712834591,
+                kCGImagePropertyGPSLongitudeRef: "W",
+                kCGImagePropertyGPSLongitude: 74.006012345,
+                kCGImagePropertyGPSAltitude: 12.5
+            ]
+        ])
+
+        try export(source, to: output, format: .tiff, metadataPrivacy: .reducedPrecision)
+        let properties = try imageProperties(output)
+        let gps = properties.object(forKey: kCGImagePropertyGPSDictionary) as? NSDictionary
+
+        // Rounded to 2 decimal degrees (~1.1km) -- close enough to place
+        // a neighborhood, not an exact address.
+        XCTAssertEqual(gps?.object(forKey: kCGImagePropertyGPSLatitude) as? Double ?? 0, 40.71, accuracy: 0.0001)
+        XCTAssertEqual(gps?.object(forKey: kCGImagePropertyGPSLongitude) as? Double ?? 0, 74.01, accuracy: 0.0001)
+        // Original full-precision values must not survive anywhere in the output.
+        XCTAssertNotEqual(gps?.object(forKey: kCGImagePropertyGPSLatitude) as? Double, 40.712834591)
+        // Non-coordinate GPS fields pass through unchanged -- this is
+        // about location precision specifically, not stripping everything.
+        XCTAssertEqual(gps?.object(forKey: kCGImagePropertyGPSAltitude) as? Double, 12.5)
+        XCTAssertEqual(gps?.object(forKey: kCGImagePropertyGPSLatitudeRef) as? String, "N")
+    }
+
+    func testMetadataPrivacyKeepOriginalPrecisionIsTheDefaultAndPreservesExactCoordinates() throws {
+        let source = tempDir.appendingPathComponent("source.tiff")
+        let output = tempDir.appendingPathComponent("output.tiff")
+        try writeImage(source, type: .tiff, properties: [
+            kCGImagePropertyGPSDictionary: [
+                kCGImagePropertyGPSLatitudeRef: "N",
+                kCGImagePropertyGPSLatitude: 40.712834591
+            ]
+        ])
+
+        // No metadataPrivacy argument -- exercises WatermarkSettings' own
+        // default (.keepOriginalPrecision), the same default used for any
+        // settings saved before this option existed, so old presets don't
+        // silently start stripping GPS they were previously relying on.
+        try export(source, to: output, format: .tiff)
+        let properties = try imageProperties(output)
+        let gps = properties.object(forKey: kCGImagePropertyGPSDictionary) as? NSDictionary
+
+        // GPS coordinates round-trip through TIFF's rational (numerator/
+        // denominator) encoding, not raw doubles -- confirmed live this
+        // produces ~1e-6 degree rounding (40.712834591 -> 40.712833333...),
+        // a normal, expected artifact of that format, not data loss this
+        // code introduces. accuracy here is set to what real GPS EXIF
+        // storage actually delivers, not an idealized exact match.
+        XCTAssertEqual(gps?.object(forKey: kCGImagePropertyGPSLatitude) as? Double ?? 0, 40.712834591, accuracy: 0.00001)
+    }
+
     func testNoGPSSourceProducesNoGPSBlock() throws {
         let source = tempDir.appendingPathComponent("source.png")
         let output = tempDir.appendingPathComponent("output.png")
@@ -253,10 +327,10 @@ final class ImageProcessorMetadataTests: XCTestCase {
         XCTAssertNil(AppState.openedURLInput(from: [], isDirectory: { _ in false }))
     }
 
-    private func export(_ source: URL, to output: URL, format: ExportFormat) throws {
+    private func export(_ source: URL, to output: URL, format: ExportFormat, metadataPrivacy: MetadataPrivacyLevel = .keepOriginalPrecision) throws {
         let watermark = tempDir.appendingPathComponent("watermark.png")
         try writeImage(watermark, type: .png)
-        _ = try ImageProcessor.export(sourceURL: source, watermarkURL: watermark, outputURL: output, settings: WatermarkSettings(sizeFraction: 0.2, opacity: 0, anchor: .center, offsetX: 0, offsetY: 0, layoutMode: .single, padding: 0, spacing: 0, rotationPattern: .none, customAngle: 0, exportFormat: format, jpegQuality: 0.9, outputPrefix: "", outputSuffix: ""))
+        _ = try ImageProcessor.export(sourceURL: source, watermarkURL: watermark, outputURL: output, settings: WatermarkSettings(sizeFraction: 0.2, opacity: 0, anchor: .center, offsetX: 0, offsetY: 0, layoutMode: .single, padding: 0, spacing: 0, rotationPattern: .none, customAngle: 0, exportFormat: format, jpegQuality: 0.9, outputPrefix: "", outputSuffix: "", metadataPrivacy: metadataPrivacy))
     }
 
     private func writeImage(_ url: URL, type: UTType, width: Int = 4, height: Int = 4, properties: [CFString: Any] = [:]) throws {

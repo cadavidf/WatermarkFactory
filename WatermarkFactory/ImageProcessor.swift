@@ -334,13 +334,13 @@ struct ImageProcessor {
         context.restoreGState()
     }
 
-    private static func encode(image: CGImage, sourceURL: URL, format: ExportFormat, quality: Double) throws -> (data: Data, ext: String, usedHEICFallback: Bool) {
+    private static func encode(image: CGImage, sourceURL: URL, format: ExportFormat, quality: Double, metadataPrivacy: MetadataPrivacyLevel) throws -> (data: Data, ext: String, usedHEICFallback: Bool) {
         let resolved = resolvedFormat(sourceURL: sourceURL, format: format)
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(data, resolved.type.identifier as CFString, 1, nil) else {
             throw ImageProcessorError.encodeFailed
         }
-        var properties = scrubbedMetadata(sourceURL: sourceURL)
+        var properties = scrubbedMetadata(sourceURL: sourceURL, metadataPrivacy: metadataPrivacy)
         if resolved.type == .jpeg {
             properties[kCGImageDestinationLossyCompressionQuality] = quality
         }
@@ -358,7 +358,7 @@ struct ImageProcessor {
         let baseQuality = jpegQuality(sourceURL: sourceURL, settings: settings)
         guard settings.maxFileSizeKB > 0,
               resolvedFormat(sourceURL: sourceURL, format: settings.exportFormat).type == .jpeg else {
-            let result = try encode(image: image, sourceURL: sourceURL, format: settings.exportFormat, quality: baseQuality)
+            let result = try encode(image: image, sourceURL: sourceURL, format: settings.exportFormat, quality: baseQuality, metadataPrivacy: settings.metadataPrivacy)
             return (result.data, result.ext, result.usedHEICFallback, true)
         }
 
@@ -366,11 +366,11 @@ struct ImageProcessor {
         var currentImage = image
 
         while true {
-            let atHigh = try encode(image: currentImage, sourceURL: sourceURL, format: settings.exportFormat, quality: 0.95)
+            let atHigh = try encode(image: currentImage, sourceURL: sourceURL, format: settings.exportFormat, quality: 0.95, metadataPrivacy: settings.metadataPrivacy)
             if atHigh.data.count <= targetBytes {
                 return (atHigh.data, atHigh.ext, atHigh.usedHEICFallback, true)
             }
-            let atLow = try encode(image: currentImage, sourceURL: sourceURL, format: settings.exportFormat, quality: 0.2)
+            let atLow = try encode(image: currentImage, sourceURL: sourceURL, format: settings.exportFormat, quality: 0.2, metadataPrivacy: settings.metadataPrivacy)
             if atLow.data.count > targetBytes {
                 let longest = max(currentImage.width, currentImage.height)
                 if longest <= minSizeTargetLongestEdge {
@@ -386,7 +386,7 @@ struct ImageProcessor {
             var best = atLow
             for _ in 0..<6 {
                 let mid = (low + high) / 2
-                let midResult = try encode(image: currentImage, sourceURL: sourceURL, format: settings.exportFormat, quality: mid)
+                let midResult = try encode(image: currentImage, sourceURL: sourceURL, format: settings.exportFormat, quality: mid, metadataPrivacy: settings.metadataPrivacy)
                 if midResult.data.count <= targetBytes {
                     best = midResult
                     low = mid
@@ -411,7 +411,7 @@ struct ImageProcessor {
         return resized
     }
 
-    private static func scrubbedMetadata(sourceURL: URL) -> [CFString: Any] {
+    private static func scrubbedMetadata(sourceURL: URL, metadataPrivacy: MetadataPrivacyLevel) -> [CFString: Any] {
         // Verified live (standalone CGImageDestination test, not assumed):
         // for JPEG output written from a bare in-memory CGImage (no
         // pre-existing metadata source to merge into), CGImageDestination
@@ -435,12 +435,32 @@ struct ImageProcessor {
                 kCGImagePropertyPNGAuthor: "automality.com"
             ]
         ]
-        guard let source = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
+        guard metadataPrivacy != .removeLocation,
+              let source = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
               let sourceProperties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as NSDictionary?,
-              let gps = sourceProperties.object(forKey: kCGImagePropertyGPSDictionary) else {
+              let gps = sourceProperties.object(forKey: kCGImagePropertyGPSDictionary) as? [CFString: Any] else {
             return properties
         }
-        properties[kCGImagePropertyGPSDictionary] = gps
+        switch metadataPrivacy {
+        case .removeLocation:
+            break // unreachable, guarded above -- no GPS key added at all
+        case .keepOriginalPrecision:
+            properties[kCGImagePropertyGPSDictionary] = gps
+        case .reducedPrecision:
+            // Rounds to 2 decimal degrees (~1.1km at the equator) -- close
+            // enough to place a photo's neighborhood/city without pinning
+            // an exact address. Only touches lat/lon; ref (N/S, E/W) and
+            // any other GPS fields (altitude, timestamp) pass through
+            // unchanged since they don't carry the same precision risk.
+            var reduced = gps
+            if let lat = gps[kCGImagePropertyGPSLatitude] as? Double {
+                reduced[kCGImagePropertyGPSLatitude] = (lat * 100).rounded() / 100
+            }
+            if let lon = gps[kCGImagePropertyGPSLongitude] as? Double {
+                reduced[kCGImagePropertyGPSLongitude] = (lon * 100).rounded() / 100
+            }
+            properties[kCGImagePropertyGPSDictionary] = reduced
+        }
         return properties
     }
 

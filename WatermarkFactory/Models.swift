@@ -433,6 +433,32 @@ enum IntentPreset: String, CaseIterable {
     }
 }
 
+/// Governs what happens to the source image's GPS location on export.
+/// Everything else in scrubbedMetadata's original/hidden metadata (camera
+/// make/model, maker notes, AI-provenance descriptions, embedded
+/// thumbnails, author fields, etc.) is already unconditionally removed by
+/// construction -- the output is a freshly composited CGImage with a
+/// synthesized properties dict, never a copy of the source's metadata --
+/// verified directly against a real exiftool dump of a real app output
+/// (Author "Aubz" and a full AI-generation-prompt Description on the
+/// source were both fully gone in the output). GPS is the one field this
+/// code deliberately carries over today, unconditionally, at full
+/// precision -- this type is what makes that a real choice instead.
+enum MetadataPrivacyLevel: String, CaseIterable, Identifiable, Codable {
+    case removeLocation
+    case reducedPrecision
+    case keepOriginalPrecision
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .removeLocation: String(localized: "Remove location")
+        case .reducedPrecision: String(localized: "Reduce precision (~1km)")
+        case .keepOriginalPrecision: String(localized: "Keep exact location")
+        }
+    }
+}
+
 struct WatermarkSettings: Codable {
     var sizeFraction: Double
     var opacity: Double
@@ -454,8 +480,9 @@ struct WatermarkSettings: Codable {
     var outputSuffix: String
     var maxFileSizeKB: Int
     var watermarkTint: WatermarkTint
+    var metadataPrivacy: MetadataPrivacyLevel
 
-    init(sizeFraction: Double, opacity: Double, anchor: Anchor, additionalAnchors: [Anchor] = [], offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputWidth: Int = 0, outputHeight: Int = 0, outputPrefix: String, outputSuffix: String, maxFileSizeKB: Int = 0, watermarkTint: WatermarkTint = .original) {
+    init(sizeFraction: Double, opacity: Double, anchor: Anchor, additionalAnchors: [Anchor] = [], offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputWidth: Int = 0, outputHeight: Int = 0, outputPrefix: String, outputSuffix: String, maxFileSizeKB: Int = 0, watermarkTint: WatermarkTint = .original, metadataPrivacy: MetadataPrivacyLevel = .keepOriginalPrecision) {
         self.sizeFraction = sizeFraction
         self.opacity = opacity
         self.anchor = anchor
@@ -476,10 +503,11 @@ struct WatermarkSettings: Codable {
         self.outputSuffix = outputSuffix
         self.maxFileSizeKB = maxFileSizeKB
         self.watermarkTint = watermarkTint
+        self.metadataPrivacy = metadataPrivacy
     }
 
     private enum CodingKeys: String, CodingKey {
-        case sizeFraction, opacity, anchor, additionalAnchors, offsetX, offsetY, layoutMode, padding, spacing, rotationPattern, customAngle, exportFormat, jpegQuality, optimizeForWeb, outputWidth, outputHeight, outputPrefix, outputSuffix, maxFileSizeKB, watermarkTint
+        case sizeFraction, opacity, anchor, additionalAnchors, offsetX, offsetY, layoutMode, padding, spacing, rotationPattern, customAngle, exportFormat, jpegQuality, optimizeForWeb, outputWidth, outputHeight, outputPrefix, outputSuffix, maxFileSizeKB, watermarkTint, metadataPrivacy
     }
 
     init(from decoder: Decoder) throws {
@@ -504,6 +532,11 @@ struct WatermarkSettings: Codable {
         outputSuffix = try container.decode(String.self, forKey: .outputSuffix)
         maxFileSizeKB = try container.decodeIfPresent(Int.self, forKey: .maxFileSizeKB) ?? 0
         watermarkTint = try container.decodeIfPresent(WatermarkTint.self, forKey: .watermarkTint) ?? .original
+        // Default preserves the pre-existing, unconditional behavior for
+        // any settings saved before this option existed -- keepOriginalPrecision,
+        // not removeLocation, so nobody's saved presets silently start
+        // stripping GPS they were previously relying on.
+        metadataPrivacy = try container.decodeIfPresent(MetadataPrivacyLevel.self, forKey: .metadataPrivacy) ?? .keepOriginalPrecision
     }
 }
 
