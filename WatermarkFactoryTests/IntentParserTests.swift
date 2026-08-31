@@ -18,6 +18,24 @@ final class IntentParserTests: XCTestCase {
         XCTAssertTrue(slots.needsClarification.isEmpty)
     }
 
+    /// Regression test: confirmed live against gemma3:4b this session that a
+    /// real model wraps its JSON answer in a ```json fence despite the
+    /// system prompt saying not to -- a bare JSONDecoder call on that raw
+    /// content throws instead of decoding, which silently degrades every
+    /// chat exchange to the scripted fallback.
+    func testDecodesJSONWrappedInMarkdownFence() throws {
+        let fenced = """
+        ```json
+        {"anchor":"center","sizeFraction":null,"opacity":null,"tint":"Original","exportPlatform":null,"renamePrefix":null,"needsClarification":[],"assistantReply":"Okay."}
+        ```
+        """
+
+        let slots = try IntentParser.decodeSlots(from: fenced)
+
+        XCTAssertEqual(slots.anchor, "center")
+        XCTAssertEqual(slots.tint, "Original")
+    }
+
     func testMalformedModelOutputThrows() {
         XCTAssertThrowsError(try IntentParser.decodeSlots(from: "Here is your JSON: nope"))
     }
