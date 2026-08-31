@@ -381,16 +381,11 @@ final class AppState: ObservableObject {
                 if !summary.failed.isEmpty { text += " " + String(format: String(localized: "Failed: %@."), summary.failed.joined(separator: ", ")) }
                 self.status = text
                 let succeeded = summary.success == items.count && summary.failed.isEmpty
-                // One-time, after a genuinely successful export -- not
-                // every time, and never on a failed/partial run. In-app
-                // instructions only (Automator.app steps, no filesystem
-                // writes to ~/Library/Services/ from this app) -- the
-                // hand-authored-.workflow approach corrupted the Services
-                // database once already this project; not repeating that.
-                if succeeded && !self.defaults.bool(forKey: "hasShownQuickActionPrompt") {
-                    self.defaults.set(true, forKey: "hasShownQuickActionPrompt")
-                    self.showQuickActionPrompt = true
-                }
+                // Quick Action prompt is disabled for this release -- pulled
+                // per request. The underlying QuickActionPromptView and
+                // showQuickActionPrompt plumbing are left intact for a
+                // future version; this just removes the trigger, same
+                // pattern as Smart Placement earlier.
                 completion?(succeeded)
             }
         }
