@@ -3,6 +3,20 @@
     <channel>
         <title>WatermarkFactory</title>
         <item>
+            <title>1.2.3</title>
+            <pubDate>Mon, 31 Aug 2026 12:11:48 -0500</pubDate>
+            <sparkle:version>16</sparkle:version>
+            <sparkle:shortVersionString>1.2.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <ul>
+                    <li>Added Recent folders to Select Images -- reselect a folder you've used before in one click instead of reopening the picker.</li>
+                    <li>Removed the Finder Quick Action prompt for this release (deferred, not deleted).</li>
+                </ul>
+            ]]></description>
+            <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.2.3/WatermarkFactory.dmg" length="2393111" type="application/octet-stream" sparkle:edSignature="7EFmG9tRI5N16mKUI7IaN5IKvq4TJkSmam7yoDCmTbPjGf0+POOFrGG9UWSCv4+YXUPWPG5Wntvkj2RPPB3AAg=="/>
+        </item>
+        <item>
             <title>1.2.2</title>
             <pubDate>Mon, 31 Aug 2026 12:07:09 -0500</pubDate>
             <sparkle:version>15</sparkle:version>
@@ -29,20 +43,6 @@
                 </ul>
             ]]></description>
             <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.2.1/WatermarkFactory.dmg" length="2374067" type="application/octet-stream" sparkle:edSignature="ou7IaeEDNXLeCNerTglTJ7oU11dt4/71CvOMSQCNrPMb3c/4mB4PuDWNwXBdslUABb8ARPoBMgKytpchH78gDA=="/>
-        </item>
-        <item>
-            <title>1.2.0</title>
-            <pubDate>Mon, 31 Aug 2026 11:56:57 -0500</pubDate>
-            <sparkle:version>13</sparkle:version>
-            <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <description><![CDATA[
-                <ul>
-                    <li>WatermarkFactory now speaks Spanish — the whole interface (not just the chat's understanding of Spanish input) follows your Mac's Language &amp; Region setting.</li>
-                    <li>Fixed step labels in the top progress bar getting silently truncated with an ellipsis when they didn't fit.</li>
-                </ul>
-            ]]></description>
-            <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.2.0/WatermarkFactory.dmg" length="2345978" type="application/octet-stream" sparkle:edSignature="TrVdjj1raldvAq/HgVpLaLDeN8hliZGfTF0UZaK2NYmITjfvDrxHGKP88Y43XHWEBWomxXgA+NXZ++RHStIuDA=="/>
         </item>
         <item>
             <title>1.1.2</title>
