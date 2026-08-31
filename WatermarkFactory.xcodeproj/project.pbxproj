@@ -14,6 +14,7 @@
 		1A00002F2B00000000000001 /* SecurityScopedAccessTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000302B00000000000001 /* SecurityScopedAccessTracker.swift */; };
 		1A0000312B00000000000001 /* IntentParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000322B00000000000001 /* IntentParser.swift */; };
 		1A0000332B00000000000001 /* ChatFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000342B00000000000001 /* ChatFlowView.swift */; };
+		1A0000492B00000000000001 /* QuickActionPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00004A2B00000000000001 /* QuickActionPromptView.swift */; };
 		1A0000432B00000000000001 /* AcknowledgementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000442B00000000000001 /* AcknowledgementsView.swift */; };
 		1A00001A2B00000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A00001B2B00000000000001 /* Assets.xcassets */; };
 		1A0000452B00000000000001 /* automality-watermark.png in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000462B00000000000001 /* automality-watermark.png */; };
@@ -42,6 +43,7 @@
 		1A0000302B00000000000001 /* SecurityScopedAccessTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityScopedAccessTracker.swift; sourceTree = "<group>"; };
 		1A0000322B00000000000001 /* IntentParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntentParser.swift; sourceTree = "<group>"; };
 		1A0000342B00000000000001 /* ChatFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatFlowView.swift; sourceTree = "<group>"; };
+		1A00004A2B00000000000001 /* QuickActionPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionPromptView.swift; sourceTree = "<group>"; };
 		1A0000442B00000000000001 /* AcknowledgementsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcknowledgementsView.swift; sourceTree = "<group>"; };
 		1A0000092B00000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		1A00000A2B00000000000001 /* WatermarkFactory.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WatermarkFactory.entitlements; sourceTree = "<group>"; };
@@ -89,6 +91,7 @@
 				1A0000022B00000000000001 /* WatermarkFactoryApp.swift */,
 				1A0000042B00000000000001 /* ContentView.swift */,
 				1A0000342B00000000000001 /* ChatFlowView.swift */,
+				1A00004A2B00000000000001 /* QuickActionPromptView.swift */,
 				1A0000442B00000000000001 /* AcknowledgementsView.swift */,
 				1A0000062B00000000000001 /* ImageProcessor.swift */,
 				1A0000322B00000000000001 /* IntentParser.swift */,
@@ -223,6 +226,7 @@
 			files = (
 				1A0000032B00000000000001 /* ContentView.swift in Sources */,
 				1A0000332B00000000000001 /* ChatFlowView.swift in Sources */,
+				1A0000492B00000000000001 /* QuickActionPromptView.swift in Sources */,
 				1A0000432B00000000000001 /* AcknowledgementsView.swift in Sources */,
 				1A0000052B00000000000001 /* ImageProcessor.swift in Sources */,
 				1A0000312B00000000000001 /* IntentParser.swift in Sources */,

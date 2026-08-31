@@ -78,6 +78,7 @@ final class AppState: ObservableObject {
     @Published var status = "Choose a folder and watermark to begin."
     @Published var progress = 0.0
     @Published var isExporting = false
+    @Published var showQuickActionPrompt = false
     @Published var isSuggestingPlacement = false
     @Published var smartPlacementProposal: SmartPlacementProposal?
     @Published var presets: [WatermarkPreset] = []
@@ -373,7 +374,18 @@ final class AppState: ObservableObject {
                 if !summary.unmetSizeTarget.isEmpty { text += " \(summary.unmetSizeTarget.count) couldn't reach the max file size target and were shipped at their closest achievable size." }
                 if !summary.failed.isEmpty { text += " Failed: \(summary.failed.joined(separator: ", "))." }
                 self.status = text
-                completion?(summary.success == items.count && summary.failed.isEmpty)
+                let succeeded = summary.success == items.count && summary.failed.isEmpty
+                // One-time, after a genuinely successful export -- not
+                // every time, and never on a failed/partial run. In-app
+                // instructions only (Automator.app steps, no filesystem
+                // writes to ~/Library/Services/ from this app) -- the
+                // hand-authored-.workflow approach corrupted the Services
+                // database once already this project; not repeating that.
+                if succeeded && !self.defaults.bool(forKey: "hasShownQuickActionPrompt") {
+                    self.defaults.set(true, forKey: "hasShownQuickActionPrompt")
+                    self.showQuickActionPrompt = true
+                }
+                completion?(succeeded)
             }
         }
     }
@@ -764,6 +776,9 @@ struct ContentView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("A preset named \"\(duplicatePresetName)\" already exists.")
+        }
+        .sheet(isPresented: $state.showQuickActionPrompt) {
+            QuickActionPromptView(isPresented: $state.showQuickActionPrompt)
         }
     }
 
