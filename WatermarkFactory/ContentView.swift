@@ -737,18 +737,22 @@ struct ContentView: View {
 
     /// The single "continue to the next stage" action, always in the top
     /// header next to the step nav — not buried at the bottom of a scrolling
-    /// controls pane. Accent-colored (orange) so it reads as the one thing
-    /// to do next; every other button on screen stays primary/secondary.
+    /// controls pane. Accent-colored (orange) ONLY while it's actually the
+    /// next actionable thing — the moment a stage still needs a choice made
+    /// elsewhere on screen (e.g. Choose Watermark), that other control gets
+    /// the accent instead and Next drops back to secondary. Exactly one
+    /// orange element on screen at a time is the whole point: it has to
+    /// always point at the one real next step, never two things competing.
     @ViewBuilder
     private var nextButton: some View {
         switch state.stage {
         case .selectImages:
             Button("Next") { state.advance(to: .watermark) }
-                .buttonStyle(.automalityAccent)
+                .buttonStyle(state.images.isEmpty ? .automalitySecondary : .automalityAccent)
                 .disabled(state.images.isEmpty)
         case .watermark:
             Button("Next") { state.advance(to: .orderRename) }
-                .buttonStyle(.automalityAccent)
+                .buttonStyle(state.watermarkURL == nil ? .automalitySecondary : .automalityAccent)
                 .disabled(state.watermarkURL == nil)
         case .orderRename:
             Button("Next") { state.advance(to: .export) }
@@ -957,8 +961,14 @@ struct ContentView: View {
     private var watermarkSourceSection: some View {
         ControlSection("Watermark source") {
             HStack(spacing: 12) {
+                // Accent (orange) until a watermark is picked -- it's the
+                // one thing blocking progress on this stage, so it's the
+                // single orange element on screen (the header's Next stays
+                // secondary/disabled until this is done, see nextButton).
+                // Reverts to primary once set, handing the "next step"
+                // spotlight to Next.
                 Button("Choose Watermark...") { state.chooseWatermark() }
-                    .buttonStyle(.automalityPrimary)
+                    .buttonStyle(state.watermarkURL == nil ? .automalityAccent : .automalityPrimary)
                 Spacer()
                 if let url = state.watermarkURL { Thumb(url: url, size: 56) }
             }

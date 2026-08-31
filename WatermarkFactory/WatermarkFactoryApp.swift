@@ -6,6 +6,7 @@ import SwiftUI
 @main
 struct WatermarkFactoryApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
         WindowGroup {
@@ -38,12 +39,25 @@ struct WatermarkFactoryApp: App {
                 .environment(\.brandTheme, AutomalityTheme())
         }
         .commands {
+            // "About WatermarkFactory" is the standard macOS About panel --
+            // provided automatically by SwiftUI/AppKit, no code needed here.
+            // Acknowledgements gets its own window rather than being crammed
+            // into the About panel's small credits box, since license text
+            // (Sparkle's, specifically) is long enough to need real scrolling
+            // and formatting.
             CommandGroup(after: .appInfo) {
+                Button("Acknowledgements…") {
+                    openWindow(id: "acknowledgements")
+                }
                 Button("Check for Updates…") {
                     appDelegate.checkForUpdates(nil)
                 }
             }
         }
+        Window("Acknowledgements", id: "acknowledgements") {
+            AcknowledgementsView()
+        }
+        .windowResizability(.contentSize)
     }
 }
 
