@@ -3,6 +3,19 @@
     <channel>
         <title>WatermarkFactory</title>
         <item>
+            <title>1.1.5</title>
+            <pubDate>Mon, 31 Aug 2026 11:04:07 -0500</pubDate>
+            <sparkle:version>8</sparkle:version>
+            <sparkle:shortVersionString>1.1.5</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <ul>
+                    <li>Fixed an inconsistency in the Watermark stage's Skip button: it could get you onto a later stage, but the progress nav and that stage's own Skip button were still silently blocked from going further, since only Skip itself bypassed the real gate. Fixed at the source -- viewing any stage now only requires images to be selected; the actual export action still correctly requires a watermark, unchanged.</li>
+                </ul>
+            ]]></description>
+            <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.1.5/WatermarkFactory.dmg" length="2292400" type="application/octet-stream" sparkle:edSignature="yeCMzn2dlQ87CHEMkuAZitVtqUwJ/a2zIbwGEtMaBak0ikZ5thQuuwma7IH3ao/rHB7Ql5s0Qa58ygoiIv2QCw=="/>
+        </item>
+        <item>
             <title>1.1.4</title>
             <pubDate>Mon, 31 Aug 2026 10:56:25 -0500</pubDate>
             <sparkle:version>7</sparkle:version>
