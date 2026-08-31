@@ -1293,3 +1293,90 @@ this exact distribution shape.
 - `xcodebuild build`/`test` tails as usual; all 24 existing tests must
   still pass.
 
+
+## Spanish localization (proper internationalization, not just Chat mode's existing Spanish input parsing)
+
+This app has **zero** localization infrastructure today — no String Catalog,
+no `*.lproj` folders, no `CFBundleLocalizations` in Info.plist. Chat mode's
+`IntentParser` already understands Spanish *input* (verified live earlier
+this session), but that's unrelated to this task: every button label,
+section title, hint, alert, and menu item in the actual UI is a hardcoded
+English string literal. This adds real UI internationalization.
+
+**Note on tooling**: this was meant to be a two-tool pass (codex for the
+infrastructure, gemini for translation quality) but the `gemini` CLI is
+currently blocked on a `GOOGLE_CLOUD_PROJECT` auth gap in this environment
+(confirmed failing again just before writing this spec). Do both parts
+yourself rather than leave translation quality unaddressed — but flag any
+string you're genuinely unsure how to translate naturally (idiom, brand
+terms like "Watermark Intensity", technical terms like "clear space")
+rather than guessing silently.
+
+### Infrastructure
+- Add a String Catalog (`WatermarkFactory/Localizable.xcstrings`, Xcode 15+
+  format) to the project, registered in the Resources build phase the same
+  way `Assets.xcassets`/the bundled watermark PNG were added (see recent
+  git history for the exact PBXFileReference/PBXBuildFile pattern this
+  project uses for adding new resources by hand-editing `project.pbxproj`
+  — this project isn't opened in Xcode's GUI during this work, so the file
+  needs to be added the same manual way).
+- Set `knownRegions = (en, es, Base)` and add `CFBundleLocalizations`
+  (`en`, `es`) to Info.plist / build settings as appropriate.
+- SwiftUI's `Text("literal")`, `Button("literal") { }`, `Label("literal",
+  systemImage:)` etc. are automatically extractable into a String Catalog
+  by Xcode's build system as long as they're plain string literals (not
+  already-computed `String` variables) — verify this project's actual
+  string usage patterns hold that property before assuming it, and note in
+  your summary which files needed restructuring (e.g. a computed `String`
+  property that builds a label via string interpolation needs
+  `String(localized:)` with explicit interpolation arguments instead of
+  relying on automatic `Text` extraction).
+- Interpolated/pluralized strings (e.g. `"\(count) images selected"`,
+  `"\(index + 1) of \(count)"`) need real localization-safe handling —
+  `String(localized:)` with a format string and named arguments, not naive
+  string concatenation, since Spanish word order can differ from English.
+- `AutomalityType`/label components that force `.textCase(.uppercase)` for
+  the brand's tracked-uppercase look — confirm this doesn't break Spanish
+  accented uppercase characters (Á, É, Í, Ó, Ú, Ñ) by testing at least one
+  string containing each.
+
+### Translation
+- Translate every extracted string to natural, professional Spanish (not
+  literal word-for-word) — reader is the same audience as English users, a
+  Spanish-speaking photographer/creator using a batch watermarking tool.
+- Keep brand/proper nouns untranslated: "WatermarkFactory", "Automality",
+  preset names that are also visual labels (the Watermark Intensity chip
+  labels "Discrete"/"Subtle"/etc. — translate these too, they're UI copy,
+  not brand names, e.g. "Discreto"/"Sutil"/"Equilibrado"/"Seguro"/
+  "Marcado"/"Protector" or similar — use your best judgment on natural
+  Spanish naming here and flag your choices for review rather than assume
+  they're final).
+- Match the app's existing tone: direct, no exclamation-point enthusiasm,
+  matches the plain English copy already in the app (e.g. "Choose Folder or
+  Images...", "Watermark all images", not overly formal or overly casual
+  Spanish).
+
+### What NOT to touch
+- `IntentParser.systemPrompt` (the prompt sent to the local Ollama model)
+  stays in English regardless of the app's display language — it's an
+  instruction to the model, not UI copy, and changing it isn't part of this
+  task.
+- Don't add a language picker/settings UI in this pass — rely on the
+  system's own Language & Region setting (standard macOS localization
+  behavior: the app picks up whatever language macOS is set to, falling
+  back to English if Spanish isn't available for a given string). A
+  manual in-app override can be a later addition if wanted.
+
+### Verification
+- `xcodebuild build`/`test` must still pass -- string-literal changes
+  shouldn't affect any existing test's assertions (tests check values, not
+  display strings, as far as this codebase's existing test suite goes;
+  confirm that's still true rather than assume it).
+- Genuinely testing the Spanish UI requires either changing this Mac's
+  system language (disruptive, don't do it) or launching with
+  `-AppleLanguages '(es)'` as a launch argument — note in your summary that
+  you verified the String Catalog structurally (every English string has a
+  non-empty Spanish counterpart, no missing keys) but the actual rendered-
+  in-Spanish UI needs a manual check with that launch argument, same
+  "flag what's unverified" pattern used elsewhere in this file.
+
