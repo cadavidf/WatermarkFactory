@@ -2,7 +2,7 @@ import XCTest
 @testable import WatermarkFactory
 
 final class WatermarkIntensityPresetTests: XCTestCase {
-    func testSixStepsOrderedByIntrusiveness() {
+    func testSixStepsOrderedBySizeAndOpacity() {
         let cases = WatermarkIntensityPreset.allCases
         XCTAssertEqual(cases.count, 6)
         for (a, b) in zip(cases, cases.dropFirst()) {
@@ -11,32 +11,52 @@ final class WatermarkIntensityPresetTests: XCTestCase {
         }
     }
 
-    func testOnlyProtectiveTiles() {
-        for preset in WatermarkIntensityPreset.allCases where preset != .protective {
-            XCTAssertEqual(preset.layoutMode, .single)
-        }
-        XCTAssertEqual(WatermarkIntensityPreset.protective.layoutMode, .tiled)
+    func testDiscreteIsBarelyOpaqueAndProtectiveIsFullyOpaque() {
+        // Discrete lowered from an earlier 0.20; Protective raised from an
+        // earlier 0.95 -- both per explicit feedback that Discrete should
+        // read as less opaque and Protective as maximally hard to remove.
+        XCTAssertLessThanOrEqual(WatermarkIntensityPreset.discrete.opacity, 0.15)
+        XCTAssertEqual(WatermarkIntensityPreset.protective.opacity, 1.0, accuracy: 0.0001)
     }
 
-    func testInterpolationAtExactStepsMatchesThatStep() {
-        for preset in WatermarkIntensityPreset.allCases {
-            let resolved = WatermarkIntensityPreset.interpolated(at: preset.sliderPosition)
-            XCTAssertEqual(resolved.sizeFraction, preset.sizeFraction, accuracy: 0.0001)
-            XCTAssertEqual(resolved.opacity, preset.opacity, accuracy: 0.0001)
-            XCTAssertEqual(resolved.nearestLabel, preset.label)
-        }
+    func testLayoutStyleProgressesFromSingleToTiledRotated() {
+        XCTAssertEqual(WatermarkIntensityPreset.discrete.layoutStyle, .single)
+        XCTAssertEqual(WatermarkIntensityPreset.protective.layoutStyle, .tiledRotated)
+        // Only protective and bold reach tiled; only confident and
+        // protective involve rotation -- not every step needs to touch
+        // every corner of the layout axis.
+        XCTAssertEqual(WatermarkIntensityPreset.bold.layoutMode, .tiled)
+        XCTAssertEqual(WatermarkIntensityPreset.confident.rotationPattern, .diagonal)
     }
 
-    func testInterpolationBetweenStepsIsMonotonicAndClamped() {
-        let midway = WatermarkIntensityPreset.interpolated(at: 0.5) // between Discrete and Subtle
-        XCTAssertGreaterThan(midway.sizeFraction, WatermarkIntensityPreset.discrete.sizeFraction)
-        XCTAssertLessThan(midway.sizeFraction, WatermarkIntensityPreset.subtle.sizeFraction)
+    func testLayoutStyleMapsCorrectlyToRealSettings() {
+        XCTAssertEqual(WatermarkLayoutStyle.single.layoutMode, .single)
+        XCTAssertEqual(WatermarkLayoutStyle.single.rotationPattern, .none)
+        XCTAssertEqual(WatermarkLayoutStyle.singleRotated.layoutMode, .single)
+        XCTAssertEqual(WatermarkLayoutStyle.singleRotated.rotationPattern, .diagonal)
+        XCTAssertEqual(WatermarkLayoutStyle.tiled.layoutMode, .tiled)
+        XCTAssertEqual(WatermarkLayoutStyle.tiled.rotationPattern, .none)
+        XCTAssertEqual(WatermarkLayoutStyle.tiledRotated.layoutMode, .tiled)
+        XCTAssertEqual(WatermarkLayoutStyle.tiledRotated.rotationPattern, .diagonal)
+    }
 
-        let belowRange = WatermarkIntensityPreset.interpolated(at: -3)
-        XCTAssertEqual(belowRange.sizeFraction, WatermarkIntensityPreset.discrete.sizeFraction, accuracy: 0.0001)
+    func testLayoutStyleClosestRoundTripsForAllFourCombinations() {
+        for style in WatermarkLayoutStyle.allCases {
+            let closest = WatermarkLayoutStyle.closest(to: style.layoutMode, rotationPattern: style.rotationPattern)
+            XCTAssertEqual(closest, style)
+        }
+        // A rotation pattern the matrix doesn't represent (.custom) still
+        // resolves to the nearest real stop rather than crashing/nil.
+        XCTAssertEqual(WatermarkLayoutStyle.closest(to: .single, rotationPattern: .custom), .singleRotated)
+        XCTAssertEqual(WatermarkLayoutStyle.closest(to: .single, rotationPattern: .alternating), .singleRotated)
+    }
 
-        let aboveRange = WatermarkIntensityPreset.interpolated(at: 99)
-        XCTAssertEqual(aboveRange.sizeFraction, WatermarkIntensityPreset.protective.sizeFraction, accuracy: 0.0001)
+    func testNearestFindsClosestPresetBySizeAndLayout() {
+        let nearDiscrete = WatermarkIntensityPreset.nearest(sizeFraction: 0.09, layoutStyle: .single)
+        XCTAssertEqual(nearDiscrete, .discrete)
+
+        let nearProtective = WatermarkIntensityPreset.nearest(sizeFraction: 0.58, layoutStyle: .tiledRotated)
+        XCTAssertEqual(nearProtective, .protective)
     }
 
     func testDefaultIsSubtleTheResearchedProfessionalRange() {
@@ -45,6 +65,12 @@ final class WatermarkIntensityPresetTests: XCTestCase {
         XCTAssertEqual(WatermarkIntensityPreset.subtle.sizeFraction, 0.13, accuracy: 0.0001)
         XCTAssertGreaterThanOrEqual(WatermarkIntensityPreset.subtle.sizeFraction, 0.10)
         XCTAssertLessThanOrEqual(WatermarkIntensityPreset.subtle.sizeFraction, 0.15)
+    }
+
+    func testSizeRangeCoversAllNamedPresets() {
+        for preset in WatermarkIntensityPreset.allCases {
+            XCTAssertTrue(WatermarkIntensityPreset.sizeRange.contains(preset.sizeFraction), "\(preset) sizeFraction out of the matrix's own size range")
+        }
     }
 
     func testBundledAutomalityWatermarkResourceExists() {

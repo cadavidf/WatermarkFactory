@@ -36,15 +36,55 @@ enum WatermarkSizePreset: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-/// A single named step covering size + opacity + layout together, ordered
-/// low-to-high intrusiveness -- Discrete (barely there) through Protective
-/// (large, high-opacity, tiled, hard to crop or clone out). Distinct from
-/// WatermarkSizePreset/OpacityPreset, which stay as independent fine-tuning
-/// sliders for anyone who wants an exact custom combination; this is the
-/// "just tell me how loud" single control most people actually want.
-/// Sizing grounded in real market data (10-15% of canvas width is the
-/// professional-branding sweet spot, larger coverage is the anti-theft use
-/// case) -- see SPEC.md's watermark-intensity section for sources.
+/// The four ways a watermark can actually sit on a photo, ordered by
+/// coverage/aggressiveness -- the vertical axis of the intensity matrix
+/// below. Single vs tiled is WatermarkSettings.layoutMode; rotated vs not
+/// is settings.rotationPattern (.diagonal vs .none) -- this just names the
+/// four meaningful combinations of those two existing settings as one
+/// discrete axis, rather than introducing new state.
+enum WatermarkLayoutStyle: Int, CaseIterable, Identifiable {
+    case single, singleRotated, tiled, tiledRotated
+    var id: Int { rawValue }
+
+    var label: String {
+        switch self {
+        case .single: String(localized: "Single")
+        case .singleRotated: String(localized: "Single, rotated")
+        case .tiled: String(localized: "Tiled")
+        case .tiledRotated: String(localized: "Tiled, rotated")
+        }
+    }
+
+    var layoutMode: LayoutMode {
+        (self == .tiled || self == .tiledRotated) ? .tiled : .single
+    }
+
+    var rotationPattern: RotationPattern {
+        (self == .singleRotated || self == .tiledRotated) ? .diagonal : .none
+    }
+
+    static func closest(to layoutMode: LayoutMode, rotationPattern: RotationPattern) -> WatermarkLayoutStyle {
+        let rotated = rotationPattern != .none
+        switch (layoutMode, rotated) {
+        case (.single, false): return .single
+        case (.single, true): return .singleRotated
+        case (.tiled, false): return .tiled
+        case (.tiled, true): return .tiledRotated
+        }
+    }
+}
+
+/// A single named point on the intensity matrix: size + layout style
+/// (position on the 2D pad) plus its own opacity, which rides along
+/// visibly as the drag handle's own transparency but is independently
+/// adjustable -- not locked to position, unlike the size/layout axes.
+/// Distinct from WatermarkSizePreset/OpacityPreset, which stay as
+/// independent fine-tuning sliders for anyone who wants an exact custom
+/// combination; this is the "just tell me how loud" single control most
+/// people actually want. Sizing grounded in real market data (10-15% of
+/// canvas width is the professional-branding sweet spot, larger coverage
+/// is the anti-theft use case) -- see SPEC.md's watermark-intensity
+/// section for sources.
 enum WatermarkIntensityPreset: String, CaseIterable, Identifiable, Codable {
     case discrete, subtle, balanced, confident, bold, protective
     var id: String { rawValue }
@@ -61,7 +101,7 @@ enum WatermarkIntensityPreset: String, CaseIterable, Identifiable, Codable {
     }
 
     /// One line explaining what each step is actually for, shown under the
-    /// chip row -- "intrusiveness" alone doesn't tell you when you'd want
+    /// matrix -- "intrusiveness" alone doesn't tell you when you'd want
     /// which end.
     var purpose: String {
         switch self {
@@ -70,7 +110,7 @@ enum WatermarkIntensityPreset: String, CaseIterable, Identifiable, Codable {
         case .balanced: String(localized: "Noticeable without dominating the photo.")
         case .confident: String(localized: "Clearly branded — good for social posts and previews.")
         case .bold: String(localized: "Hard to ignore — makes ownership unmistakable.")
-        case .protective: String(localized: "Large, high-opacity, tiled — resists cropping or cloning out. For proofs and preview-only shares.")
+        case .protective: String(localized: "Large, solid, tiled — resists cropping or cloning out. For proofs and preview-only shares.")
         }
     }
 
@@ -85,45 +125,40 @@ enum WatermarkIntensityPreset: String, CaseIterable, Identifiable, Codable {
         }
     }
 
+    var layoutStyle: WatermarkLayoutStyle {
+        switch self {
+        case .discrete, .subtle, .balanced: .single
+        case .confident: .singleRotated
+        case .bold: .tiled
+        case .protective: .tiledRotated
+        }
+    }
+
     var opacity: Double {
         switch self {
-        case .discrete: 0.20
+        case .discrete: 0.12   // lowered from an earlier 0.20 -- meant to be barely there
         case .subtle: 0.40
         case .balanced: 0.55
         case .confident: 0.70
         case .bold: 0.85
-        case .protective: 0.95
+        case .protective: 1.00 // raised from an earlier 0.95 -- the whole point is resisting removal
         }
     }
 
-    var layoutMode: LayoutMode {
-        self == .protective ? .tiled : .single
-    }
+    var layoutMode: LayoutMode { layoutStyle.layoutMode }
+    var rotationPattern: RotationPattern { layoutStyle.rotationPattern }
 
-    /// Continuous position 0...5 for the slider -- lets it sit between two
-    /// named steps rather than only snapping to one of the six.
-    var sliderPosition: Double { Double(Self.allCases.firstIndex(of: self) ?? 0) }
+    /// Size axis bounds for the matrix pad -- matches the useful range the
+    /// six named points actually cover; anyone wanting more than Protective's
+    /// 60% still has the fine-grained Size & Opacity slider below.
+    static let sizeRange: ClosedRange<Double> = 0.05...0.60
 
-    /// Interpolates size/opacity between the two nearest named steps for a
-    /// given continuous slider position, snapping layoutMode/label to
-    /// whichever step is closer -- the slider is for feel, not for hitting
-    /// an exact number, so a nearest-step snap for the categorical fields
-    /// is the right compromise rather than fabricating layout states that
-    /// don't correspond to any named preset.
-    static func interpolated(at position: Double) -> (sizeFraction: Double, opacity: Double, layoutMode: LayoutMode, nearestLabel: String) {
-        let clamped = min(max(position, 0), Double(allCases.count - 1))
-        let lowerIndex = Int(clamped.rounded(.down))
-        let upperIndex = min(lowerIndex + 1, allCases.count - 1)
-        let t = clamped - Double(lowerIndex)
-        let lower = allCases[lowerIndex]
-        let upper = allCases[upperIndex]
-        let nearest = t < 0.5 ? lower : upper
-        return (
-            sizeFraction: lower.sizeFraction + (upper.sizeFraction - lower.sizeFraction) * t,
-            opacity: lower.opacity + (upper.opacity - lower.opacity) * t,
-            layoutMode: nearest.layoutMode,
-            nearestLabel: nearest.label
-        )
+    static func nearest(sizeFraction: Double, layoutStyle: WatermarkLayoutStyle) -> WatermarkIntensityPreset {
+        allCases.min { a, b in
+            let da = abs(a.sizeFraction - sizeFraction) + (a.layoutStyle == layoutStyle ? 0 : 0.15)
+            let db = abs(b.sizeFraction - sizeFraction) + (b.layoutStyle == layoutStyle ? 0 : 0.15)
+            return da < db
+        } ?? .subtle
     }
 }
 

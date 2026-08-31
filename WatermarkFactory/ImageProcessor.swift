@@ -305,7 +305,25 @@ struct ImageProcessor {
     }
 
     private static func drawSingleWatermark(context: CGContext, watermark: CGImage, canvas: CGSize, size: CGSize, anchor: Anchor, settings: WatermarkSettings) {
-        context.draw(watermark, in: rect(for: size, canvas: canvas, anchor: anchor, padding: settings.padding, offsetX: settings.offsetX, offsetY: settings.offsetY))
+        let rect = rect(for: size, canvas: canvas, anchor: anchor, padding: settings.padding, offsetX: settings.offsetX, offsetY: settings.offsetY)
+        // .alternating has no meaning for a single instance (nothing to
+        // alternate between) -- falls back to unrotated rather than picking
+        // an arbitrary angle.
+        let angle: CGFloat
+        switch settings.rotationPattern {
+        case .none, .alternating: angle = 0
+        case .diagonal: angle = 45
+        case .custom: angle = settings.customAngle
+        }
+        guard angle != 0 else {
+            context.draw(watermark, in: rect)
+            return
+        }
+        context.saveGState()
+        context.translateBy(x: rect.midX, y: rect.midY)
+        context.rotate(by: angle * .pi / 180)
+        context.draw(watermark, in: CGRect(x: -rect.width / 2, y: -rect.height / 2, width: rect.width, height: rect.height))
+        context.restoreGState()
     }
 
     private static func encode(image: CGImage, sourceURL: URL, format: ExportFormat, quality: Double) throws -> (data: Data, ext: String, usedHEICFallback: Bool) {

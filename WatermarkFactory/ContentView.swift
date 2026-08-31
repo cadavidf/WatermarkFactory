@@ -33,15 +33,20 @@ final class AppState: ObservableObject {
     @Published var stage: Stage = .selectImages
     @Published var sizePreset: WatermarkSizePreset? = .medium
     @Published var opacityPreset: OpacityPreset? = .balanced
-    // Continuous 0...5 position across WatermarkIntensityPreset's six named
-    // steps (Discrete...Protective) -- the "how loud" single control.
-    // Defaults to Subtle (13% / 40% opacity), the researched professional-
-    // branding sweet spot. Setting sizeFraction/opacity/layoutMode below
-    // doesn't write back here (they're the independent fine-tuning
-    // sliders), so this only reflects deliberate intensity-control use,
-    // not just any settings change.
-    @Published var intensitySliderPosition = WatermarkIntensityPreset.subtle.sliderPosition {
-        didSet { applyIntensity() }
+    // The intensity matrix binds directly to sizeFraction (X, below) and
+    // this computed layoutStyle (Y) rather than shadow state -- layoutStyle
+    // just names one of the 4 meaningful combinations of the two real
+    // settings (layoutMode, rotationPattern) that already exist; writing to
+    // it writes straight through to them, no separate state to keep in
+    // sync. Opacity is NOT part of the matrix: it rides along visibly as
+    // the drag handle's own transparency but stays the existing
+    // independent `opacity` property, adjustable on its own.
+    var intensityLayoutStyle: WatermarkLayoutStyle {
+        get { WatermarkLayoutStyle.closest(to: layoutMode, rotationPattern: rotationPattern) }
+        set {
+            layoutMode = newValue.layoutMode
+            rotationPattern = newValue.rotationPattern
+        }
     }
     @Published var sizeFraction = 0.35 { didSet { saveSettings(); updateEstimate() } }
     @Published var opacity = 0.5 { didSet { saveSettings(); updateEstimate() } }
@@ -507,13 +512,6 @@ final class AppState: ObservableObject {
         saveBookmark(url, key: "watermarkBookmark")
         advanceIfReady()
         updateEstimate()
-    }
-
-    private func applyIntensity() {
-        let resolved = WatermarkIntensityPreset.interpolated(at: intensitySliderPosition)
-        sizeFraction = resolved.sizeFraction
-        opacity = resolved.opacity
-        layoutMode = resolved.layoutMode
     }
 
     private func apply(_ settings: WatermarkSettings) {
@@ -1162,22 +1160,38 @@ struct ContentView: View {
     /// custom combination this ladder doesn't cover.
     private var intensitySection: some View {
         ControlSection("Watermark Intensity") {
+            WatermarkIntensityPad(
+                sizeFraction: $state.sizeFraction,
+                layoutStyle: Binding(get: { state.intensityLayoutStyle }, set: { state.intensityLayoutStyle = $0 }),
+                opacity: state.opacity
+            )
             FlowLayout {
                 ForEach(WatermarkIntensityPreset.allCases) { preset in
-                    Button(preset.label) { state.intensitySliderPosition = preset.sliderPosition }
-                        .buttonStyle(.automalityChip(isSelected: state.intensitySliderPosition == preset.sliderPosition))
+                    Button(preset.label) {
+                        state.sizeFraction = preset.sizeFraction
+                        state.intensityLayoutStyle = preset.layoutStyle
+                        state.opacity = preset.opacity
+                    }
+                    .buttonStyle(.automalityChip(isSelected: isCurrentIntensityPreset(preset)))
                 }
             }
-            AutomalitySlider(value: $state.intensitySliderPosition, in: 0...Double(WatermarkIntensityPreset.allCases.count - 1))
+            Text("Opacity").automalityLabelText().foregroundStyle(AutomalityColor.ink)
+            AutomalitySlider(value: $state.opacity, in: 0...1)
+            Text("\(Int(state.opacity * 100))%").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             Text(currentIntensityPurpose)
                 .font(.caption)
                 .foregroundStyle(AutomalityColor.inkMuted)
         }
     }
 
+    private func isCurrentIntensityPreset(_ preset: WatermarkIntensityPreset) -> Bool {
+        abs(state.sizeFraction - preset.sizeFraction) < 0.005
+            && state.intensityLayoutStyle == preset.layoutStyle
+            && abs(state.opacity - preset.opacity) < 0.005
+    }
+
     private var currentIntensityPurpose: String {
-        let resolved = WatermarkIntensityPreset.interpolated(at: state.intensitySliderPosition)
-        return WatermarkIntensityPreset.allCases.first { $0.label == resolved.nearestLabel }?.purpose ?? ""
+        WatermarkIntensityPreset.nearest(sizeFraction: state.sizeFraction, layoutStyle: state.intensityLayoutStyle).purpose
     }
 
     private var sizeOpacitySection: some View {
@@ -1544,6 +1558,88 @@ struct ContentView: View {
         } else {
             Color.clear.frame(width: 16, height: 16)
         }
+    }
+}
+
+/// Drag anywhere to set size (X) and layout style (Y) together in one
+/// gesture. Opacity isn't a third spatial axis -- forcing four independent
+/// dimensions into one control is exactly what makes a control hard to
+/// use, not powerful. It rides along as the handle's own transparency
+/// instead, live, while staying a real independently-adjustable value via
+/// the slider underneath.
+struct WatermarkIntensityPad: View {
+    @Binding var sizeFraction: Double
+    @Binding var layoutStyle: WatermarkLayoutStyle
+    let opacity: Double
+
+    private let padHeight: CGFloat = 168
+
+    var body: some View {
+        GeometryReader { geo in
+            let rowHeight = geo.size.height / CGFloat(WatermarkLayoutStyle.allCases.count)
+            ZStack(alignment: .topLeading) {
+                AutomalityColor.gray100
+                // Row bands + labels
+                ForEach(WatermarkLayoutStyle.allCases) { style in
+                    let y = CGFloat(style.rawValue) * rowHeight
+                    Rectangle()
+                        .stroke(AutomalityColor.gray300, lineWidth: 1)
+                        .frame(width: geo.size.width, height: rowHeight)
+                        .position(x: geo.size.width / 2, y: y + rowHeight / 2)
+                    Text(style.label)
+                        .font(.caption2)
+                        .foregroundStyle(AutomalityColor.inkMuted)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(AutomalityColor.offWhite.opacity(0.85))
+                        .position(x: 44, y: y + 10)
+                }
+                // Reference dots for the six named presets, so the grid
+                // isn't just an empty field -- it shows where the named
+                // steps actually sit.
+                ForEach(WatermarkIntensityPreset.allCases) { preset in
+                    let px = xPosition(for: preset.sizeFraction, width: geo.size.width)
+                    let py = CGFloat(preset.layoutStyle.rawValue) * rowHeight + rowHeight / 2
+                    Circle()
+                        .fill(AutomalityColor.gray300)
+                        .frame(width: 6, height: 6)
+                        .position(x: px, y: py)
+                }
+                // The draggable handle itself
+                let hx = xPosition(for: sizeFraction, width: geo.size.width)
+                let hy = CGFloat(layoutStyle.rawValue) * rowHeight + rowHeight / 2
+                Circle()
+                    .fill(AutomalityColor.teal.opacity(max(opacity, 0.15)))
+                    .overlay(Circle().stroke(AutomalityColor.ink, lineWidth: 2))
+                    .frame(width: 22, height: 22)
+                    .position(x: hx, y: hy)
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        let clampedX = min(max(value.location.x, 0), geo.size.width)
+                        sizeFraction = fraction(forX: clampedX, width: geo.size.width)
+                        let row = min(max(Int(value.location.y / rowHeight), 0), WatermarkLayoutStyle.allCases.count - 1)
+                        if let style = WatermarkLayoutStyle(rawValue: row) { layoutStyle = style }
+                    }
+            )
+        }
+        .frame(height: padHeight)
+        .overlay(Rectangle().stroke(AutomalityColor.ink.opacity(0.3), lineWidth: 1))
+    }
+
+    private func xPosition(for size: Double, width: CGFloat) -> CGFloat {
+        let range = WatermarkIntensityPreset.sizeRange
+        let t = (size - range.lowerBound) / (range.upperBound - range.lowerBound)
+        return CGFloat(min(max(t, 0), 1)) * width
+    }
+
+    private func fraction(forX x: CGFloat, width: CGFloat) -> Double {
+        let range = WatermarkIntensityPreset.sizeRange
+        guard width > 0 else { return range.lowerBound }
+        let t = Double(x / width)
+        return range.lowerBound + t * (range.upperBound - range.lowerBound)
     }
 }
 
