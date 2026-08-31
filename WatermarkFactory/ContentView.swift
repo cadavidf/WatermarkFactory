@@ -135,25 +135,30 @@ final class AppState: ObservableObject {
     var canSavePreset: Bool { watermarkURL != nil }
     var canSuggestPlacement: Bool { selected != nil && watermarkURL != nil && !isSuggestingPlacement }
 
-    func chooseFolder() {
+    /// Single picker for both a folder and individual images -- there's no
+    /// real reason to force a person to know in advance which of those two
+    /// things they have before they're even allowed to open the panel.
+    /// Dispatches through the same openedURLInput/open(_:) path the Finder
+    /// Quick Action and drag-and-drop use, so all three entry points agree
+    /// on "if anything selected is a folder, treat the whole selection as
+    /// that one folder" (matches the existing Quick Action semantics rather
+    /// than introducing a second, different merge rule).
+    func chooseFolderOrImages() {
         let panel = NSOpenPanel()
-        panel.canChooseFiles = false
+        panel.canChooseFiles = true
         panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-            setFolder(url)
+        panel.allowsMultipleSelection = true
+        panel.allowedContentTypes = [.png, .jpeg, .heic, .tiff, .gif]
+        if panel.runModal() == .OK, let input = Self.openedURLInput(from: panel.urls) {
+            open(input)
         }
     }
 
-    func chooseImages() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = true
-        panel.allowedContentTypes = [.png, .jpeg, .heic, .tiff, .gif]
-        if panel.runModal() == .OK {
-            setImages(panel.urls)
-        }
+    /// Drag-and-drop entry point (see imagePickerSection's dropDestination)
+    /// -- same dispatch as chooseFolderOrImages/openFromFinder.
+    func addDroppedURLs(_ urls: [URL]) {
+        guard let input = Self.openedURLInput(from: urls) else { return }
+        open(input)
     }
 
     func chooseWatermark() {
@@ -673,6 +678,7 @@ struct ContentView: View {
     @State private var duplicatePresetName = ""
     @State private var showingOverwriteConfirm = false
     @State private var draggingItem: ImageItem?
+    @State private var isFileDropTargeted = false
     private let controlsWidth: CGFloat = 360
     private let previewMinWidth: CGFloat = 560
     private let spacing: CGFloat = AutomalitySpacing.sm
@@ -851,6 +857,18 @@ struct ContentView: View {
             imageList
         }
         .padding(panePadding)
+        // Same dispatch as the Choose Folder or Images button and the
+        // Finder Quick Action (AppState.addDroppedURLs -> openedURLInput ->
+        // open(_:)) -- one rule everywhere for "what does dropping a mix of
+        // folders/files actually mean", not three different ones.
+        .dropDestination(for: URL.self) { urls, _ in
+            state.addDroppedURLs(urls)
+            return true
+        } isTargeted: { targeted in
+            isFileDropTargeted = targeted
+        }
+        .background(isFileDropTargeted ? AutomalityColor.tealPale : Color.clear)
+        .animation(.easeOut(duration: 0.15), value: isFileDropTargeted)
     }
 
     private var watermarkStage: some View {
@@ -922,11 +940,12 @@ struct ContentView: View {
     private var imagePickerSection: some View {
         ControlSection("Select Images") {
             FlowLayout {
-                Button("Choose Folder...") { state.chooseFolder() }
-                    .buttonStyle(.automalityPrimary)
-                Button("Choose Images...") { state.chooseImages() }
+                Button("Choose Folder or Images...") { state.chooseFolderOrImages() }
                     .buttonStyle(.automalityPrimary)
             }
+            Text("...or drag a folder or images in")
+                .font(.caption)
+                .foregroundStyle(AutomalityColor.inkMuted)
             if let folder = state.folderURL {
                 Text(folder.lastPathComponent).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             }
