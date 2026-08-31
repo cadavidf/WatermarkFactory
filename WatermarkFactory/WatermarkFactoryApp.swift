@@ -19,6 +19,15 @@ struct WatermarkFactoryApp: App {
                 // List background and washed-out Picker labels regardless of any
                 // SwiftUI-level .background()/.foregroundStyle() override.
                 .environment(\.colorScheme, .light)
+                // Pins the accent color every native, unstyled SwiftUI/AppKit
+                // control falls back to (DisclosureGroup's chevron, Picker's
+                // selection highlight, etc.) to Automality teal. Without this,
+                // those controls inherit the user's macOS System Settings ->
+                // Appearance accent color — which reads as random magenta/
+                // purple/pink on any Mac where that's set to something other
+                // than blue, regardless of how correctly every custom
+                // Automality*Style component is themed.
+                .tint(AutomalityColor.teal)
                 // Required setup for every AutomalityUI/DesignSystemKit consumer:
                 // Themed*Style components read this via @Environment(\.brandTheme).
                 // Without it set at the true app root, every themed control
