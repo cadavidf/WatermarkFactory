@@ -69,6 +69,9 @@ final class AppState: ObservableObject {
     @Published var smartPlacementProposal: SmartPlacementProposal?
     @Published var presets: [WatermarkPreset] = []
     @Published var orderedImageURLs: [URL] = [] { didSet { saveImageOrder() } }
+    @Published var chatTranscript: [ChatMessage] = [
+        ChatMessage(role: .assistant, text: "Tell me how you want these watermarked.", chips: ["Just watermark these", "Subtle corner", "Centered bold", "Tiled brand"])
+    ]
 
     enum OpenedURLInput: Equatable {
         case folder(URL)
@@ -384,6 +387,11 @@ final class AppState: ObservableObject {
         status = "Applied \(preset.name) export preset."
     }
 
+    func applyIntentSlots(_ slots: IntentSlots, message: String) {
+        apply(IntentPreset.settings(from: slots, message: message, current: settings))
+        status = slots.assistantReply
+    }
+
     func suggestPlacement() {
         guard let source = selected?.url, let watermark = watermarkURL else { return }
         isSuggestingPlacement = true
@@ -667,6 +675,8 @@ struct ContentView: View {
 
             if state.flowMode == .guided {
                 stageContent
+            } else if state.flowMode == .chat {
+                chatContent
             } else {
                 compactContent
             }
@@ -712,6 +722,8 @@ struct ContentView: View {
                 ))
                 Spacer()
                 nextButton
+            } else {
+                Spacer()
             }
         }
     }
@@ -780,6 +792,20 @@ struct ContentView: View {
                 .padding(panePadding)
             }
             .frame(width: controlsWidth)
+        }
+    }
+
+    private var chatContent: some View {
+        HStack(spacing: 0) {
+            ChatFlowView(
+                state: state,
+                sizeOpacitySection: { AnyView(sizeOpacitySection) },
+                positionPaddingSection: { AnyView(positionPaddingSection) },
+                exportSection: { AnyView(exportSection) }
+            )
+            .frame(width: controlsWidth)
+            Divider()
+            previewPane
         }
     }
 

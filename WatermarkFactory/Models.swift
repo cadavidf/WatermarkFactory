@@ -110,6 +110,7 @@ enum LayoutMode: String, CaseIterable, Identifiable, Codable {
 enum FlowMode: String, CaseIterable, Identifiable, Codable {
     case guided = "Guided"
     case compact = "Compact"
+    case chat = "Chat"
     var id: String { rawValue }
 }
 
@@ -156,6 +157,111 @@ struct ImageItem: Identifiable, Hashable {
     let url: URL
     var id: URL { url }
     var filename: String { url.lastPathComponent }
+}
+
+enum ChatRole: String, Codable {
+    case assistant, user
+}
+
+struct ChatMessage: Identifiable, Codable {
+    var id = UUID()
+    var role: ChatRole
+    var text: String
+    var chips: [String]?
+}
+
+struct ChatQuestion: Identifiable {
+    let id: String
+    let text: String
+    let chips: [String]
+}
+
+struct IntentSlots: Codable, Equatable {
+    var anchor: String?
+    var sizeFraction: Double?
+    var opacity: Double?
+    var tint: String?
+    var exportPlatform: String?
+    var renamePrefix: String?
+    var needsClarification: [String]
+    var assistantReply: String
+}
+
+enum IntentPreset: String, CaseIterable {
+    case cornerSubtle, centeredBold, tiledBrand
+
+    static func inferred(from message: String, slots: IntentSlots) -> IntentPreset {
+        let text = message.lowercased()
+        if slots.anchor == "tiled" || text.contains("tile") || text.contains("repeat") { return .tiledBrand }
+        if slots.anchor == Anchor.center.rawValue || text.contains("center") || text.contains("bold") { return .centeredBold }
+        return .cornerSubtle
+    }
+
+    static func settings(from slots: IntentSlots, message: String, current: WatermarkSettings = .chatDefault) -> WatermarkSettings {
+        var settings = WatermarkSettings.chatDefault
+        settings.outputSuffix = current.outputSuffix
+        apply(inferred(from: message, slots: slots), to: &settings)
+
+        if let anchor = slots.anchor {
+            if anchor == "tiled" {
+                settings.layoutMode = .tiled
+            } else if let parsed = Anchor(rawValue: anchor) {
+                settings.layoutMode = .single
+                settings.anchor = parsed
+            }
+        }
+        if let size = slots.sizeFraction { settings.sizeFraction = min(max(size, 0.05), 0.6) }
+        if let opacity = slots.opacity { settings.opacity = min(max(opacity, 0), 1) }
+        if let tint = slots.tint, let parsed = WatermarkTint(rawValue: tint) { settings.watermarkTint = parsed }
+        applyPlatform(slots.exportPlatform ?? "original", to: &settings)
+        settings.outputPrefix = (slots.renamePrefix ?? "").replacingOccurrences(of: "/", with: "").replacingOccurrences(of: "\0", with: "")
+        return settings
+    }
+
+    static func apply(_ preset: IntentPreset, to settings: inout WatermarkSettings) {
+        switch preset {
+        case .cornerSubtle:
+            settings.layoutMode = .single
+            settings.anchor = .bottomRight
+            settings.sizeFraction = 0.18
+            settings.opacity = 0.5
+            settings.watermarkTint = .original
+        case .centeredBold:
+            settings.layoutMode = .single
+            settings.anchor = .center
+            settings.sizeFraction = 0.35
+            settings.opacity = 0.85
+        case .tiledBrand:
+            settings.layoutMode = .tiled
+            settings.rotationPattern = .diagonal
+            settings.spacing = 80
+        }
+    }
+
+    private static func applyPlatform(_ platform: String, to settings: inout WatermarkSettings) {
+        switch platform.lowercased() {
+        case "instagram":
+            if let preset = PlatformExportPreset.all.first(where: { $0.id == "instagram" }) {
+                settings.outputWidth = preset.width
+                settings.outputHeight = preset.height
+                settings.exportFormat = .jpeg
+                settings.jpegQuality = preset.jpegQuality
+            }
+        case "web":
+            settings.optimizeForWeb = true
+            settings.exportFormat = .jpeg
+            settings.jpegQuality = min(settings.jpegQuality, 0.8)
+        case "print":
+            settings.exportFormat = .tiff
+            settings.outputWidth = 0
+            settings.outputHeight = 0
+            settings.maxFileSizeKB = 0
+        case "original":
+            settings.exportFormat = .keepOriginal
+        default:
+            break
+        }
+    }
 }
 
 struct WatermarkSettings: Codable {
@@ -229,6 +335,10 @@ struct WatermarkSettings: Codable {
     }
 }
 
+extension WatermarkSettings {
+    static let chatDefault = WatermarkSettings(sizeFraction: 0.18, opacity: 0.5, anchor: .bottomRight, offsetX: 24, offsetY: 24, layoutMode: .single, padding: 16, spacing: 80, rotationPattern: .diagonal, customAngle: 30, exportFormat: .keepOriginal, jpegQuality: 0.9, outputPrefix: "", outputSuffix: "", watermarkTint: .original)
+}
+
 struct SmartPlacementProposal {
     var anchor: Anchor
     var padding: Double
@@ -257,6 +367,14 @@ struct PlatformExportPreset: Identifiable {
     var sizeLabel: String { "\(width)x\(height) JPEG" }
 
     static let all: [PlatformExportPreset] = [
+        PlatformExportPreset(
+            id: "instagram",
+            name: "Instagram",
+            width: 1080,
+            height: 1080,
+            jpegQuality: 0.85,
+            note: "Instagram square export: 1080x1080 JPEG."
+        ),
         PlatformExportPreset(
             id: "fincaraiz",
             name: "FincaRaiz",
