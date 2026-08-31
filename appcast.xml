@@ -3,6 +3,21 @@
     <channel>
         <title>WatermarkFactory</title>
         <item>
+            <title>1.2.1</title>
+            <pubDate>Mon, 31 Aug 2026 12:02:03 -0500</pubDate>
+            <sparkle:version>14</sparkle:version>
+            <sparkle:shortVersionString>1.2.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <ul>
+                    <li>Watermark Intensity is now a real 2D matrix: drag to set size and layout style (Single/Rotated/Tiled/Tiled+Rotated) together, opacity stays independently adjustable and shows live on the drag handle.</li>
+                    <li>Discrete is now less opaque, Protective is fully opaque -- both per direct feedback.</li>
+                    <li>Single (non-tiled) watermarks can now be rotated, not just tiled ones.</li>
+                </ul>
+            ]]></description>
+            <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.2.1/WatermarkFactory.dmg" length="2374067" type="application/octet-stream" sparkle:edSignature="ou7IaeEDNXLeCNerTglTJ7oU11dt4/71CvOMSQCNrPMb3c/4mB4PuDWNwXBdslUABb8ARPoBMgKytpchH78gDA=="/>
+        </item>
+        <item>
             <title>1.2.0</title>
             <pubDate>Mon, 31 Aug 2026 11:56:57 -0500</pubDate>
             <sparkle:version>13</sparkle:version>
@@ -28,20 +43,6 @@
                 </ul>
             ]]></description>
             <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.1.9/WatermarkFactory.dmg" length="2333353" type="application/octet-stream" sparkle:edSignature="k0gUE4fLSNJAyXEUX94QI020He0ftCZ0pO+blTFVo/9C4VtUXqCFowhbEspc9dpx9Vh2ctnDliB5n+evl6gFCw=="/>
-        </item>
-        <item>
-            <title>1.1.8</title>
-            <pubDate>Mon, 31 Aug 2026 11:32:04 -0500</pubDate>
-            <sparkle:version>11</sparkle:version>
-            <sparkle:shortVersionString>1.1.8</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <description><![CDATA[
-                <ul>
-                    <li>New Watermark Intensity control on the Position stage: six named steps from Discrete to Protective (size + opacity + layout together), sized from real market research (10-15% of canvas width is the professional-branding sweet spot). Chip row plus a slider that interpolates between steps.</li>
-                    <li>The preview now shows Automality's own mark when you haven't chosen a watermark yet, so the intensity presets are actually visible before you have your own logo ready. Clearly badged as a demo -- never used for a real export.</li>
-                </ul>
-            ]]></description>
-            <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.1.8/WatermarkFactory.dmg" length="2318551" type="application/octet-stream" sparkle:edSignature="h/zqGTuPq0oaGex4iDk1vpL2LqY8RxSXLMkFu2LnDArt9VzM2A2EpGyUs1HXgRyBb9IZvGsa6p8IVf+bgGjvCQ=="/>
         </item>
         <item>
             <title>1.1.2</title>
