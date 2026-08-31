@@ -710,7 +710,32 @@ struct ContentView: View {
                     get: { state.stage.rawValue },
                     set: { if let stage = AppState.Stage(rawValue: $0) { state.advance(to: stage) } }
                 ))
+                Spacer()
+                nextButton
             }
+        }
+    }
+
+    /// The single "continue to the next stage" action, always in the top
+    /// header next to the step nav — not buried at the bottom of a scrolling
+    /// controls pane. Accent-colored (orange) so it reads as the one thing
+    /// to do next; every other button on screen stays primary/secondary.
+    @ViewBuilder
+    private var nextButton: some View {
+        switch state.stage {
+        case .selectImages:
+            Button("Next") { state.advance(to: .watermark) }
+                .buttonStyle(.automalityAccent)
+                .disabled(state.images.isEmpty)
+        case .watermark:
+            Button("Next") { state.advance(to: .orderRename) }
+                .buttonStyle(.automalityAccent)
+                .disabled(state.watermarkURL == nil)
+        case .orderRename:
+            Button("Next") { state.advance(to: .export) }
+                .buttonStyle(.automalityAccent)
+        case .export:
+            EmptyView()
         }
     }
 
@@ -762,12 +787,6 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: spacing) {
             imagePickerSection
             imageList
-            HStack {
-                Spacer()
-                Button("Next") { state.advance(to: .watermark) }
-                    .buttonStyle(.automalityPrimary)
-                    .disabled(state.images.isEmpty)
-            }
         }
         .padding(panePadding)
     }
@@ -783,12 +802,6 @@ struct ContentView: View {
                     sizeOpacitySection
                     layoutModeSection
                     positionPaddingSection
-                    HStack {
-                        Spacer()
-                        Button("Next") { state.advance(to: .orderRename) }
-                            .buttonStyle(.automalityPrimary)
-                            .disabled(state.watermarkURL == nil)
-                    }
                 }
                 .padding(panePadding)
             }
