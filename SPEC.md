@@ -1225,3 +1225,71 @@ default) / **.zip** / **PDF, one image per page**.
   (`PDFDocument(url:)?.pageCount` from PDFKit).
 - All prior tests must still pass.
 
+
+## Auto-update (Sparkle)
+
+App ships as a signed dmg via GitHub Releases, not the Mac App Store — no
+built-in update mechanism exists today, users have to notice a new release
+and manually re-download. Add Sparkle (`https://github.com/sparkle-project/
+Sparkle`, SPM dependency, current major is 2.x), the de facto standard for
+this exact distribution shape.
+
+### Package + wiring
+- Add Sparkle as an SPM package dependency (`SparkleCore`/`Sparkle`
+  product — check the package's actual product name at implementation
+  time, don't assume).
+- `WatermarkFactoryApp.swift`'s `AppDelegate` gets an
+  `SPUStandardUpdaterController` (Sparkle's ready-made controller — don't
+  hand-roll the update-check/download/relaunch flow, that's exactly what
+  this type exists for), created in `applicationDidFinishLaunching`, with
+  `startingUpdater: true` **unless** the app was launched via the
+  Finder-Quick-Action auto-run path (`didFinishLaunching` check already
+  exists for that in `AppDelegate` — an update check firing during a
+  silent, auto-quitting batch run would be surprising and could block the
+  auto-quit on a downloaded-update prompt; skip starting the updater in
+  that path, still check normally on an interactive launch).
+- Add a "Check for Updates…" menu item wired to
+  `updaterController.checkForUpdates(_:)`, in whatever menu the app's
+  existing menu bar customization (if any) lives, or the default
+  Help/App menu if none — check `WatermarkFactoryApp.swift`'s `Scene` for
+  any existing `.commands {}` block before adding a new one.
+
+### Appcast + signing
+- Generate an EdDSA key pair via Sparkle's bundled `generate_keys` tool
+  (ships in the package's `bin/` after SPM resolves it, or via `brew
+  install sparkle` if that's easier to invoke standalone). **The private
+  key must never be committed to git** — store it in Keychain or a local
+  file outside the repo, document where in README.md, and treat generating
+  it as a one-time manual step you report back on rather than something
+  to automate blindly.
+- Embed the **public** key in `Info.plist` as `SUPublicEDKey`, and the feed
+  URL as `SUFeedURL`.
+- Host `appcast.xml` alongside releases — simplest: commit it into the
+  `WatermarkFactory` repo itself (e.g. `docs/appcast.xml`) and serve via
+  GitHub Pages, or generate it fresh on each release and attach it as a
+  release asset with a stable raw-GitHub-content URL
+  (`raw.githubusercontent.com/cadavidf/WatermarkFactory/main/appcast.xml`)
+  — pick whichever needs less new infrastructure, note the choice and why
+  in your summary.
+- Each release needs: the dmg (already produced by the existing
+  build+sign+package steps — no change there), an EdDSA signature over
+  that dmg (Sparkle's `sign_update` tool), and an appcast entry with
+  version, minimum system version, release notes, and the signed download
+  URL. This should become a repeatable step in whatever script/process
+  currently runs `gh release create` — extend it, don't hand-write the XML
+  each time.
+
+### Verification
+- Unit-testable: none of this is meaningfully unit-testable (Sparkle's own
+  update-check/download/install flow is the library's job, not this app's
+  code) — say so plainly rather than inventing a test for it.
+- Manual-only, and genuinely needs a real two-version test: build v1.1.2
+  with this integrated, publish an appcast pointing a fake "v1.1.3" at a
+  real signed dmg, launch v1.1.2, and confirm Sparkle's update UI actually
+  offers and installs it. This is the one piece of this whole session that
+  can't be verified any other way — flag it clearly as unverified until
+  that manual pass happens, the same way the Chat mode fix was flagged
+  unverified until it was actually run live.
+- `xcodebuild build`/`test` tails as usual; all 24 existing tests must
+  still pass.
+
