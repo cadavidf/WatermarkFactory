@@ -751,9 +751,21 @@ struct ContentView: View {
                 .buttonStyle(state.images.isEmpty ? .automalitySecondary : .automalityAccent)
                 .disabled(state.images.isEmpty)
         case .watermark:
-            Button("Next") { state.advance(to: .orderRename) }
-                .buttonStyle(state.watermarkURL == nil ? .automalitySecondary : .automalityAccent)
-                .disabled(state.watermarkURL == nil)
+            // No watermark chosen yet: this becomes an explicit, always-
+            // enabled "Skip" rather than a disabled "Next" -- watermarking
+            // is the app's whole point but not force-required, and
+            // advance(to:) itself would otherwise block jumping past a
+            // stage that isn't "ready" yet, so this sets stage directly.
+            // Primary (teal) rather than accent: it's a real, deliberate
+            // choice, not the orange "do this next" spotlight, which stays
+            // on Choose Watermark until one's actually picked.
+            if state.watermarkURL == nil {
+                Button("Skip") { state.stage = .orderRename }
+                    .buttonStyle(.automalityPrimary)
+            } else {
+                Button("Next") { state.advance(to: .orderRename) }
+                    .buttonStyle(.automalityAccent)
+            }
         case .orderRename:
             Button("Next") { state.advance(to: .export) }
                 .buttonStyle(.automalityAccent)
