@@ -75,6 +75,7 @@ final class AppState: ObservableObject {
     @Published var maxFileSizeKB = 0 { didSet { saveSettings(); updateEstimate() } }
     @Published var watermarkTint: WatermarkTint = .original { didSet { saveSettings(); updateEstimate() } }
     @Published var metadataPrivacy: MetadataPrivacyLevel = .keepOriginalPrecision { didSet { saveSettings(); updateEstimate() } }
+    @Published var removeWatermarkBackground = false { didSet { saveSettings(); updateEstimate() } }
     @Published var previewImage: NSImage?
     @Published var isDemoPreview = false
     @Published var sourceImageSize: CGSize?
@@ -150,7 +151,7 @@ final class AppState: ObservableObject {
         return nil
     }
     var settings: WatermarkSettings {
-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, additionalAnchors: additionalAnchors, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, optimizeForWeb: optimizeForWeb, outputWidth: outputWidth, outputHeight: outputHeight, outputPrefix: outputPrefix, outputSuffix: outputSuffix, maxFileSizeKB: maxFileSizeKB, watermarkTint: watermarkTint, metadataPrivacy: metadataPrivacy)
+        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, additionalAnchors: additionalAnchors, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, optimizeForWeb: optimizeForWeb, outputWidth: outputWidth, outputHeight: outputHeight, outputPrefix: outputPrefix, outputSuffix: outputSuffix, maxFileSizeKB: maxFileSizeKB, watermarkTint: watermarkTint, metadataPrivacy: metadataPrivacy, removeWatermarkBackground: removeWatermarkBackground)
     }
     var canSavePreset: Bool { watermarkURL != nil }
     var canSuggestPlacement: Bool { selected != nil && watermarkURL != nil && !isSuggestingPlacement }
@@ -575,6 +576,7 @@ final class AppState: ObservableObject {
         maxFileSizeKB = settings.maxFileSizeKB
         watermarkTint = settings.watermarkTint
         metadataPrivacy = settings.metadataPrivacy
+        removeWatermarkBackground = settings.removeWatermarkBackground
         syncPresetSelections()
         updateEstimate(delay: 0)
     }
@@ -626,6 +628,7 @@ final class AppState: ObservableObject {
         defaults.set(maxFileSizeKB, forKey: "maxFileSizeKB")
         defaults.set(watermarkTint.rawValue, forKey: "watermarkTint")
         defaults.set(metadataPrivacy.rawValue, forKey: "metadataPrivacy")
+        defaults.set(removeWatermarkBackground, forKey: "removeWatermarkBackground")
     }
 
     private func restore() {
@@ -653,6 +656,7 @@ final class AppState: ObservableObject {
         maxFileSizeKB = defaults.object(forKey: "maxFileSizeKB") == nil ? 0 : defaults.integer(forKey: "maxFileSizeKB")
         watermarkTint = WatermarkTint(rawValue: defaults.string(forKey: "watermarkTint") ?? "") ?? .original
         metadataPrivacy = MetadataPrivacyLevel(rawValue: defaults.string(forKey: "metadataPrivacy") ?? "") ?? .keepOriginalPrecision
+        removeWatermarkBackground = defaults.bool(forKey: "removeWatermarkBackground")
         syncPresetSelections()
         folderURL = restoreBookmark("folderBookmark")
         watermarkURL = restoreBookmark("watermarkBookmark")
@@ -1170,6 +1174,15 @@ struct ContentView: View {
             AutomalitySegmentedControl(options: WatermarkTint.allCases, selection: $state.watermarkTint, label: \.label) { tint in
                 AnyView(tintSwatch(tint))
             }
+            // For watermarks that weren't prepared as a proper transparent
+            // PNG (a flat-color-filled square exported straight from a
+            // design tool, say) -- strips a solid/near-solid background at
+            // export time instead of forcing the user to fix the source
+            // file by hand. Off by default: an intentionally-opaque
+            // watermark (a solid badge, a colored banner) shouldn't lose
+            // its background just because this exists.
+            Toggle("Remove watermark background", isOn: $state.removeWatermarkBackground)
+                .toggleStyle(.automality)
             // Smart Placement ("Suggest Placement") is disabled for this
             // release — the suggestions weren't reliable enough yet. The
             // underlying logic (AppState.suggestPlacement, smartPlacementCard,

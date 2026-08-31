@@ -481,8 +481,14 @@ struct WatermarkSettings: Codable {
     var maxFileSizeKB: Int
     var watermarkTint: WatermarkTint
     var metadataPrivacy: MetadataPrivacyLevel
+    /// Strips a solid/near-solid background from the watermark image itself
+    /// before compositing -- for watermarks that weren't prepared as a
+    /// proper transparent PNG. Off by default: an intentionally-opaque
+    /// watermark (a solid badge, a colored banner) shouldn't have its
+    /// background silently stripped just because this exists.
+    var removeWatermarkBackground: Bool
 
-    init(sizeFraction: Double, opacity: Double, anchor: Anchor, additionalAnchors: [Anchor] = [], offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputWidth: Int = 0, outputHeight: Int = 0, outputPrefix: String, outputSuffix: String, maxFileSizeKB: Int = 0, watermarkTint: WatermarkTint = .original, metadataPrivacy: MetadataPrivacyLevel = .keepOriginalPrecision) {
+    init(sizeFraction: Double, opacity: Double, anchor: Anchor, additionalAnchors: [Anchor] = [], offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputWidth: Int = 0, outputHeight: Int = 0, outputPrefix: String, outputSuffix: String, maxFileSizeKB: Int = 0, watermarkTint: WatermarkTint = .original, metadataPrivacy: MetadataPrivacyLevel = .keepOriginalPrecision, removeWatermarkBackground: Bool = false) {
         self.sizeFraction = sizeFraction
         self.opacity = opacity
         self.anchor = anchor
@@ -504,10 +510,11 @@ struct WatermarkSettings: Codable {
         self.maxFileSizeKB = maxFileSizeKB
         self.watermarkTint = watermarkTint
         self.metadataPrivacy = metadataPrivacy
+        self.removeWatermarkBackground = removeWatermarkBackground
     }
 
     private enum CodingKeys: String, CodingKey {
-        case sizeFraction, opacity, anchor, additionalAnchors, offsetX, offsetY, layoutMode, padding, spacing, rotationPattern, customAngle, exportFormat, jpegQuality, optimizeForWeb, outputWidth, outputHeight, outputPrefix, outputSuffix, maxFileSizeKB, watermarkTint, metadataPrivacy
+        case sizeFraction, opacity, anchor, additionalAnchors, offsetX, offsetY, layoutMode, padding, spacing, rotationPattern, customAngle, exportFormat, jpegQuality, optimizeForWeb, outputWidth, outputHeight, outputPrefix, outputSuffix, maxFileSizeKB, watermarkTint, metadataPrivacy, removeWatermarkBackground
     }
 
     init(from decoder: Decoder) throws {
@@ -537,6 +544,7 @@ struct WatermarkSettings: Codable {
         // not removeLocation, so nobody's saved presets silently start
         // stripping GPS they were previously relying on.
         metadataPrivacy = try container.decodeIfPresent(MetadataPrivacyLevel.self, forKey: .metadataPrivacy) ?? .keepOriginalPrecision
+        removeWatermarkBackground = try container.decodeIfPresent(Bool.self, forKey: .removeWatermarkBackground) ?? false
     }
 }
 

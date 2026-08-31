@@ -208,7 +208,10 @@ struct ImageProcessor {
         context.interpolationQuality = .high
         context.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
         context.setAlpha(settings.opacity)
-        let watermark = try tintedWatermark(watermark, tint: settings.watermarkTint)
+        let watermark = try tintedWatermark(
+            try backgroundRemovedWatermark(watermark, remove: settings.removeWatermarkBackground),
+            tint: settings.watermarkTint
+        )
 
         let targetLongestSide = min(CGFloat(width), CGFloat(height)) * settings.sizeFraction
         let scale = targetLongestSide / max(CGFloat(watermark.width), CGFloat(watermark.height))
@@ -266,6 +269,69 @@ struct ImageProcessor {
         proposed.offsetX = 0
         proposed.offsetY = opticalYOffset(for: sourceSize, anchor: anchor)
         return watermarkFrame(sourceSize: sourceSize, watermarkSize: watermarkSize, settings: proposed).intersection(saliencyRect).area
+    }
+
+    /// Strips a solid/near-solid background from a watermark that wasn't
+    /// prepared as a proper transparent PNG -- exactly the problem hit with
+    /// this app's own first watermark asset (a flat-color-filled square,
+    /// unusable as-is until regenerated transparent by hand). Floods from
+    /// the four edges inward, removing only pixels connected to the border
+    /// that are within `tolerance` of the sampled edge color -- not every
+    /// matching pixel anywhere in the image, so a subject with a similarly-
+    /// colored interior detail (e.g. a white highlight inside a logo) isn't
+    /// punched full of holes just because it happens to share the
+    /// background's color. If the four corners don't agree on a color
+    /// (already transparent, or a complex/photographic image, not a flat
+    /// background), this leaves the image untouched rather than guessing.
+    private static func backgroundRemovedWatermark(_ image: CGImage, remove: Bool, tolerance: Double = 0.12) throws -> CGImage {
+        guard remove else { return image }
+        let width = image.width
+        let height = image.height
+        guard width > 1, height > 1,
+              let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return image }
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        guard let context = CGContext(data: &bytes, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            return image
+        }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        func pixel(_ x: Int, _ y: Int) -> (r: Int, g: Int, b: Int, a: Int) {
+            let i = (y * width + x) * 4
+            return (Int(bytes[i]), Int(bytes[i + 1]), Int(bytes[i + 2]), Int(bytes[i + 3]))
+        }
+        func colorDistance(_ a: (r: Int, g: Int, b: Int, a: Int), _ b: (r: Int, g: Int, b: Int, a: Int)) -> Double {
+            let dr = Double(a.r - b.r), dg = Double(a.g - b.g), db = Double(a.b - b.b)
+            return (dr * dr + dg * dg + db * db).squareRoot() / (255 * 1.732)
+        }
+
+        let corners = [pixel(0, 0), pixel(width - 1, 0), pixel(0, height - 1), pixel(width - 1, height - 1)]
+        guard corners.dropFirst().allSatisfy({ colorDistance($0, corners[0]) < tolerance }) else {
+            return image // corners disagree -- not a clean flat background, don't guess
+        }
+        let background = corners[0]
+        guard background.a > 10 else { return image } // already transparent at the edges, nothing to do
+
+        var visited = [Bool](repeating: false, count: width * height)
+        var queue: [(Int, Int)] = []
+        for x in 0..<width { queue.append((x, 0)); queue.append((x, height - 1)) }
+        for y in 0..<height { queue.append((0, y)); queue.append((width - 1, y)) }
+        var head = 0
+        while head < queue.count {
+            let (x, y) = queue[head]
+            head += 1
+            guard x >= 0, x < width, y >= 0, y < height else { continue }
+            let index = y * width + x
+            guard !visited[index] else { continue }
+            guard colorDistance(pixel(x, y), background) < tolerance else { continue }
+            visited[index] = true
+            let byteIndex = index * 4
+            bytes[byteIndex] = 0; bytes[byteIndex + 1] = 0; bytes[byteIndex + 2] = 0; bytes[byteIndex + 3] = 0
+            queue.append((x + 1, y)); queue.append((x - 1, y))
+            queue.append((x, y + 1)); queue.append((x, y - 1))
+        }
+
+        guard let result = context.makeImage() else { return image }
+        return result
     }
 
     private static func tintedWatermark(_ image: CGImage, tint: WatermarkTint) throws -> CGImage {

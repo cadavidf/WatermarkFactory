@@ -1,9 +1,26 @@
+import AppKit
 import CoreGraphics
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 import XCTest
 @testable import WatermarkFactory
+
+/// `CGColor(red:green:blue:alpha:)` builds an untagged/generic-RGB color,
+/// which CoreGraphics color-matches (not merely rounds) when composited
+/// into an sRGB-tagged context -- pure blue picks up a visible red/green
+/// tint after that conversion. Every synthetic test color goes through
+/// this instead so pixel-exact assertions test the watermark logic, not a
+/// colorspace mismatch in the test fixtures.
+private func srgb(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat) -> CGColor {
+    NSColor(srgbRed: r, green: g, blue: b, alpha: 1).cgColor
+}
+
+private struct RGB: Equatable, CustomStringConvertible {
+    let r: Int, g: Int, b: Int
+    init(_ r: Int, _ g: Int, _ b: Int) { self.r = r; self.g = g; self.b = b }
+    var description: String { "(\(r), \(g), \(b))" }
+}
 
 final class ImageProcessorMetadataTests: XCTestCase {
     private var tempDir: URL!
@@ -194,6 +211,113 @@ final class ImageProcessorMetadataTests: XCTestCase {
         }
     }
 
+    /// The watermark fully covers a same-size canvas (sizeFraction 1.0,
+    /// centered, no padding), so a corner pixel of the composed result maps
+    /// to the watermark's background corner and the center pixel maps to
+    /// its non-background subject -- deterministic regardless of any
+    /// vertical flip in the drawing pipeline.
+    func testRemoveWatermarkBackgroundStripsFlatBackgroundButKeepsSubject() throws {
+        let source = tempDir.appendingPathComponent("source.png")
+        let watermark = tempDir.appendingPathComponent("watermark.png")
+        try writeImage(source, type: .png, width: 80, height: 80, properties: [:], color: srgb(0, 0, 1))
+        try writeBorderedWatermark(watermark, size: 40, border: srgb(1, 0, 0), subject: srgb(0, 1, 0))
+
+        var settings = WatermarkSettings(sizeFraction: 1.0, opacity: 1.0, anchor: .center, offsetX: 0, offsetY: 0, layoutMode: .single, padding: 0, spacing: 0, rotationPattern: .none, customAngle: 0, exportFormat: .png, jpegQuality: 0.9, outputPrefix: "", outputSuffix: "")
+        settings.removeWatermarkBackground = true
+        let image = try ImageProcessor.watermarkedImage(sourceURL: source, watermarkURL: watermark, settings: settings)
+
+        let corner = try pixel(image, x: 0, y: 0)
+        XCTAssertEqual(corner, RGB(0, 0, 255), "background should be stripped, letting the blue source show through")
+        let center = try pixel(image, x: 40, y: 40)
+        XCTAssertEqual(center, RGB(0, 255, 0), "the watermark's actual subject should survive untouched")
+    }
+
+    /// Corners that don't agree on a color aren't a flat background -- a
+    /// photographic or already-complex watermark should be left untouched
+    /// rather than guessed at.
+    func testRemoveWatermarkBackgroundLeavesDisagreeingCornersUntouched() throws {
+        let source = tempDir.appendingPathComponent("source.png")
+        let watermark = tempDir.appendingPathComponent("watermark.png")
+        try writeImage(source, type: .png, width: 20, height: 20, properties: [:], color: srgb(0, 0, 1))
+        try writeQuadrantWatermark(watermark, size: 20)
+
+        var settings = WatermarkSettings(sizeFraction: 1.0, opacity: 1.0, anchor: .center, offsetX: 0, offsetY: 0, layoutMode: .single, padding: 0, spacing: 0, rotationPattern: .none, customAngle: 0, exportFormat: .png, jpegQuality: 0.9, outputPrefix: "", outputSuffix: "")
+        settings.removeWatermarkBackground = true
+        let image = try ImageProcessor.watermarkedImage(sourceURL: source, watermarkURL: watermark, settings: settings)
+
+        // Every quadrant color should still be opaque somewhere -- nothing
+        // was stripped since the four corners disagree.
+        let corner = try pixel(image, x: 0, y: 0)
+        XCTAssertNotEqual(corner, RGB(0, 0, 255), "a disagreeing-corners watermark should not have been touched, so its own color should still show, not the source's")
+    }
+
+    private func writeBorderedWatermark(_ url: URL, size: Int, border: CGColor, subject: CGColor) throws {
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            throw ImageProcessorError.contextFailed
+        }
+        context.setShouldAntialias(false)
+        context.setFillColor(border)
+        context.fill(CGRect(x: 0, y: 0, width: size, height: size))
+        let inset = size / 4
+        context.setFillColor(subject)
+        context.fill(CGRect(x: inset, y: inset, width: size - inset * 2, height: size - inset * 2))
+        guard let image = context.makeImage() else { throw ImageProcessorError.contextFailed }
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else {
+            XCTFail("Could not create image destination"); return
+        }
+        CGImageDestinationAddImage(destination, image, nil)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        try (data as Data).write(to: url)
+    }
+
+    /// Four different quadrant colors -- corners deliberately disagree.
+    private func writeQuadrantWatermark(_ url: URL, size: Int) throws {
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            throw ImageProcessorError.contextFailed
+        }
+        let half = size / 2
+        let quadrants: [(CGRect, CGColor)] = [
+            // None of these is the source's blue -- avoids a coincidental
+            // match if a quadrant happens to land under a corner sample
+            // (CGRect fills bottom-up in drawing space, while the raw
+            // buffer read is top-down, so which quadrant lands at buffer
+            // (0,0) isn't the one that's visually top-left).
+            (CGRect(x: 0, y: 0, width: half, height: half), srgb(1, 0, 0)),
+            (CGRect(x: half, y: 0, width: half, height: half), srgb(0, 1, 0)),
+            (CGRect(x: 0, y: half, width: half, height: half), srgb(1, 0.5, 0)),
+            (CGRect(x: half, y: half, width: half, height: half), srgb(1, 1, 0))
+        ]
+        for (rect, color) in quadrants {
+            context.setFillColor(color)
+            context.fill(rect)
+        }
+        guard let image = context.makeImage() else { throw ImageProcessorError.contextFailed }
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else {
+            XCTFail("Could not create image destination"); return
+        }
+        CGImageDestinationAddImage(destination, image, nil)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        try (data as Data).write(to: url)
+    }
+
+    /// Reads one pixel's RGB (0-255) from a CGImage via a raw bitmap
+    /// context, mirroring the low-level access pattern ImageProcessor
+    /// itself uses for background removal / luminance sampling.
+    private func pixel(_ image: CGImage, x: Int, y: Int) throws -> RGB {
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { throw ImageProcessorError.contextFailed }
+        var bytes = [UInt8](repeating: 0, count: image.width * image.height * 4)
+        guard let context = CGContext(data: &bytes, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            throw ImageProcessorError.contextFailed
+        }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        let i = (y * image.width + x) * 4
+        return RGB(Int(bytes[i]), Int(bytes[i + 1]), Int(bytes[i + 2]))
+    }
+
     func testExactOutputSizeUsesRequestedPlatformPixels() throws {
         let source = tempDir.appendingPathComponent("source.jpg")
         let output = tempDir.appendingPathComponent("output.jpg")
@@ -333,13 +457,14 @@ final class ImageProcessorMetadataTests: XCTestCase {
         _ = try ImageProcessor.export(sourceURL: source, watermarkURL: watermark, outputURL: output, settings: WatermarkSettings(sizeFraction: 0.2, opacity: 0, anchor: .center, offsetX: 0, offsetY: 0, layoutMode: .single, padding: 0, spacing: 0, rotationPattern: .none, customAngle: 0, exportFormat: format, jpegQuality: 0.9, outputPrefix: "", outputSuffix: "", metadataPrivacy: metadataPrivacy))
     }
 
-    private func writeImage(_ url: URL, type: UTType, width: Int = 4, height: Int = 4, properties: [CFString: Any] = [:]) throws {
+    private func writeImage(_ url: URL, type: UTType, width: Int = 4, height: Int = 4, properties: [CFString: Any] = [:], color: CGColor? = nil) throws {
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(data, type.identifier as CFString, 1, nil) else {
             XCTFail("Could not create image destination")
             return
         }
-        CGImageDestinationAddImage(destination, try makeImage(width: width, height: height), properties as CFDictionary)
+        let image = try makeImage(width: width, height: height, color: color ?? CGColor(red: 1, green: 0, blue: 0, alpha: 1))
+        CGImageDestinationAddImage(destination, image, properties as CFDictionary)
         XCTAssertTrue(CGImageDestinationFinalize(destination))
         try (data as Data).write(to: url)
     }

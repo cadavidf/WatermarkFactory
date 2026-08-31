@@ -32,6 +32,10 @@ func printUsage() {
                                    notes, AI-provenance descriptions, embedded
                                    thumbnails) is always removed regardless of
                                    this setting -- this flag only controls GPS.
+      --remove-background         Strip a solid/near-solid background from the
+                                   watermark image itself (flood-fill from the
+                                   edges) for watermarks that weren't prepared
+                                   as a proper transparent PNG. Off by default.
       --dry-run                   List what would be processed, write nothing
 
     EXAMPLES:
@@ -120,6 +124,7 @@ if let raw = flagValue("--metadata-privacy") {
 var maxFileSizeKB = 0
 if let raw = flagValue("--max-file-size-kb"), let parsed = Int(raw) { maxFileSizeKB = parsed }
 let optimizeForWeb = hasFlag("--optimize-for-web")
+let removeBackground = hasFlag("--remove-background")
 let dryRun = hasFlag("--dry-run")
 
 guard FileManager.default.fileExists(atPath: sourceFolder.path) else {
@@ -144,6 +149,7 @@ print("Found \(images.count) image(s) in \(sourceFolder.path)")
 print("Watermark: \(watermarkURL.lastPathComponent)  size: \(Int(sizeFraction * 100))%  opacity: \(Int(opacity * 100))%  anchor: \(anchor.rawValue)")
 print("Format: \(exportFormat.rawValue)  optimizeForWeb: \(optimizeForWeb)  maxFileSizeKB: \(maxFileSizeKB == 0 ? "off" : "\(maxFileSizeKB)")")
 print("Metadata privacy (GPS): \(metadataPrivacy.rawValue)")
+print("Remove watermark background: \(removeBackground)")
 print("Output: \(outputFolder.path)")
 
 if dryRun {
@@ -163,7 +169,8 @@ let settings = WatermarkSettings(
     sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: 24, offsetY: 24,
     layoutMode: .single, padding: 16, spacing: 80, rotationPattern: .none, customAngle: 30,
     exportFormat: exportFormat, jpegQuality: 0.9, optimizeForWeb: optimizeForWeb,
-    outputPrefix: "", outputSuffix: "", maxFileSizeKB: maxFileSizeKB, metadataPrivacy: metadataPrivacy
+    outputPrefix: "", outputSuffix: "", maxFileSizeKB: maxFileSizeKB, metadataPrivacy: metadataPrivacy,
+    removeWatermarkBackground: removeBackground
 )
 
 var succeeded = 0
