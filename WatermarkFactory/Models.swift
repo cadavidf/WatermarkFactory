@@ -134,6 +134,7 @@ enum ExportFormat: String, CaseIterable, Identifiable, Codable {
     case jpeg = "JPEG"
     case png = "PNG"
     case tiff = "TIFF"
+    case gif = "GIF"
     var id: String { rawValue }
     var hint: String {
         switch self {
@@ -141,6 +142,7 @@ enum ExportFormat: String, CaseIterable, Identifiable, Codable {
         case .jpeg: "Best for photos going to listing sites: small files, fast uploads, no transparency needed."
         case .png: "Use only if you need transparency or plan to edit further. Files are much larger, and most listing portals do not need this."
         case .tiff: "Archival or print-quality only. Files are very large and not intended for web upload."
+        case .gif: "Single-frame GIF: simple and widely supported, but limited color and no smooth transparency."
         }
     }
     var fileExtension: String? {
@@ -149,6 +151,7 @@ enum ExportFormat: String, CaseIterable, Identifiable, Codable {
         case .jpeg: "jpg"
         case .png: "png"
         case .tiff: "tiff"
+        case .gif: "gif"
         }
     }
 }
@@ -178,13 +181,32 @@ struct ChatQuestion: Identifiable {
 
 struct IntentSlots: Codable, Equatable {
     var anchor: String?
+    var additionalAnchors: [String]?
     var sizeFraction: Double?
     var opacity: Double?
     var tint: String?
     var exportPlatform: String?
+    var contentType: String?
     var renamePrefix: String?
+    var reorder: String?
+    var maxFileSizeKB: Double?
     var needsClarification: [String]
     var assistantReply: String
+
+    init(anchor: String? = nil, additionalAnchors: [String]? = nil, sizeFraction: Double? = nil, opacity: Double? = nil, tint: String? = nil, exportPlatform: String? = nil, contentType: String? = nil, renamePrefix: String? = nil, reorder: String? = nil, maxFileSizeKB: Double? = nil, needsClarification: [String] = [], assistantReply: String = "") {
+        self.anchor = anchor
+        self.additionalAnchors = additionalAnchors
+        self.sizeFraction = sizeFraction
+        self.opacity = opacity
+        self.tint = tint
+        self.exportPlatform = exportPlatform
+        self.contentType = contentType
+        self.renamePrefix = renamePrefix
+        self.reorder = reorder
+        self.maxFileSizeKB = maxFileSizeKB
+        self.needsClarification = needsClarification
+        self.assistantReply = assistantReply
+    }
 }
 
 enum IntentPreset: String, CaseIterable {
@@ -210,10 +232,15 @@ enum IntentPreset: String, CaseIterable {
                 settings.anchor = parsed
             }
         }
+        settings.additionalAnchors = (slots.additionalAnchors ?? []).compactMap(Anchor.init(rawValue:))
         if let size = slots.sizeFraction { settings.sizeFraction = min(max(size, 0.05), 0.6) }
         if let opacity = slots.opacity { settings.opacity = min(max(opacity, 0), 1) }
         if let tint = slots.tint, let parsed = WatermarkTint(rawValue: tint) { settings.watermarkTint = parsed }
         applyPlatform(slots.exportPlatform ?? "original", to: &settings)
+        applyContentType(slots.contentType, to: &settings)
+        if let maxFileSizeKB = slots.maxFileSizeKB {
+            settings.maxFileSizeKB = max(0, Int(maxFileSizeKB.rounded()))
+        }
         settings.outputPrefix = (slots.renamePrefix ?? "").replacingOccurrences(of: "/", with: "").replacingOccurrences(of: "\0", with: "")
         return settings
     }
@@ -262,12 +289,24 @@ enum IntentPreset: String, CaseIterable {
             break
         }
     }
+
+    private static func applyContentType(_ contentType: String?, to settings: inout WatermarkSettings) {
+        switch contentType?.lowercased() {
+        case "camera": settings.exportFormat = .jpeg
+        case "graphic": settings.exportFormat = .png
+        case "geodata": settings.exportFormat = .tiff
+        case "gif": settings.exportFormat = .gif
+        case "other": settings.exportFormat = .keepOriginal
+        default: break
+        }
+    }
 }
 
 struct WatermarkSettings: Codable {
     var sizeFraction: Double
     var opacity: Double
     var anchor: Anchor
+    var additionalAnchors: [Anchor]
     var offsetX: Double
     var offsetY: Double
     var layoutMode: LayoutMode
@@ -285,10 +324,11 @@ struct WatermarkSettings: Codable {
     var maxFileSizeKB: Int
     var watermarkTint: WatermarkTint
 
-    init(sizeFraction: Double, opacity: Double, anchor: Anchor, offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputWidth: Int = 0, outputHeight: Int = 0, outputPrefix: String, outputSuffix: String, maxFileSizeKB: Int = 0, watermarkTint: WatermarkTint = .original) {
+    init(sizeFraction: Double, opacity: Double, anchor: Anchor, additionalAnchors: [Anchor] = [], offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputWidth: Int = 0, outputHeight: Int = 0, outputPrefix: String, outputSuffix: String, maxFileSizeKB: Int = 0, watermarkTint: WatermarkTint = .original) {
         self.sizeFraction = sizeFraction
         self.opacity = opacity
         self.anchor = anchor
+        self.additionalAnchors = additionalAnchors
         self.offsetX = offsetX
         self.offsetY = offsetY
         self.layoutMode = layoutMode
@@ -308,7 +348,7 @@ struct WatermarkSettings: Codable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case sizeFraction, opacity, anchor, offsetX, offsetY, layoutMode, padding, spacing, rotationPattern, customAngle, exportFormat, jpegQuality, optimizeForWeb, outputWidth, outputHeight, outputPrefix, outputSuffix, maxFileSizeKB, watermarkTint
+        case sizeFraction, opacity, anchor, additionalAnchors, offsetX, offsetY, layoutMode, padding, spacing, rotationPattern, customAngle, exportFormat, jpegQuality, optimizeForWeb, outputWidth, outputHeight, outputPrefix, outputSuffix, maxFileSizeKB, watermarkTint
     }
 
     init(from decoder: Decoder) throws {
@@ -316,6 +356,7 @@ struct WatermarkSettings: Codable {
         sizeFraction = try container.decode(Double.self, forKey: .sizeFraction)
         opacity = try container.decode(Double.self, forKey: .opacity)
         anchor = try container.decode(Anchor.self, forKey: .anchor)
+        additionalAnchors = try container.decodeIfPresent([Anchor].self, forKey: .additionalAnchors) ?? []
         offsetX = try container.decode(Double.self, forKey: .offsetX)
         offsetY = try container.decode(Double.self, forKey: .offsetY)
         layoutMode = try container.decode(LayoutMode.self, forKey: .layoutMode)

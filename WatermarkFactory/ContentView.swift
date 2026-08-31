@@ -35,6 +35,7 @@ final class AppState: ObservableObject {
     @Published var sizeFraction = 0.35 { didSet { saveSettings(); updateEstimate() } }
     @Published var opacity = 0.5 { didSet { saveSettings(); updateEstimate() } }
     @Published var anchor: Anchor = .bottomRight { didSet { saveSettings(); updateEstimate() } }
+    @Published var additionalAnchors: [Anchor] = [] { didSet { saveSettings(); updateEstimate() } }
     @Published var offsetX = 24.0 { didSet { saveSettings(); if !suppressOffsetPreview { updateEstimate() } } }
     @Published var offsetY = 24.0 { didSet { saveSettings(); if !suppressOffsetPreview { updateEstimate() } } }
     @Published var layoutMode: LayoutMode = .single { didSet { saveSettings(); updateEstimate() } }
@@ -121,7 +122,7 @@ final class AppState: ObservableObject {
         return nil
     }
     var settings: WatermarkSettings {
-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, optimizeForWeb: optimizeForWeb, outputWidth: outputWidth, outputHeight: outputHeight, outputPrefix: outputPrefix, outputSuffix: outputSuffix, maxFileSizeKB: maxFileSizeKB, watermarkTint: watermarkTint)
+        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, additionalAnchors: additionalAnchors, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, optimizeForWeb: optimizeForWeb, outputWidth: outputWidth, outputHeight: outputHeight, outputPrefix: outputPrefix, outputSuffix: outputSuffix, maxFileSizeKB: maxFileSizeKB, watermarkTint: watermarkTint)
     }
     var canSavePreset: Bool { watermarkURL != nil }
     var canSuggestPlacement: Bool { selected != nil && watermarkURL != nil && !isSuggestingPlacement }
@@ -141,7 +142,7 @@ final class AppState: ObservableObject {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = true
-        panel.allowedContentTypes = [.png, .jpeg, .heic, .tiff]
+        panel.allowedContentTypes = [.png, .jpeg, .heic, .tiff, .gif]
         if panel.runModal() == .OK {
             setImages(panel.urls)
         }
@@ -151,7 +152,7 @@ final class AppState: ObservableObject {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
-        panel.allowedContentTypes = [.png, .jpeg, .heic, .tiff]
+        panel.allowedContentTypes = [.png, .jpeg, .heic, .tiff, .gif]
         if panel.runModal() == .OK, let url = panel.url {
             setWatermark(url)
         }
@@ -389,6 +390,9 @@ final class AppState: ObservableObject {
 
     func applyIntentSlots(_ slots: IntentSlots, message: String) {
         apply(IntentPreset.settings(from: slots, message: message, current: settings))
+        if slots.reorder == "byCurrentOrder" {
+            numberInCurrentOrder(orderedItems)
+        }
         status = slots.assistantReply
     }
 
@@ -456,6 +460,7 @@ final class AppState: ObservableObject {
         sizeFraction = settings.sizeFraction
         opacity = settings.opacity
         anchor = settings.anchor
+        additionalAnchors = settings.additionalAnchors
         offsetX = settings.offsetX
         offsetY = settings.offsetY
         layoutMode = settings.layoutMode
@@ -505,6 +510,7 @@ final class AppState: ObservableObject {
         defaults.set(sizeFraction, forKey: "sizeFraction")
         defaults.set(opacity, forKey: "opacity")
         defaults.set(anchor.rawValue, forKey: "anchor")
+        defaults.set(additionalAnchors.map(\.rawValue), forKey: "additionalAnchors")
         defaults.set(offsetX, forKey: "offsetX")
         defaults.set(offsetY, forKey: "offsetY")
         defaults.set(layoutMode.rawValue, forKey: "layoutMode")
@@ -529,6 +535,7 @@ final class AppState: ObservableObject {
         if defaults.object(forKey: "sizeFraction") != nil { sizeFraction = defaults.double(forKey: "sizeFraction") }
         if defaults.object(forKey: "opacity") != nil { opacity = defaults.double(forKey: "opacity") }
         anchor = Anchor(rawValue: defaults.string(forKey: "anchor") ?? "") ?? .bottomRight
+        additionalAnchors = (defaults.array(forKey: "additionalAnchors") as? [String] ?? []).compactMap(Anchor.init(rawValue:))
         offsetX = defaults.object(forKey: "offsetX") == nil ? 24 : defaults.double(forKey: "offsetX")
         offsetY = defaults.object(forKey: "offsetY") == nil ? 24 : defaults.double(forKey: "offsetY")
         layoutMode = LayoutMode(rawValue: defaults.string(forKey: "layoutMode") ?? "") ?? .single

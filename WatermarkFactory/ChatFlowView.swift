@@ -15,6 +15,11 @@ struct ChatFlowView: View {
 
     private let questions: [ChatQuestion] = [
         ChatQuestion(id: "style", text: "Pick a starting style.", chips: ["Subtle corner", "Centered bold", "Tiled brand"]),
+        ChatQuestion(id: "additionalAnchors", text: "Add it to another corner too?", chips: ["No", "Top-left", "Top-right", "Bottom-left", "Bottom-right"]),
+        ChatQuestion(id: "padding", text: "How much padding from the edge?", chips: ["Tight (8px)", "Default (16px)", "Generous (32px)"]),
+        ChatQuestion(id: "contentType", text: "What kind of images are these?", chips: ["Camera photos", "Logos or screenshots", "Geo or technical data", "GIFs", "Not sure"]),
+        ChatQuestion(id: "reorder", text: "Number these in the order shown, or skip numbering?", chips: ["Number them", "Skip"]),
+        ChatQuestion(id: "maxFileSizeKB", text: "Cap the file size per image?", chips: ["No limit", "500 KB", "200 KB"]),
         ChatQuestion(id: "platform", text: "Where are these going?", chips: ["Instagram", "Web", "Print", "Original"]),
         ChatQuestion(id: "renamePrefix", text: "Add a filename prefix?", chips: ["No prefix", "wm_", "Skip remaining, use defaults"])
     ]
@@ -72,10 +77,12 @@ struct ChatFlowView: View {
                     get: { expandedQuestionID == message.id.uuidString },
                     set: { expandedQuestionID = $0 ? message.id.uuidString : nil }
                 )) {
-                    if questionIndex <= 1 {
-                        sizeOpacitySection()
-                        positionPaddingSection()
-                    } else {
+                if questionIndex <= 1 {
+                    positionPaddingSection()
+                } else if questionIndex <= 3 {
+                    sizeOpacitySection()
+                    positionPaddingSection()
+                } else {
                         exportSection()
                     }
                 }
@@ -135,11 +142,26 @@ struct ChatFlowView: View {
         if slots.contains("anchor") || slots.contains("sizeFraction") || slots.contains("opacity") || slots.contains("tint") {
             return questions[0]
         }
-        if slots.contains("exportPlatform") {
+        if slots.contains("padding") {
+            return questions[2]
+        }
+        if slots.contains("additionalAnchors") {
             return questions[1]
         }
+        if slots.contains("contentType") {
+            return questions[3]
+        }
+        if slots.contains("reorder") {
+            return questions[4]
+        }
+        if slots.contains("maxFileSizeKB"), state.exportFormat != .png, state.exportFormat != .tiff {
+            return questions[5]
+        }
+        if slots.contains("exportPlatform") {
+            return questions[6]
+        }
         if slots.contains("renamePrefix") {
-            return questions[2]
+            return questions[7]
         }
         return nil
     }
@@ -151,21 +173,59 @@ struct ChatFlowView: View {
             return
         }
 
-        switch questionIndex {
-        case 0:
+        switch questions[questionIndex].id {
+        case "style":
             let anchor = lower.contains("tile") ? "tiled" : (lower.contains("center") ? Anchor.center.rawValue : Anchor.bottomRight.rawValue)
-            let slots = IntentSlots(anchor: anchor, sizeFraction: nil, opacity: nil, tint: nil, exportPlatform: nil, renamePrefix: nil, needsClarification: [], assistantReply: "Watermark style set.")
+            let slots = IntentSlots(anchor: anchor, additionalAnchors: nil, sizeFraction: nil, opacity: nil, tint: nil, exportPlatform: nil, contentType: nil, renamePrefix: nil, reorder: nil, maxFileSizeKB: nil, needsClarification: [], assistantReply: "Watermark style set.")
             state.applyIntentSlots(slots, message: text)
-        case 1:
+        case "padding":
+            let value = Double(lower.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? (lower.contains("tight") ? 8 : (lower.contains("generous") ? 32 : 16))
+            state.padding = min(max(value, 0), 100)
+            state.status = "Padding set."
+        case "additionalAnchors":
+            let anchors = additionalAnchors(from: lower)
+            let slots = IntentSlots(anchor: nil, additionalAnchors: anchors.map(\.rawValue), sizeFraction: nil, opacity: nil, tint: nil, exportPlatform: nil, contentType: nil, renamePrefix: nil, reorder: nil, maxFileSizeKB: nil, needsClarification: [], assistantReply: anchors.isEmpty ? "Single placement kept." : "Extra placement added.")
+            state.applyIntentSlots(slots, message: text)
+        case "contentType":
+            let contentType: String
+            if lower.contains("camera") || lower.contains("photo") { contentType = "camera" }
+            else if lower.contains("logo") || lower.contains("screenshot") || lower.contains("graphic") { contentType = "graphic" }
+            else if lower.contains("geo") || lower.contains("technical") { contentType = "geoData" }
+            else if lower.contains("gif") { contentType = "gif" }
+            else { contentType = "other" }
+            let slots = IntentSlots(anchor: nil, additionalAnchors: nil, sizeFraction: nil, opacity: nil, tint: nil, exportPlatform: nil, contentType: contentType, renamePrefix: nil, reorder: nil, maxFileSizeKB: nil, needsClarification: [], assistantReply: "Format set.")
+            state.applyIntentSlots(slots, message: text)
+        case "reorder":
+            let reorder = lower.contains("number") ? "byCurrentOrder" : "skip"
+            let slots = IntentSlots(anchor: nil, additionalAnchors: nil, sizeFraction: nil, opacity: nil, tint: nil, exportPlatform: nil, contentType: nil, renamePrefix: nil, reorder: reorder, maxFileSizeKB: nil, needsClarification: [], assistantReply: "Order set.")
+            state.applyIntentSlots(slots, message: text)
+        case "maxFileSizeKB":
+            let value = lower.contains("no") ? 0 : (Double(lower.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? 0)
+            let slots = IntentSlots(anchor: nil, additionalAnchors: nil, sizeFraction: nil, opacity: nil, tint: nil, exportPlatform: nil, contentType: nil, renamePrefix: nil, reorder: nil, maxFileSizeKB: value, needsClarification: [], assistantReply: value > 0 ? "File size cap set." : "No file size cap set.")
+            state.applyIntentSlots(slots, message: text)
+        case "platform":
             let platform = ["instagram", "web", "print", "original"].first { lower.contains($0) } ?? "original"
-            let slots = IntentSlots(anchor: nil, sizeFraction: nil, opacity: nil, tint: nil, exportPlatform: platform, renamePrefix: nil, needsClarification: [], assistantReply: "Export target set.")
+            let slots = IntentSlots(anchor: nil, additionalAnchors: nil, sizeFraction: nil, opacity: nil, tint: nil, exportPlatform: platform, contentType: nil, renamePrefix: nil, reorder: nil, maxFileSizeKB: nil, needsClarification: [], assistantReply: "Export target set.")
             state.applyIntentSlots(slots, message: text)
         default:
             let prefix = lower.contains("no prefix") ? "" : text
-            let slots = IntentSlots(anchor: nil, sizeFraction: nil, opacity: nil, tint: nil, exportPlatform: nil, renamePrefix: prefix, needsClarification: [], assistantReply: "Ready to export.")
+            let slots = IntentSlots(anchor: nil, additionalAnchors: nil, sizeFraction: nil, opacity: nil, tint: nil, exportPlatform: nil, contentType: nil, renamePrefix: prefix, reorder: nil, maxFileSizeKB: nil, needsClarification: [], assistantReply: "Ready to export.")
             state.applyIntentSlots(slots, message: text)
         }
-        questionIndex += 1
+        questionIndex = nextQuestionIndex(after: questionIndex)
         askCurrentQuestion()
+    }
+
+    private func nextQuestionIndex(after index: Int) -> Int {
+        var next = index + 1
+        while next < questions.count, questions[next].id == "maxFileSizeKB", (state.exportFormat == .png || state.exportFormat == .tiff) {
+            next += 1
+        }
+        return next
+    }
+
+    private func additionalAnchors(from text: String) -> [Anchor] {
+        guard !text.contains("no") && !text.contains("skip") else { return [] }
+        return Anchor.allCases.filter { text.contains($0.displayName) || text.contains($0.rawValue.lowercased()) }
     }
 }

@@ -47,4 +47,28 @@ final class IntentParserTests: XCTestCase {
         XCTAssertEqual(settings.maxFileSizeKB, 0)
         XCTAssertEqual(settings.outputPrefix, "set1")
     }
+
+    func testContentTypeMapsToExportFormat() {
+        XCTAssertEqual(IntentPreset.settings(from: IntentSlots(contentType: "camera"), message: "").exportFormat, .jpeg)
+        XCTAssertEqual(IntentPreset.settings(from: IntentSlots(contentType: "graphic"), message: "").exportFormat, .png)
+        XCTAssertEqual(IntentPreset.settings(from: IntentSlots(contentType: "geoData"), message: "").exportFormat, .tiff)
+        XCTAssertEqual(IntentPreset.settings(from: IntentSlots(contentType: "gif"), message: "").exportFormat, .gif)
+        XCTAssertEqual(IntentPreset.settings(from: IntentSlots(contentType: "other"), message: "").exportFormat, .keepOriginal)
+    }
+
+    func testContentTypeWinsFormatButKeepsInstagramDimensions() {
+        let settings = IntentPreset.settings(from: IntentSlots(exportPlatform: "instagram", contentType: "graphic"), message: "instagram screenshots")
+
+        XCTAssertEqual(settings.exportFormat, .png)
+        XCTAssertEqual(settings.outputWidth, 1080)
+        XCTAssertEqual(settings.outputHeight, 1080)
+        XCTAssertEqual(settings.jpegQuality, 0.85)
+    }
+
+    func testAdditionalAnchorsRoundTripThroughSettings() {
+        let settings = IntentPreset.settings(from: IntentSlots(anchor: "bottomRight", additionalAnchors: ["topLeft", "topRight"]), message: "put it in several corners")
+
+        XCTAssertEqual(settings.anchor, .bottomRight)
+        XCTAssertEqual(settings.additionalAnchors, [.topLeft, .topRight])
+    }
 }

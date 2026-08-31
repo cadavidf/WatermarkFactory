@@ -124,6 +124,20 @@ final class ImageProcessorMetadataTests: XCTestCase {
         XCTAssertEqual(image.height, 1200)
     }
 
+    func testExportsSingleFrameGIF() throws {
+        let source = tempDir.appendingPathComponent("source.jpg")
+        let output = tempDir.appendingPathComponent("output.gif")
+        let watermark = tempDir.appendingPathComponent("watermark.png")
+        try writeImage(source, type: .jpeg, width: 16, height: 16)
+        try writeImage(watermark, type: .png, width: 4, height: 4)
+
+        _ = try ImageProcessor.export(sourceURL: source, watermarkURL: watermark, outputURL: output, settings: WatermarkSettings(sizeFraction: 0.2, opacity: 0, anchor: .center, offsetX: 0, offsetY: 0, layoutMode: .single, padding: 0, spacing: 0, rotationPattern: .none, customAngle: 0, exportFormat: .gif, jpegQuality: 0.9, outputPrefix: "", outputSuffix: ""))
+
+        let imageSource = try XCTUnwrap(CGImageSourceCreateWithURL(output as CFURL, nil))
+        XCTAssertEqual(CGImageSourceGetType(imageSource) as String?, UTType.gif.identifier)
+        XCTAssertEqual(CGImageSourceGetCount(imageSource), 1)
+    }
+
     func testOutputFilenameInsertsOrderAfterPrefix() {
         let source = tempDir.appendingPathComponent("beach.jpg")
         let settings = WatermarkSettings(sizeFraction: 0.2, opacity: 0, anchor: .center, offsetX: 0, offsetY: 0, layoutMode: .single, padding: 0, spacing: 0, rotationPattern: .none, customAngle: 0, exportFormat: .jpeg, jpegQuality: 0.9, outputPrefix: "wm_", outputSuffix: "")

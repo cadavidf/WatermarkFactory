@@ -16,7 +16,7 @@ enum ImageProcessorError: Error {
 }
 
 struct ImageProcessor {
-    static let supportedExtensions: Set<String> = ["jpg", "jpeg", "png", "heic", "tif", "tiff"]
+    static let supportedExtensions: Set<String> = ["jpg", "jpeg", "png", "heic", "tif", "tiff", "gif"]
     private static let webMaxPixelSize = 2048
     private static let minSizeTargetLongestEdge = 400
 
@@ -208,7 +208,9 @@ struct ImageProcessor {
 
         switch settings.layoutMode {
         case .single:
-            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, padding: settings.padding, offsetX: settings.offsetX, offsetY: settings.offsetY))
+            for anchor in [settings.anchor] + settings.additionalAnchors {
+                drawSingleWatermark(context: context, watermark: watermark, canvas: CGSize(width: width, height: height), size: watermarkSize, anchor: anchor, settings: settings)
+            }
         case .tiled:
             drawTiles(context: context, watermark: watermark, canvas: CGSize(width: width, height: height), size: watermarkSize, settings: settings)
         }
@@ -300,6 +302,10 @@ struct ImageProcessor {
             row += 1
             y += stepY
         }
+    }
+
+    private static func drawSingleWatermark(context: CGContext, watermark: CGImage, canvas: CGSize, size: CGSize, anchor: Anchor, settings: WatermarkSettings) {
+        context.draw(watermark, in: rect(for: size, canvas: canvas, anchor: anchor, padding: settings.padding, offsetX: settings.offsetX, offsetY: settings.offsetY))
     }
 
     private static func encode(image: CGImage, sourceURL: URL, format: ExportFormat, quality: Double) throws -> (data: Data, ext: String, usedHEICFallback: Bool) {
@@ -452,11 +458,13 @@ struct ImageProcessor {
         case .jpeg: return (.jpeg, "jpg", false)
         case .png: return (.png, "png", false)
         case .tiff: return (.tiff, "tiff", false)
+        case .gif: return (.gif, "gif", false)
         case .keepOriginal:
             switch sourceExt {
             case "jpg", "jpeg": return (.jpeg, sourceExt, false)
             case "png": return (.png, "png", false)
             case "tif", "tiff": return (.tiff, sourceExt, false)
+            case "gif": return (.gif, "gif", false)
             default: return (.png, "png", sourceExt == "heic")
             }
         }

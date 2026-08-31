@@ -35,17 +35,21 @@ struct IntentParser {
         }
     }
 
-    static let slotNames = ["anchor", "sizeFraction", "opacity", "tint", "exportPlatform", "renamePrefix"]
+    static let slotNames = ["anchor", "additionalAnchors", "sizeFraction", "opacity", "tint", "exportPlatform", "contentType", "renamePrefix", "reorder", "maxFileSizeKB"]
 
     static var systemPrompt: String {
         """
         Map one user watermark request to JSON only. No prose outside JSON.
-        JSON keys: anchor, sizeFraction, opacity, tint, exportPlatform, renamePrefix, needsClarification, assistantReply.
+        JSON keys: anchor, additionalAnchors, sizeFraction, opacity, tint, exportPlatform, contentType, renamePrefix, reorder, maxFileSizeKB, needsClarification, assistantReply.
         anchor valid values: \(Anchor.allCases.map(\.rawValue).joined(separator: ", ")), tiled.
+        additionalAnchors is an optional array of Anchor values for extra simultaneous placements.
         sizeFraction valid range: 0.05...0.6.
         opacity valid range: 0...1.
         tint valid values: \(WatermarkTint.allCases.map(\.rawValue).joined(separator: ", ")).
         exportPlatform valid values: instagram, web, print, original.
+        contentType valid values: camera, graphic, geoData, gif, other.
+        reorder valid values: byCurrentOrder, skip.
+        maxFileSizeKB is a positive KB number or null.
         needsClarification is an array of slot names you could not infer.
         assistantReply is one short sentence.
         Use null for unknown optional slots.
