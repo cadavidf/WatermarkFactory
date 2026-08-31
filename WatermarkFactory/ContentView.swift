@@ -834,11 +834,19 @@ struct ContentView: View {
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: spacing) {
-                    savedPresetLibrary
                     watermarkSourceSection
-                    sizeOpacitySection
-                    layoutModeSection
-                    positionPaddingSection
+                    // Choosing the watermark is its own step -- everything
+                    // about placing it (size, opacity, position/padding,
+                    // tiling, presets) only makes sense once there's
+                    // something to place, so it stays hidden until then
+                    // rather than showing a wall of controls with nothing
+                    // to apply them to.
+                    if state.watermarkURL != nil {
+                        savedPresetLibrary
+                        sizeOpacitySection
+                        layoutModeSection
+                        positionPaddingSection
+                    }
                 }
                 .padding(panePadding)
             }
