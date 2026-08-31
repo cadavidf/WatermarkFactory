@@ -528,6 +528,20 @@ struct WatermarkPreset: Identifiable, Codable {
     var settings: WatermarkSettings
 }
 
+/// A folder chosen before, kept as a security-scoped bookmark so it can be
+/// re-selected in one click instead of re-opening the panel and navigating
+/// back to it. path is kept alongside the bookmark purely for cheap
+/// dedup/display without resolving+starting security scope just to check
+/// "have we seen this one" -- the bookmark itself is still what's used to
+/// actually gain access when picked.
+struct RecentFolder: Identifiable, Codable, Equatable {
+    var id = UUID()
+    var name: String
+    var path: String
+    var bookmark: Data
+    var lastUsed: Date
+}
+
 struct PlatformExportPreset: Identifiable {
     let id: String
     let name: String

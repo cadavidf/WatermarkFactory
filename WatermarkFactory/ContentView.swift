@@ -87,6 +87,7 @@ final class AppState: ObservableObject {
     @Published var isSuggestingPlacement = false
     @Published var smartPlacementProposal: SmartPlacementProposal?
     @Published var presets: [WatermarkPreset] = []
+    @Published var recentFolders: [RecentFolder] = []
     @Published var orderedImageURLs: [URL] = [] { didSet { saveImageOrder() } }
     @Published var chatTranscript: [ChatMessage] = [
         ChatMessage(role: .assistant, text: String(localized: "Tell me how you want these watermarked."), chips: [String(localized: "Just watermark these"), String(localized: "Subtle corner"), String(localized: "Centered bold"), String(localized: "Tiled brand")])
@@ -487,7 +488,46 @@ final class AppState: ObservableObject {
         sourceAccess.replace(with: [url])
         folderURL = url
         saveBookmark(url, key: "folderBookmark")
+        recordRecentFolder(url)
         reloadImages()
+    }
+
+    /// Selecting a folder from the Recent list -- same path as any other
+    /// folder pick, plus a fresh security-scoped resolve from its stored
+    /// bookmark (the original picker-granted access doesn't carry over
+    /// between launches, only the bookmark does).
+    func selectRecentFolder(_ recent: RecentFolder) {
+        var stale = false
+        guard let url = try? URL(resolvingBookmarkData: recent.bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale) else {
+            // Bookmark no longer resolves (folder moved/deleted/permission
+            // revoked) -- drop it from the list rather than leave a dead
+            // entry a person would just hit the same failure on again.
+            recentFolders.removeAll { $0.id == recent.id }
+            saveRecentFolders()
+            return
+        }
+        setFolder(url)
+    }
+
+    private func recordRecentFolder(_ url: URL) {
+        guard let bookmark = bookmarkData(for: url) else { return }
+        let path = url.path
+        recentFolders.removeAll { $0.path == path }
+        recentFolders.insert(RecentFolder(name: url.lastPathComponent, path: path, bookmark: bookmark, lastUsed: Date()), at: 0)
+        recentFolders = Array(recentFolders.prefix(6))
+        saveRecentFolders()
+    }
+
+    private func saveRecentFolders() {
+        if let data = try? JSONEncoder().encode(recentFolders) {
+            defaults.set(data, forKey: "recentFolders")
+        }
+    }
+
+    private func restoreRecentFolders() {
+        guard let data = defaults.data(forKey: "recentFolders"),
+              let decoded = try? JSONDecoder().decode([RecentFolder].self, from: data) else { return }
+        recentFolders = decoded
     }
 
     private func setImages(_ urls: [URL]) {
@@ -589,6 +629,7 @@ final class AppState: ObservableObject {
 
     private func restore() {
         restorePresets()
+        restoreRecentFolders()
         flowMode = FlowMode(rawValue: defaults.string(forKey: "flowMode") ?? "") ?? .guided
         if defaults.object(forKey: "sizeFraction") != nil { sizeFraction = defaults.double(forKey: "sizeFraction") }
         if defaults.object(forKey: "opacity") != nil { opacity = defaults.double(forKey: "opacity") }
@@ -1019,6 +1060,15 @@ struct ContentView: View {
             Text("...or drag a folder or images in")
                 .font(.caption)
                 .foregroundStyle(AutomalityColor.inkMuted)
+            if !state.recentFolders.isEmpty {
+                Text("Recent").automalityLabelText().foregroundStyle(AutomalityColor.ink)
+                FlowLayout {
+                    ForEach(state.recentFolders) { recent in
+                        Button(recent.name) { state.selectRecentFolder(recent) }
+                            .buttonStyle(.automalityChip(isSelected: state.folderURL?.path == recent.path))
+                    }
+                }
+            }
             if let folder = state.folderURL {
                 Text(folder.lastPathComponent).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             }
