@@ -976,3 +976,82 @@ New file `WatermarkFactory/ChatFlowView.swift`, wired into `ContentView`'s
   summary that these need a human to actually run the app, same caveat as
   this file's Quick-Action section above.
 
+
+## Chat flow mode — Phase 1b: padding, multi-corner, reorder, max size, content-type format
+
+Refinements to Phase 1 (already built and committed) based on review of the
+full question tree. Five additions, all bounded — no new export pipeline
+(video export was discussed and explicitly deferred to a separate future
+phase; do not touch video/AVFoundation in this pass).
+
+1. **Padding as its own explicit chat question** — it's a real, frequently-
+   adjusted setting (`WatermarkSettings.padding`) that Phase 1's question
+   list never surfaces. Add a question after placement: "How much padding
+   from the edge?" with chips "Tight (8px)" / "Default (16px)" / "Generous
+   (32px)", plus free-text accepts a bare number as pixels.
+
+2. **Multiple simultaneous positions (niche, opt-in)** — add
+   `var additionalAnchors: [Anchor] = []` to `WatermarkSettings` (default
+   empty = today's single-anchor behavior, completely unchanged for
+   existing presets/tests). When non-empty, `ImageProcessor.compose` draws
+   the watermark at `settings.anchor` **and** at each entry in
+   `additionalAnchors`, same size/opacity/tint each time — factor the
+   existing single watermark-placement-and-draw block into a small helper
+   so it can loop over `[settings.anchor] + settings.additionalAnchors`
+   instead of duplicating the draw logic. In chat, this is opt-in only —
+   the placement question's chips stay single-choice; a follow-up "Add it
+   to another corner too?" only appears after the first placement answer,
+   default declined.
+
+3. **Reorder step** (was missing from Phase 1's question list) — add a
+   `reorder: String?` slot (`"byCurrentOrder"` or `"skip"`) to `IntentSlots`
+   and a chat question "Number these in the order shown, or skip
+   numbering?" with chips "Number them" / "Skip" — wires to the existing
+   `state.numberInCurrentOrder(state.orderedItems)` / no-op, exactly like
+   `orderRenameHeader`'s buttons. This is presentation only; don't touch
+   the reorder logic itself.
+
+4. **Max file size step** (also missing) — add `maxFileSizeKB: Double?` to
+   `IntentSlots`, question "Cap the file size per image?" with chips
+   "No limit" / "500 KB" / "200 KB", free text accepts a bare KB number.
+   Because `AppState.maxFileSizeBlocksExport` already blocks export when
+   this is set with PNG/TIFF, if the parser's `contentType` (see below)
+   implies PNG or TIFF, don't ask this question at all — skip straight
+   past it — rather than setting a value the app will then refuse to
+   export with.
+
+5. **Content-type-driven export format** — add
+   `case gif = "GIF"` to `ExportFormat` (static single-frame only; give it
+   a `hint` string same style as the others: e.g. "Single-frame GIF —
+   simple, widely supported, no transparency gradient."). In
+   `ImageProcessor.resolvedFormat`, add `case .gif: return (.gif, "gif",
+   false)` (import `UniformTypeIdentifiers`' `.gif` — confirm it exists in
+   the SDK before assuming; if not, use
+   `UTType("com.compuserve.gif")!`). Add a new `contentType: String?` slot
+   to `IntentSlots` (values: `camera`, `graphic`, `geoData`, `gif`,
+   `other`) with its own chat question: "What kind of images are these? —
+   Camera photos / Logos or screenshots / Geo or technical data / GIFs /
+   Not sure". Map: `camera`→`.jpeg`, `graphic`→`.png`, `geoData`→`.tiff`,
+   `gif`→`.gif`, `other`/unset→`.keepOriginal`. This format choice takes
+   precedence over whatever `exportPlatform` (instagram/web/print) would
+   otherwise set for format — `exportPlatform` still governs
+   dimensions/quality/optimizeForWeb, `contentType` governs the format
+   itself. Update `IntentPreset.applyPlatform`/`settings(from:)` so
+   `contentType`, when present, is applied *after* the platform mapping so
+   it wins the format field specifically (don't let it clobber the
+   dimension/quality fields platform already set).
+
+### Verification
+- Extend `IntentParserTests` with cases for: `contentType` → correct
+  `exportFormat`, `contentType` set alongside `exportPlatform: "instagram"`
+  (format should follow contentType, dimensions should follow instagram),
+  `additionalAnchors` round-tripping through `settings(from:)`.
+- Add one `ImageProcessor`-level test exporting through the new
+  `.gif` case if there's an existing fixture image to reuse (match however
+  `testExactOutputSizeUsesRequestedPlatformPixels` or similar is set up) —
+  if no fixture exists and building one is disproportionate, note that gap
+  explicitly in your summary rather than skipping silently.
+- All existing tests (19 as of Phase 1) must still pass unchanged.
+- `xcodebuild ... build` and `... test` tails, same as Phase 1's
+  verification section.
+
