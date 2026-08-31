@@ -885,7 +885,14 @@ struct ContentView: View {
             Button("Next") { state.advance(to: .export) }
                 .buttonStyle(.automalityAccent)
         case .export:
-            EmptyView()
+            // The terminal action gets the same top-right, always-visible,
+            // orange-when-actionable treatment as every other stage's
+            // Next -- previously buried at the bottom of a scrolling
+            // settings pane, easy to miss after scrolling through format/
+            // size/prefix controls to get there.
+            Button("Watermark All Images") { state.exportAll() }
+                .buttonStyle(state.canExport ? .automalityAccent : .automalitySecondary)
+                .disabled(!state.canExport)
         }
     }
 
@@ -1334,9 +1341,9 @@ struct ContentView: View {
             if !state.estimatedFilename.isEmpty {
                 Text(String(format: String(localized: "-> %@"), state.estimatedFilename)).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             }
-            Button("Watermark All Images") { state.exportAll() }
-                .buttonStyle(.automalityPrimary)
-                .disabled(!state.canExport)
+            // The action itself moved to the top-right header (always
+            // visible, orange when ready) -- this hint/progress stays here,
+            // next to the settings it's actually explaining.
             if let hint = state.exportHint { Text(hint).font(.caption).foregroundStyle(AutomalityColor.inkMuted) }
             if state.isExporting { ProgressView(value: state.progress) }
         }
