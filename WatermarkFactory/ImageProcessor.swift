@@ -412,12 +412,24 @@ struct ImageProcessor {
     }
 
     private static func scrubbedMetadata(sourceURL: URL) -> [CFString: Any] {
+        // Verified live (standalone CGImageDestination test, not assumed):
+        // for JPEG output written from a bare in-memory CGImage (no
+        // pre-existing metadata source to merge into), CGImageDestination
+        // silently drops the TIFF dictionary entirely -- reading the file
+        // back shows no {TIFF} block at all, so attribution written only
+        // there is lost for the single most common export format. IPTC
+        // Byline does survive on JPEG; EXIF UserComment does too (added
+        // here as a second carrier) -- both confirmed present in the
+        // actual written file, not just passed to the API. TIFF Software/
+        // Artist stay in the dict below since they DO work correctly for
+        // real TIFF exports (also confirmed), harmless no-ops otherwise.
         var properties: [CFString: Any] = [
             kCGImagePropertyTIFFDictionary: [
                 kCGImagePropertyTIFFSoftware: "automality.com",
                 kCGImagePropertyTIFFArtist: "automality.com"
             ],
             kCGImagePropertyIPTCDictionary: [kCGImagePropertyIPTCByline: "automality.com"],
+            kCGImagePropertyExifDictionary: [kCGImagePropertyExifUserComment: "automality.com"],
             kCGImagePropertyPNGDictionary: [
                 kCGImagePropertyPNGSoftware: "automality.com",
                 kCGImagePropertyPNGAuthor: "automality.com"

@@ -106,6 +106,17 @@ final class ImageProcessorMetadataTests: XCTestCase {
                 let tiff = properties.object(forKey: kCGImagePropertyTIFFDictionary) as? NSDictionary
                 XCTAssertEqual(tiff?.object(forKey: kCGImagePropertyTIFFSoftware) as? String, "automality.com")
             }
+            if type == .jpeg {
+                // Regression test: CGImageDestination silently drops the
+                // TIFF dictionary entirely for JPEG written from a bare
+                // CGImage (confirmed via a standalone properties dump,
+                // not assumed) -- IPTC alone isn't the whole story for
+                // the single most common export format, so also assert
+                // the EXIF UserComment carrier added specifically to
+                // cover that gap.
+                let exif = properties.object(forKey: kCGImagePropertyExifDictionary) as? NSDictionary
+                XCTAssertEqual(exif?.object(forKey: kCGImagePropertyExifUserComment) as? String, "automality.com")
+            }
         }
     }
 
