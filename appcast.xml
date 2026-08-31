@@ -3,6 +3,19 @@
     <channel>
         <title>WatermarkFactory</title>
         <item>
+            <title>1.1.7</title>
+            <pubDate>Mon, 31 Aug 2026 11:19:02 -0500</pubDate>
+            <sparkle:version>10</sparkle:version>
+            <sparkle:shortVersionString>1.1.7</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <ul>
+                    <li>The Watermark and Position steps are now separate, numbered stages instead of one combined step -- choose the watermark first, then a dedicated Position step for size/opacity/layout/padding, matching the progress nav for the first time.</li>
+                </ul>
+            ]]></description>
+            <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.1.7/WatermarkFactory.dmg" length="1977394" type="application/octet-stream" sparkle:edSignature="xWZrhE6LHTD5x3X5MDgnwXBl1YEKG97STEPypHGC6apQ7swIta5D2YCAPhZd7Re+KPpg0CaUJfonHA3VsACmCw=="/>
+        </item>
+        <item>
             <title>1.1.6</title>
             <pubDate>Mon, 31 Aug 2026 11:11:00 -0500</pubDate>
             <sparkle:version>9</sparkle:version>
@@ -28,22 +41,6 @@
                 </ul>
             ]]></description>
             <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.1.5/WatermarkFactory.dmg" length="2292400" type="application/octet-stream" sparkle:edSignature="yeCMzn2dlQ87CHEMkuAZitVtqUwJ/a2zIbwGEtMaBak0ikZ5thQuuwma7IH3ao/rHB7Ql5s0Qa58ygoiIv2QCw=="/>
-        </item>
-        <item>
-            <title>1.1.4</title>
-            <pubDate>Mon, 31 Aug 2026 10:56:25 -0500</pubDate>
-            <sparkle:version>7</sparkle:version>
-            <sparkle:shortVersionString>1.1.4</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <description><![CDATA[
-                <ul>
-                    <li>Watermark stage is now its own step: choose the watermark first, then size/opacity/position/padding controls appear -- not a wall of controls with nothing to apply them to yet.</li>
-                    <li>Only one orange element on screen at a time, and it always points at the real next action: Choose Watermark while nothing's picked, Next once it is.</li>
-                    <li>Added Skip (teal) so you can move past the watermark stage without choosing one, instead of being stuck on a disabled button.</li>
-                    <li>Added an Acknowledgements window (App menu) with full license text for this app's one real dependency, Sparkle.</li>
-                </ul>
-            ]]></description>
-            <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.1.4/WatermarkFactory.dmg" length="2298572" type="application/octet-stream" sparkle:edSignature="pAesM5XES/9BUwGgWe5IXrKhLAxLtCg/TrpWfPQzXt6O994J7UZijbBrk3xNlZ6HVgU09WjQL2Z76YhsxBUEAQ=="/>
         </item>
         <item>
             <title>1.1.2</title>
