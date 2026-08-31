@@ -110,10 +110,18 @@ final class AppState: ObservableObject {
     }
     var numberedCount: Int { orderedImageURLs.filter { url in images.contains { $0.url == url } }.count }
     var orderSummary: String { "\(numberedCount) of \(images.count) images numbered" }
+    // Governs how far advance(to:) lets navigation jump ahead -- images are
+    // a hard requirement (nothing else makes sense without them), but a
+    // watermark is not: the Watermark stage's Skip action is a deliberate,
+    // supported way to move on without one, so gating this on watermarkURL
+    // would leave Skip inconsistent with the progress nav and every other
+    // way of reaching a later stage (both would silently refuse the exact
+    // jump Skip just performed). The actual export ACTION stays correctly
+    // blocked without a watermark via canExport/exportHint below --
+    // this only governs which stage VIEWS are reachable, not whether
+    // export itself is allowed to run.
     var nextAvailableStage: Stage {
-        if images.isEmpty { return .selectImages }
-        if watermarkURL == nil { return .watermark }
-        return .export
+        images.isEmpty ? .selectImages : .export
     }
     var exportHint: String? {
         if images.isEmpty { return "Choose a folder or images before export." }
@@ -753,14 +761,19 @@ struct ContentView: View {
         case .watermark:
             // No watermark chosen yet: this becomes an explicit, always-
             // enabled "Skip" rather than a disabled "Next" -- watermarking
-            // is the app's whole point but not force-required, and
-            // advance(to:) itself would otherwise block jumping past a
-            // stage that isn't "ready" yet, so this sets stage directly.
-            // Primary (teal) rather than accent: it's a real, deliberate
-            // choice, not the orange "do this next" spotlight, which stays
-            // on Choose Watermark until one's actually picked.
+            // is the app's whole point but not force-required.
+            // advance(to:) itself now allows this (nextAvailableStage no
+            // longer gates on watermarkURL, see AppState) rather than this
+            // button bypassing the guard directly -- a direct bypass here
+            // left the progress nav and every other forward-navigation path
+            // still silently blocked once on a later stage, since they all
+            // go through advance(to:). One fix at the source, not another
+            // one-off workaround. Primary (teal) rather than accent: it's a
+            // real, deliberate choice, not the orange "do this next"
+            // spotlight, which stays on Choose Watermark until one's
+            // actually picked.
             if state.watermarkURL == nil {
-                Button("Skip") { state.stage = .orderRename }
+                Button("Skip") { state.advance(to: .orderRename) }
                     .buttonStyle(.automalityPrimary)
             } else {
                 Button("Next") { state.advance(to: .orderRename) }
@@ -1235,9 +1248,14 @@ struct ContentView: View {
                 Button("Number in current order") { state.numberInCurrentOrder(state.orderedItems) }
                     .buttonStyle(.automalityPrimary)
                     .disabled(state.images.isEmpty)
+                // Only images are required to view the Export stage --
+                // watermarkURL is intentionally not part of this gate (see
+                // AppState.nextAvailableStage): the actual export action
+                // stays correctly blocked without one via canExport/
+                // exportHint on that stage, this only governs navigation.
                 Button("Skip") { state.advance(to: .export) }
                     .buttonStyle(.automalitySecondary)
-                    .disabled(state.images.isEmpty || state.watermarkURL == nil)
+                    .disabled(state.images.isEmpty)
             }
         }
     }
