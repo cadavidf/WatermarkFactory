@@ -489,16 +489,26 @@ struct ImageProcessor {
         // actual written file, not just passed to the API. TIFF Software/
         // Artist stay in the dict below since they DO work correctly for
         // real TIFF exports (also confirmed), harmless no-ops otherwise.
+        // Common quick EXIF viewers often surface only Copyright/
+        // CopyrightNotice-style fields, so keep the creator attribution in
+        // those visible fields too. ImageIO's GIF dictionary has no exposed
+        // comment/copyright key, so GIF cannot carry this via
+        // CGImageDestination metadata.
         var properties: [CFString: Any] = [
             kCGImagePropertyTIFFDictionary: [
                 kCGImagePropertyTIFFSoftware: "automality.com",
-                kCGImagePropertyTIFFArtist: "automality.com"
+                kCGImagePropertyTIFFArtist: "automality.com",
+                kCGImagePropertyTIFFCopyright: "automality.com"
             ],
-            kCGImagePropertyIPTCDictionary: [kCGImagePropertyIPTCByline: "automality.com"],
+            kCGImagePropertyIPTCDictionary: [
+                kCGImagePropertyIPTCByline: "automality.com",
+                kCGImagePropertyIPTCCopyrightNotice: "automality.com"
+            ],
             kCGImagePropertyExifDictionary: [kCGImagePropertyExifUserComment: "automality.com"],
             kCGImagePropertyPNGDictionary: [
                 kCGImagePropertyPNGSoftware: "automality.com",
-                kCGImagePropertyPNGAuthor: "automality.com"
+                kCGImagePropertyPNGAuthor: "automality.com",
+                kCGImagePropertyPNGCopyright: "automality.com"
             ]
         ]
         guard metadataPrivacy != .removeLocation,
