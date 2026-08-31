@@ -748,7 +748,6 @@ struct ContentView: View {
                     sizeOpacitySection
                     layoutModeSection
                     positionPaddingSection
-                    smartPlacementCard
                     orderRenameSection
                     platformPresets
                     exportSection
@@ -784,7 +783,6 @@ struct ContentView: View {
                     sizeOpacitySection
                     layoutModeSection
                     positionPaddingSection
-                    smartPlacementCard
                     HStack {
                         Spacer()
                         Button("Next") { state.advance(to: .orderRename) }
@@ -922,18 +920,11 @@ struct ContentView: View {
             AutomalitySegmentedControl(selection: $state.watermarkTint) { tint in
                 AnyView(tintSwatch(tint))
             }
-            Button {
-                state.suggestPlacement()
-            } label: {
-                if state.isSuggestingPlacement {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Text("Suggest Placement")
-                }
-            }
-            .buttonStyle(.automalitySecondary)
-            .disabled(!state.canSuggestPlacement)
+            // Smart Placement ("Suggest Placement") is disabled for this
+            // release — the suggestions weren't reliable enough yet. The
+            // underlying logic (AppState.suggestPlacement, smartPlacementCard,
+            // SmartPlacementProposal) is left intact for a future version;
+            // this just removes the UI entry point.
         }
     }
 
@@ -991,17 +982,30 @@ struct ContentView: View {
     private var layoutModeSection: some View {
         ControlSection("Layout mode") {
             AutomalitySegmentedControl(selection: $state.layoutMode)
-            if state.layoutMode == .tiled { tiledControls }
         }
     }
 
+    // Everything about *where* the watermark sits and how much room it
+    // gets lives in one section, in the order you'd actually set it up:
+    // pick a corner → set its margin from the edge → optionally nudge it →
+    // (tiled only) set the gap between repeats and their rotation. This
+    // used to be split across two sections (Position & Padding, and a
+    // Spacing slider buried in Layout mode) — consolidated per feedback
+    // that having padding-like controls in multiple places was confusing.
     private var positionPaddingSection: some View {
         ControlSection("Position & Padding") {
-            if state.layoutMode == .single { singleControls }
+            if state.layoutMode == .single {
+                Text("Anchor").automalityLabelText().foregroundStyle(AutomalityColor.ink)
+                singleControls
+            }
+            Text(state.layoutMode == .single ? "Padding — distance from that edge" : "Padding — margin around each mark")
+                .automalityLabelText()
+                .foregroundStyle(AutomalityColor.ink)
             AutomalitySlider(value: $state.padding, in: 0...100)
-            Text("Padding \(Int(state.padding)) px").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+            Text("\(Int(state.padding)) px").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             if state.layoutMode == .tiled {
-                Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+                Divider()
+                tiledControls
             }
         }
     }
@@ -1230,6 +1234,7 @@ struct ContentView: View {
                     .buttonStyle(.automalityChip(isSelected: state.anchor == anchor))
                 }
             }
+            Text("Nudge from anchor (optional)").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             HStack(spacing: 8) {
                 TextField("X", value: $state.offsetX, format: .number)
                     .textFieldStyle(.automalityData)
@@ -1243,8 +1248,9 @@ struct ContentView: View {
 
     private var tiledControls: some View {
         VStack(alignment: .leading, spacing: 8) {
+            Text("Spacing — gap between tiles").automalityLabelText().foregroundStyle(AutomalityColor.ink)
             AutomalitySlider(value: $state.spacing, in: 0...400)
-            Text("Spacing \(Int(state.spacing)) px").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+            Text("\(Int(state.spacing)) px").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             Picker("Rotation", selection: $state.rotationPattern) {
                 ForEach(RotationPattern.allCases) { Text($0.rawValue).tag($0) }
             }

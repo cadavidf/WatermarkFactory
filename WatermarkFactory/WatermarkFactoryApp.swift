@@ -1,3 +1,5 @@
+import AutomalityUI
+import DesignSystemKit
 import SwiftUI
 
 @main
@@ -17,6 +19,13 @@ struct WatermarkFactoryApp: App {
                 // List background and washed-out Picker labels regardless of any
                 // SwiftUI-level .background()/.foregroundStyle() override.
                 .environment(\.colorScheme, .light)
+                // Required setup for every AutomalityUI/DesignSystemKit consumer:
+                // Themed*Style components read this via @Environment(\.brandTheme).
+                // Without it set at the true app root, every themed control
+                // silently falls back to DesignSystemKit's default theme instead
+                // of Automality's — this line is what makes buttons, chips,
+                // toggles, and text fields actually render on-brand.
+                .environment(\.brandTheme, AutomalityTheme())
         }
     }
 }

@@ -761,3 +761,89 @@ each individual read:
 This is a correctness bug fix — no other functional/visual behavior should
 change. Verify both the app build and `WatermarkFactoryTests` pass (derived
 data under /tmp).
+
+## Addendum: Finder Quick Action — auto-run with last-used settings (v3.4)
+
+Add a macOS Quick Action ("Watermark with Last Preset") that appears in
+Finder's right-click menu on a selected folder (or image files), and runs
+WatermarkFactory's export automatically using whatever watermark/settings
+were last used — no app UI interaction required for the common case.
+
+### Why not a custom URL scheme
+The app is sandboxed with only `com.apple.security.files.user-selected.
+read-write`, which grants read/write access exclusively to items the user
+selected through the standard file picker (NSOpenPanel) or through Finder's
+built-in "Open With" mechanism (Launch Services). A custom URL scheme
+(`watermarkfactory://run?path=...`) passing a raw path string from an
+external process would NOT carry that access grant — the sandbox would
+block reads of that folder. The correct, sandbox-compliant mechanism is to
+receive the folder via the app's standard file-open path (Finder "Open
+With" / Automator's "Open Finder Items" action targeting this app), which
+macOS automatically grants temporary read/write access for.
+
+### Part A — app-side: handle being opened with a folder
+- Add an `NSApplicationDelegateAdaptor` to `WatermarkFactoryApp` (a small
+  `AppDelegate: NSObject, NSApplicationDelegate` class) implementing
+  `application(_:open:)` (the `[URL]`-taking variant) to receive folder/
+  image URLs Finder opens this app with.
+- Register the app as able to open folders: add `CFBundleDocumentTypes` to
+  Info.plist declaring it accepts `public.folder` (and the existing
+  supported image UTIs: jpeg, png, heic, tiff) as document types, role
+  `Editor` or `Viewer` — whichever is simpler; this is what makes "Open
+  With → WatermarkFactory" and Automator's "Open Finder Items" action able
+  to target this app at all.
+- On receiving opened URL(s): if any is a directory, treat it exactly like
+  `chooseFolder()`'s result (replace the working image set, same
+  `setFolder` path) — if files, treat like `chooseImages()`'s result. Reuse
+  existing `AppState` methods, don't duplicate logic.
+- After loading: if a watermark is already set from the last-used/restored
+  session settings (it will be, via the existing `restore()` logic, as long
+  as the user has used the app at least once and picked a watermark before)
+  AND `canExport` is true, **automatically call `exportAll()`** without
+  requiring further user interaction — this is the whole point of the
+  Quick Action, a true one-click/no-click batch run.
+- If no watermark is set yet (first-ever use, nothing to reuse), do NOT
+  silently fail or silently skip — bring the app to the foreground showing
+  its normal UI with the folder already loaded, so the user can pick a
+  watermark once; after that, subsequent Quick Action invocations will
+  auto-run since the watermark is now remembered.
+- **Auto-quit behavior**: if the app was launched fresh specifically to
+  handle this open-URL event (i.e., it wasn't already running when the
+  Quick Action was invoked — check via a flag set at launch, before the
+  first `applicationDidFinishLaunching`), and the auto-run export completes
+  successfully, quit the app automatically ~2 seconds after showing the
+  completion status (matches "run it and it's done" automation feel). If
+  the app was already open/running when invoked, don't auto-quit — just
+  reveal the result normally, the user is already interacting with it.
+- Keep existing manual UI flows (Choose Folder/Images buttons, stage
+  navigation, etc.) completely unchanged — this is purely an additional
+  entry point into the same `AppState`, not a parallel code path.
+
+### Part B — the Quick Action itself (Automator workflow, built as a file,
+not built by scripting Automator.app's UI)
+- Build a `.workflow` bundle by hand (Automator workflow bundles are just a
+  plist-based `Contents/document.wflow` + `Contents/Info.plist` inside a
+  `.workflow` directory — no need to drive Automator.app's UI to create
+  one) containing a single **"Open Finder Items"** action configured to:
+  - Accept input: files or folders, from Finder.
+  - Target application: `WatermarkFactory.app` (reference by bundle
+    identifier, matching whatever `PRODUCT_BUNDLE_IDENTIFIER` the Xcode
+    project already uses).
+- Name the Quick Action **"Watermark with Last Preset"** — this is the
+  label that will appear in Finder's right-click → Quick Actions submenu.
+- Install it to `~/Library/Services/Watermark with Last Preset.workflow`
+  (the standard per-user Quick Actions/Services location — no admin/signing
+  requirement to install here, unlike `/Library/Services/`).
+- Write a short install note in README.md: what the Quick Action does, that
+  it requires having used the app at least once with a watermark set, and
+  that it can be removed via System Settings → Extensions → General → Quick
+  Actions, or by deleting the `.workflow` file directly.
+
+### Verification
+- Both app build and `WatermarkFactoryTests` must pass (derived data under
+  /tmp). Add a unit test for the "which AppState method handles an
+  opened-URL folder vs. file list" dispatch logic if it's factored as a
+  testable pure function; the Quick Action installation itself isn't
+  something XCTest can verify — note in your summary that it needs a
+  manual right-click check in Finder, don't claim automated coverage of it.
+- This is additive — no existing functional behavior changes.
