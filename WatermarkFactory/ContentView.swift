@@ -1609,7 +1609,7 @@ struct WatermarkIntensityPad: View {
                 let hx = xPosition(for: sizeFraction, width: geo.size.width)
                 let hy = CGFloat(layoutStyle.rawValue) * rowHeight + rowHeight / 2
                 Circle()
-                    .fill(AutomalityColor.teal.opacity(max(opacity, 0.15)))
+                    .fill(AutomalityColor.orange.opacity(max(opacity, 0.15)))
                     .overlay(Circle().stroke(AutomalityColor.ink, lineWidth: 2))
                     .frame(width: 22, height: 22)
                     .position(x: hx, y: hy)
