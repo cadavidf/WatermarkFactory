@@ -363,7 +363,10 @@ final class AppState: ObservableObject {
                     summary.usedHEICFallback = summary.usedHEICFallback || result.usedHEICFallback
                     if !result.metSizeTarget { summary.unmetSizeTarget.append(item.filename) }
                 } catch {
-                    summary.failed.append(item.filename)
+                    // Was silently swallowing the real reason -- "Failed:
+                    // IMG_1234.jpg" with no cause told nobody anything
+                    // (including me) about what actually went wrong.
+                    summary.failed.append("\(item.filename) (\(error.localizedDescription))")
                 }
                 await MainActor.run {
                     self.progress = Double(index + 1) / Double(items.count)

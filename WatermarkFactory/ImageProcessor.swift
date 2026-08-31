@@ -9,10 +9,18 @@ private extension CGRect {
     var area: CGFloat { width * height }
 }
 
-enum ImageProcessorError: Error {
+enum ImageProcessorError: Error, LocalizedError {
     case loadFailed
     case contextFailed
     case encodeFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .loadFailed: "couldn't read image data"
+        case .contextFailed: "couldn't create a drawing surface for this image"
+        case .encodeFailed: "couldn't encode the output file"
+        }
+    }
 }
 
 struct ImageProcessor {
