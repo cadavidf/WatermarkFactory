@@ -17,7 +17,7 @@ enum Acknowledgements {
     static let entries: [AcknowledgementEntry] = [
         AcknowledgementEntry(
             name: "Sparkle",
-            licenseSummary: "MIT-style license. Copyright (c) 2006-2013 Andy Matuschak and others.",
+            licenseSummary: String(localized: "MIT-style license. Copyright (c) 2006-2013 Andy Matuschak and others."),
             fullText: """
             Copyright (c) 2006-2013 Andy Matuschak.
             Copyright (c) 2009-2013 Elgato Systems GmbH.

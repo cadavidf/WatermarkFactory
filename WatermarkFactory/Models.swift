@@ -6,11 +6,11 @@ enum WatermarkSizePreset: String, CaseIterable, Identifiable, Codable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .tiny: "Tiny (10%)"
-        case .small: "Small (20%)"
-        case .medium: "Medium (35%)"
-        case .large: "Large (50%)"
-        case .full: "Full (75%)"
+        case .tiny: String(localized: "Tiny (10%)")
+        case .small: String(localized: "Small (20%)")
+        case .medium: String(localized: "Medium (35%)")
+        case .large: String(localized: "Large (50%)")
+        case .full: String(localized: "Full (75%)")
         }
     }
     /// Compact clothing-size-style abbreviation for the chip itself — the
@@ -51,12 +51,12 @@ enum WatermarkIntensityPreset: String, CaseIterable, Identifiable, Codable {
 
     var label: String {
         switch self {
-        case .discrete: "Discrete"
-        case .subtle: "Subtle"
-        case .balanced: "Balanced"
-        case .confident: "Confident"
-        case .bold: "Bold"
-        case .protective: "Protective"
+        case .discrete: String(localized: "Discrete")
+        case .subtle: String(localized: "Subtle")
+        case .balanced: String(localized: "Balanced")
+        case .confident: String(localized: "Confident")
+        case .bold: String(localized: "Bold")
+        case .protective: String(localized: "Protective")
         }
     }
 
@@ -65,12 +65,12 @@ enum WatermarkIntensityPreset: String, CaseIterable, Identifiable, Codable {
     /// which end.
     var purpose: String {
         switch self {
-        case .discrete: "Barely there — for polished work you're proud to have made, not worried about."
-        case .subtle: "The professional default — visible on inspection, invisible at a glance."
-        case .balanced: "Noticeable without dominating the photo."
-        case .confident: "Clearly branded — good for social posts and previews."
-        case .bold: "Hard to ignore — makes ownership unmistakable."
-        case .protective: "Large, high-opacity, tiled — resists cropping or cloning out. For proofs and preview-only shares."
+        case .discrete: String(localized: "Barely there — for polished work you're proud to have made, not worried about.")
+        case .subtle: String(localized: "The professional default — visible on inspection, invisible at a glance.")
+        case .balanced: String(localized: "Noticeable without dominating the photo.")
+        case .confident: String(localized: "Clearly branded — good for social posts and previews.")
+        case .bold: String(localized: "Hard to ignore — makes ownership unmistakable.")
+        case .protective: String(localized: "Large, high-opacity, tiled — resists cropping or cloning out. For proofs and preview-only shares.")
         }
     }
 
@@ -132,11 +132,11 @@ enum OpacityPreset: String, CaseIterable, Identifiable, Codable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .ghost: "Ghost (10%)"
-        case .subtle: "Subtle (25%)"
-        case .balanced: "Balanced (50%)"
-        case .bold: "Bold (75%)"
-        case .solid: "Solid (100%)"
+        case .ghost: String(localized: "Ghost (10%)")
+        case .subtle: String(localized: "Subtle (25%)")
+        case .balanced: String(localized: "Balanced (50%)")
+        case .bold: String(localized: "Bold (75%)")
+        case .solid: String(localized: "Solid (100%)")
         }
     }
     /// Compact percentage label for the chip itself — same "short, aligned,
@@ -179,15 +179,15 @@ enum Anchor: String, CaseIterable, Identifiable, Codable {
     }
     var displayName: String {
         switch self {
-        case .topLeft: "top-left"
-        case .top: "top"
-        case .topRight: "top-right"
-        case .left: "left"
-        case .center: "center"
-        case .right: "right"
-        case .bottomLeft: "bottom-left"
-        case .bottom: "bottom"
-        case .bottomRight: "bottom-right"
+        case .topLeft: String(localized: "top-left")
+        case .top: String(localized: "top")
+        case .topRight: String(localized: "top-right")
+        case .left: String(localized: "left")
+        case .center: String(localized: "center")
+        case .right: String(localized: "right")
+        case .bottomLeft: String(localized: "bottom-left")
+        case .bottom: String(localized: "bottom")
+        case .bottomRight: String(localized: "bottom-right")
         }
     }
 }
@@ -196,6 +196,7 @@ enum LayoutMode: String, CaseIterable, Identifiable, Codable {
     case single = "Single"
     case tiled = "Tiled"
     var id: String { rawValue }
+    var label: String { String(localized: String.LocalizationValue(rawValue)) }
 }
 
 enum FlowMode: String, CaseIterable, Identifiable, Codable {
@@ -203,6 +204,7 @@ enum FlowMode: String, CaseIterable, Identifiable, Codable {
     case compact = "Compact"
     case chat = "Chat"
     var id: String { rawValue }
+    var label: String { String(localized: String.LocalizationValue(rawValue)) }
 }
 
 enum RotationPattern: String, CaseIterable, Identifiable, Codable {
@@ -211,6 +213,7 @@ enum RotationPattern: String, CaseIterable, Identifiable, Codable {
     case alternating = "Alternating rows (0deg/45deg)"
     case custom = "Custom angle"
     var id: String { rawValue }
+    var label: String { String(localized: String.LocalizationValue(rawValue)) }
 }
 
 enum WatermarkTint: String, CaseIterable, Identifiable, Codable {
@@ -218,6 +221,7 @@ enum WatermarkTint: String, CaseIterable, Identifiable, Codable {
     case light = "Light"
     case dark = "Dark"
     var id: String { rawValue }
+    var label: String { String(localized: String.LocalizationValue(rawValue)) }
 }
 
 enum ExportFormat: String, CaseIterable, Identifiable, Codable {
@@ -227,13 +231,14 @@ enum ExportFormat: String, CaseIterable, Identifiable, Codable {
     case tiff = "TIFF"
     case gif = "GIF"
     var id: String { rawValue }
+    var label: String { String(localized: String.LocalizationValue(rawValue)) }
     var hint: String {
         switch self {
-        case .keepOriginal: "Preserves the source type where possible; HEIC falls back to PNG. Use this when you are matching an existing delivery workflow."
-        case .jpeg: "Best for photos going to listing sites: small files, fast uploads, no transparency needed."
-        case .png: "Use only if you need transparency or plan to edit further. Files are much larger, and most listing portals do not need this."
-        case .tiff: "Archival or print-quality only. Files are very large and not intended for web upload."
-        case .gif: "Single-frame GIF: simple and widely supported, but limited color and no smooth transparency."
+        case .keepOriginal: String(localized: "Preserves the source type where possible; HEIC falls back to PNG. Use this when you are matching an existing delivery workflow.")
+        case .jpeg: String(localized: "Best for photos going to listing sites: small files, fast uploads, no transparency needed.")
+        case .png: String(localized: "Use only if you need transparency or plan to edit further. Files are much larger, and most listing portals do not need this.")
+        case .tiff: String(localized: "Archival or print-quality only. Files are very large and not intended for web upload.")
+        case .gif: String(localized: "Single-frame GIF: simple and widely supported, but limited color and no smooth transparency.")
         }
     }
     var fileExtension: String? {
@@ -496,7 +501,7 @@ struct PlatformExportPreset: Identifiable {
     let jpegQuality: Double
     let note: String
 
-    var sizeLabel: String { "\(width)x\(height) JPEG" }
+    var sizeLabel: String { String(format: String(localized: "%d×%d JPEG"), width, height) }
 
     static let all: [PlatformExportPreset] = [
         PlatformExportPreset(
@@ -505,7 +510,7 @@ struct PlatformExportPreset: Identifiable {
             width: 1080,
             height: 1080,
             jpegQuality: 0.85,
-            note: "Instagram square export: 1080x1080 JPEG."
+            note: String(localized: "Instagram square export: 1080x1080 JPEG.")
         ),
         PlatformExportPreset(
             id: "fincaraiz",
@@ -513,7 +518,7 @@ struct PlatformExportPreset: Identifiable {
             width: 860,
             height: 482,
             jpegQuality: 0.85,
-            note: "FincaRaiz: 860x482px landscape, max 4.9MB - per fincaraiz.com.co guidance. Quality is an estimate; actual size depends on image content."
+            note: String(localized: "FincaRaiz: 860x482px landscape, max 4.9MB - per fincaraiz.com.co guidance. Quality is an estimate; actual size depends on image content.")
         ),
         PlatformExportPreset(
             id: "metrocuadrado",
@@ -521,7 +526,7 @@ struct PlatformExportPreset: Identifiable {
             width: 1600,
             height: 1200,
             jpegQuality: 0.85,
-            note: "Metrocuadrado: inferred 1600x1200px safe default; no exact official pixel spec published. Quality is an estimate; actual size depends on image content."
+            note: String(localized: "Metrocuadrado: inferred 1600x1200px safe default; no exact official pixel spec published. Quality is an estimate; actual size depends on image content.")
         ),
         PlatformExportPreset(
             id: "ciencuadras",
@@ -529,7 +534,7 @@ struct PlatformExportPreset: Identifiable {
             width: 1200,
             height: 1200,
             jpegQuality: 0.85,
-            note: "100Cuadras: 1200x1200px square, max 2MB - per Ciencuadras guidance. Quality is an estimate; actual size depends on image content."
+            note: String(localized: "100Cuadras: 1200x1200px square, max 2MB - per Ciencuadras guidance. Quality is an estimate; actual size depends on image content.")
         )
     ]
 }

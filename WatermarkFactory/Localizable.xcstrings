@@ -1,0 +1,648 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "200 KB" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "200 KB" } } }
+    },
+    "500 KB" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "500 KB" } } }
+    },
+    "%d couldn't reach the max file size target and were shipped at their closest achievable size." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "%d no pudieron alcanzar el tamaño máximo de archivo y se exportaron con el tamaño más cercano posible." } } }
+    },
+    "%d images found." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "%d imágenes encontradas." } } }
+    },
+    "%d images restored." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "%d imágenes restauradas." } } }
+    },
+    "%d images selected." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "%d imágenes seleccionadas." } } }
+    },
+    "%d of %d images numbered" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "%d de %d imágenes numeradas" } } }
+    },
+    "%d of %d images watermarked, total output size ~%@." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "%d de %d imágenes con marca de agua, tamaño total de salida ~%@." } } }
+    },
+    "%d×%d JPEG" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "%d×%d JPEG" } } }
+    },
+    "...or drag a folder or images in" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "...o arrastra una carpeta o imágenes aquí" } } }
+    },
+    "+ %d more" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "+ %d más" } } }
+    },
+    "100Cuadras: 1200x1200px square, max 2MB - per Ciencuadras guidance. Quality is an estimate; actual size depends on image content." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "100Cuadras: 1200×1200 px cuadrado, máximo 2 MB, según la guía de Ciencuadras. La calidad es una estimación; el tamaño real depende del contenido de la imagen." } } }
+    },
+    "A preset named \"%@\" already exists." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Ya existe un preajuste llamado \"%@\"." } } }
+    },
+    "Acknowledgements" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Agradecimientos" } } }
+    },
+    "Acknowledgements…" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Agradecimientos..." } } }
+    },
+    "Add a filename prefix?" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "¿Agregar un prefijo al nombre de archivo?" } } }
+    },
+    "Add a right-click shortcut?" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "¿Agregar un atajo de clic derecho?" } } }
+    },
+    "Add it to another corner too?" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "¿Agregarla también en otra esquina?" } } }
+    },
+    "Alternating rows (0deg/45deg)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Filas alternas (0°/45°)" } } }
+    },
+    "Anchor" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Ancla" } } }
+    },
+    "Applied %@ export preset." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Preajuste de exportación %@ aplicado." } } }
+    },
+    "Applied suggested placement." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Ubicación sugerida aplicada." } } }
+    },
+    "Apply" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Aplicar" } } }
+    },
+    "Archival or print-quality only. Files are very large and not intended for web upload." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Solo para archivo o calidad de impresión. Los archivos son muy grandes y no están pensados para subirlos a la web." } } }
+    },
+    "Balanced" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Equilibrado" } } }
+    },
+    "Balanced (50%)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Equilibrado (50%)" } } }
+    },
+    "Barely there — for polished work you're proud to have made, not worried about." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Apenas visible: para trabajos pulidos que quieres firmar, no proteger." } } }
+    },
+    "Best for photos going to listing sites: small files, fast uploads, no transparency needed." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Ideal para fotos destinadas a portales de anuncios: archivos pequeños, subidas rápidas y sin necesidad de transparencia." } } }
+    },
+    "Bold" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Marcado" } } }
+    },
+    "Bold (75%)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Marcado (75%)" } } }
+    },
+    "Bottom-left" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Abajo izquierda" } } }
+    },
+    "Bottom-right" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Abajo derecha" } } }
+    },
+    "Camera photos" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Fotos de cámara" } } }
+    },
+    "Cancel" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Cancelar" } } }
+    },
+    "Cap the file size per image?" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "¿Limitar el tamaño de archivo por imagen?" } } }
+    },
+    "Centered bold" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Centrada y marcada" } } }
+    },
+    "Chat" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Chat" } } }
+    },
+    "Check for Updates…" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Buscar actualizaciones..." } } }
+    },
+    "Choose Folder or Images..." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Elegir carpeta o imágenes..." } } }
+    },
+    "Choose New Document → Quick Action." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Elige Nuevo documento → Acción rápida." } } }
+    },
+    "Choose Watermark..." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Elegir marca de agua..." } } }
+    },
+    "Choose a folder and watermark to begin." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Elige una carpeta y una marca de agua para comenzar." } } }
+    },
+    "Choose a folder or images before export." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Elige una carpeta o imágenes antes de exportar." } } }
+    },
+    "Choose a folder or select individual images to get started." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Elige una carpeta o selecciona imágenes individuales para empezar." } } }
+    },
+    "Choose a watermark image before export." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Elige una imagen de marca de agua antes de exportar." } } }
+    },
+    "Clear order" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Borrar orden" } } }
+    },
+    "Clearly branded — good for social posts and previews." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Marca claramente visible: útil para publicaciones sociales y previsualizaciones." } } }
+    },
+    "Compact" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Compacto" } } }
+    },
+    "Confident" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Seguro" } } }
+    },
+    "Could not analyze this image for placement." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "No se pudo analizar esta imagen para sugerir una ubicación." } } }
+    },
+    "Couldn't access the selected folder. Please re-choose it." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "No se pudo acceder a la carpeta seleccionada. Vuelve a elegirla." } } }
+    },
+    "Custom" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Personalizado" } } }
+    },
+    "Custom angle" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Ángulo personalizado" } } }
+    },
+    "Customize..." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Personalizar..." } } }
+    },
+    "Dark" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Oscuro" } } }
+    },
+    "Default (16px)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Predeterminado (16 px)" } } }
+    },
+    "Degrees" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Grados" } } }
+    },
+    "Delete preset" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Eliminar preajuste" } } }
+    },
+    "Describe the watermark..." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Describe la marca de agua..." } } }
+    },
+    "Diagonal (45deg)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Diagonal (45°)" } } }
+    },
+    "Discrete" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Discreto" } } }
+    },
+    "Dismiss" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Descartar" } } }
+    },
+    "Export" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Exportar" } } }
+    },
+    "Export format" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Formato de exportación" } } }
+    },
+    "Export summary" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Resumen de exportación" } } }
+    },
+    "Export target set." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Destino de exportación definido." } } }
+    },
+    "Exporting %d of %d..." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Exportando %d de %d..." } } }
+    },
+    "Exporting 0 of %d..." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Exportando 0 de %d..." } } }
+    },
+    "Estimated output size %@" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Tamaño de salida estimado %@" } } }
+    },
+    "Extra placement added." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Ubicación adicional agregada." } } }
+    },
+    "Failed: %@." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Falló: %@." } } }
+    },
+    "File size cap set." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Límite de tamaño definido." } } }
+    },
+    "FincaRaiz: 860x482px landscape, max 4.9MB - per fincaraiz.com.co guidance. Quality is an estimate; actual size depends on image content." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "FincaRaiz: 860×482 px horizontal, máximo 4,9 MB, según la guía de fincaraiz.com.co. La calidad es una estimación; el tamaño real depende del contenido de la imagen." } } }
+    },
+    "Format set." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Formato definido." } } }
+    },
+    "Full (75%)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Completo (75%)" } } }
+    },
+    "Full license text" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Texto completo de la licencia" } } }
+    },
+    "Generous (32px)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Amplio (32 px)" } } }
+    },
+    "Ghost (10%)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Fantasma (10%)" } } }
+    },
+    "GIF" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "GIF" } } }
+    },
+    "GIFs" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "GIF" } } }
+    },
+    "Geo or technical data" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Datos geográficos o técnicos" } } }
+    },
+    "Guided" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Guiado" } } }
+    },
+    "Hard to ignore — makes ownership unmistakable." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Difícil de ignorar: deja clara la autoría." } } }
+    },
+    "HEIC was exported as PNG." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "HEIC se exportó como PNG." } } }
+    },
+    "Height" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Alto" } } }
+    },
+    "How much padding from the edge?" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "¿Cuánto margen desde el borde?" } } }
+    },
+    "Images" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Imágenes" } } }
+    },
+    "Instagram square export: 1080x1080 JPEG." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Exportación cuadrada para Instagram: 1080×1080 JPEG." } } }
+    },
+    "Instagram" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Instagram" } } }
+    },
+    "It'll use whatever watermark and settings you had selected last, the same way opening files with WatermarkFactory already works." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Usará la marca de agua y los ajustes que hayas seleccionado la última vez, igual que al abrir archivos con WatermarkFactory." } } }
+    },
+    "JPEG" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "JPEG" } } }
+    },
+    "JPEG quality %d%%" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Calidad JPEG %d%%" } } }
+    },
+    "Just watermark these" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Solo aplicar marca de agua" } } }
+    },
+    "KB" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "KB" } } }
+    },
+    "Keep Original" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Mantener original" } } }
+    },
+    "Large (50%)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Grande (50%)" } } }
+    },
+    "Large, high-opacity, tiled — resists cropping or cloning out. For proofs and preview-only shares." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Grande, de alta opacidad y en mosaico: resiste recortes o clonaciones. Para pruebas y entregas solo de vista previa." } } }
+    },
+    "Layout mode" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Modo de disposición" } } }
+    },
+    "Light" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Claro" } } }
+    },
+    "Loaded preset \"%@\"." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Preajuste \"%@\" cargado." } } }
+    },
+    "Logos or screenshots" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Logos o capturas de pantalla" } } }
+    },
+    "Maybe later" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Quizás después" } } }
+    },
+    "Max file size" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Tamaño máximo" } } }
+    },
+    "Max file size requires JPEG — switch format or clear this limit." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "El tamaño máximo requiere JPEG: cambia el formato o borra este límite." } } }
+    },
+    "Medium (35%)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Mediano (35%)" } } }
+    },
+    "Metrocuadrado: inferred 1600x1200px safe default; no exact official pixel spec published. Quality is an estimate; actual size depends on image content." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Metrocuadrado: valor seguro inferido de 1600×1200 px; no hay una especificación oficial exacta publicada. La calidad es una estimación; el tamaño real depende del contenido de la imagen." } } }
+    },
+    "MIT-style license. Copyright (c) 2006-2013 Andy Matuschak and others." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Licencia estilo MIT. Copyright (c) 2006-2013 Andy Matuschak y otros." } } }
+    },
+    "Next" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Siguiente" } } }
+    },
+    "No" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "No" } } }
+    },
+    "No file size cap set." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Sin límite de tamaño de archivo." } } }
+    },
+    "No limit" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Sin límite" } } }
+    },
+    "No prefix" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Sin prefijo" } } }
+    },
+    "No saved presets." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "No hay preajustes guardados." } } }
+    },
+    "No supported images found in this folder." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "No se encontraron imágenes compatibles en esta carpeta." } } }
+    },
+    "No supported images selected." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "No se seleccionaron imágenes compatibles." } } }
+    },
+    "None (0deg)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Ninguno (0°)" } } }
+    },
+    "Not sure" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "No estoy seguro" } } }
+    },
+    "Noticeable without dominating the photo." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Visible sin dominar la foto." } } }
+    },
+    "Number in current order" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Numerar en el orden actual" } } }
+    },
+    "Number them" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Numerarlas" } } }
+    },
+    "Number these in the order shown, or skip numbering?" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "¿Numerarlas en el orden mostrado u omitir la numeración?" } } }
+    },
+    "Nudge from anchor (optional)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Ajuste desde el ancla (opcional)" } } }
+    },
+    "Off" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Desactivado" } } }
+    },
+    "Opacity" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Opacidad" } } }
+    },
+    "Open Automator" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Abrir Automator" } } }
+    },
+    "Open Automator (Spotlight → “Automator”)." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Abre Automator (Spotlight → “Automator”)." } } }
+    },
+    "Optimize for Web" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Optimizar para web" } } }
+    },
+    "Order & Rename" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Ordenar y renombrar" } } }
+    },
+    "Order & Rename (optional)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Ordenar y renombrar (opcional)" } } }
+    },
+    "Order set." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Orden definido." } } }
+    },
+    "Original" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Original" } } }
+    },
+    "Output size %d×%d px" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Tamaño de salida %d×%d px" } } }
+    },
+    "Output size original" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Tamaño de salida original" } } }
+    },
+    "Overwrite" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Sobrescribir" } } }
+    },
+    "Overwrite preset?" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "¿Sobrescribir preajuste?" } } }
+    },
+    "Padding — distance from that edge" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Margen: distancia desde ese borde" } } }
+    },
+    "Padding — margin around each mark" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Margen: espacio alrededor de cada marca" } } }
+    },
+    "Padding set." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Margen definido." } } }
+    },
+    "Pick a starting style." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Elige un estilo inicial." } } }
+    },
+    "Platform presets" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Preajustes de plataforma" } } }
+    },
+    "PNG" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "PNG" } } }
+    },
+    "Position" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Posición" } } }
+    },
+    "Position & Padding" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Posición y margen" } } }
+    },
+    "Prefix" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Prefijo" } } }
+    },
+    "Preserves the source type where possible; HEIC falls back to PNG. Use this when you are matching an existing delivery workflow." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Conserva el tipo de origen cuando es posible; HEIC pasa a PNG. Úsalo cuando debas respetar un flujo de entrega existente." } } }
+    },
+    "Preset name" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Nombre del preajuste" } } }
+    },
+    "Presets" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Preajustes" } } }
+    },
+    "Previewing with Automality's mark — choose your own watermark to replace it" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Vista previa con la marca de Automality: elige tu propia marca de agua para reemplazarla" } } }
+    },
+    "Print" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Impresión" } } }
+    },
+    "Protective" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Protector" } } }
+    },
+    "Quality (and, if needed, dimensions) will be reduced to fit ~%d KB per image." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "La calidad y, si hace falta, las dimensiones se reducirán para ajustarse a ~%d KB por imagen." } } }
+    },
+    "Ready to export." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Listo para exportar." } } }
+    },
+    "Rotation" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Rotación" } } }
+    },
+    "Saliency was unavailable for this image." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "La saliencia no estuvo disponible para esta imagen." } } }
+    },
+    "Save" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Guardar" } } }
+    },
+    "Save Preset" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Guardar preajuste" } } }
+    },
+    "Save current as preset..." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Guardar actual como preajuste..." } } }
+    },
+    "Save it, naming it something like “Watermark with WatermarkFactory.”" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Guárdala con un nombre como “Marca de agua con WatermarkFactory”." } } }
+    },
+    "Search the actions list for “Open Finder Items” and drag it into the workflow." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Busca “Abrir ítems del Finder” en la lista de acciones y arrástrala al flujo." } } }
+    },
+    "Select Images" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Seleccionar imágenes" } } }
+    },
+    "Select an image to preview." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Selecciona una imagen para previsualizarla." } } }
+    },
+    "Send" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Enviar" } } }
+    },
+    "Set “Open with” to WatermarkFactory." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Define “Abrir con” como WatermarkFactory." } } }
+    },
+    "Set “Workflow receives” to images and folders in Finder." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Define “El flujo recibe” como imágenes y carpetas en Finder." } } }
+    },
+    "Set this up once in Automator, and next time you can right-click a folder or a batch of images in Finder and watermark them straight from there — no need to open WatermarkFactory first." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Configúralo una vez en Automator y, la próxima vez, podrás hacer clic derecho en una carpeta o un lote de imágenes en Finder y aplicarles la marca de agua desde ahí, sin abrir WatermarkFactory primero." } } }
+    },
+    "Single" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Única" } } }
+    },
+    "Single placement kept." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Se mantuvo una sola ubicación." } } }
+    },
+    "Single-frame GIF: simple and widely supported, but limited color and no smooth transparency." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "GIF de un solo cuadro: simple y muy compatible, pero con color limitado y sin transparencia suave." } } }
+    },
+    "Size" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Tamaño" } } }
+    },
+    "Size & Opacity" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Tamaño y opacidad" } } }
+    },
+    "Skip" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Omitir" } } }
+    },
+    "Skip remaining, use defaults" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Omitir lo restante, usar valores predeterminados" } } }
+    },
+    "Small (20%)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Pequeño (20%)" } } }
+    },
+    "Solid (100%)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Sólido (100%)" } } }
+    },
+    "Spacing — gap between tiles" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Espaciado: separación entre mosaicos" } } }
+    },
+    "Subtle" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Sutil" } } }
+    },
+    "Subtle (25%)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Sutil (25%)" } } }
+    },
+    "Subtle corner" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Esquina sutil" } } }
+    },
+    "Suffix" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Sufijo" } } }
+    },
+    "Suggested Placement" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Ubicación sugerida" } } }
+    },
+    "Tell me how you want these watermarked." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Dime cómo quieres aplicar la marca de agua." } } }
+    },
+    "The professional default — visible on inspection, invisible at a glance." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "El valor profesional por defecto: visible al revisar, discreto a primera vista." } } }
+    },
+    "This app's own code, icon, and the Automality design system (AutomalityUI, DesignSystemKit) are original work, not third-party." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "El código propio de esta app, su icono y el sistema de diseño Automality (AutomalityUI, DesignSystemKit) son trabajo original, no de terceros." } } }
+    },
+    "TIFF" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "TIFF" } } }
+    },
+    "Tiled" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Mosaico" } } }
+    },
+    "Tiled brand" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Marca en mosaico" } } }
+    },
+    "Tiny (10%)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Mínimo (10%)" } } }
+    },
+    "Tight (8px)" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Ajustado (8 px)" } } }
+    },
+    "Tint" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Tinte" } } }
+    },
+    "Top-left" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Arriba izquierda" } } }
+    },
+    "Top-right" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Arriba derecha" } } }
+    },
+    "Use only if you need transparency or plan to edit further. Files are much larger, and most listing portals do not need this." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Úsalo solo si necesitas transparencia o planeas editar después. Los archivos son mucho más grandes y la mayoría de portales de anuncios no lo necesitan." } } }
+    },
+    "Watermark" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Marca de agua" } } }
+    },
+    "Watermark All Images" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Aplicar marca de agua a todas" } } }
+    },
+    "Watermark Intensity" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Intensidad de marca de agua" } } }
+    },
+    "Watermark source" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Fuente de marca de agua" } } }
+    },
+    "Watermark style set." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Estilo de marca de agua definido." } } }
+    },
+    "WatermarkFactory is built on the open-source software listed below. Each entry's full license text is included, as required by its terms." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "WatermarkFactory está construido con el software de código abierto listado abajo. Se incluye el texto completo de licencia de cada entrada, como exigen sus términos." } } }
+    },
+    "Web" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Web" } } }
+    },
+    "What kind of images are these?" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "¿Qué tipo de imágenes son?" } } }
+    },
+    "Where are these going?" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "¿A dónde van estas imágenes?" } } }
+    },
+    "Width" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Ancho" } } }
+    },
+    "Working offline — I'll ask a few quick questions instead." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "Trabajando sin conexión: haré unas preguntas rápidas en su lugar." } } }
+    },
+    "-> %@" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "→ %@" } } }
+    },
+    "center" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "centro" } } }
+    },
+    "bottom" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "abajo" } } }
+    },
+    "bottom-left" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "abajo izquierda" } } }
+    },
+    "bottom-right" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "abajo derecha" } } }
+    },
+    "left" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "izquierda" } } }
+    },
+    "right" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "derecha" } } }
+    },
+    "thinking..." : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "pensando..." } } }
+    },
+    "top" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "arriba" } } }
+    },
+    "top-left" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "arriba izquierda" } } }
+    },
+    "top-right" : {
+      "localizations" : { "es" : { "stringUnit" : { "state" : "translated", "value" : "arriba derecha" } } }
+    }
+  },
+  "version" : "1.0"
+}

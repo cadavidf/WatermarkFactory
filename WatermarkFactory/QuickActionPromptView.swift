@@ -13,12 +13,12 @@ struct QuickActionPromptView: View {
     @Binding var isPresented: Bool
 
     private let steps = [
-        "Open Automator (Spotlight → \u{201C}Automator\u{201D}).",
-        "Choose New Document → Quick Action.",
-        "Set \u{201C}Workflow receives\u{201D} to images and folders in Finder.",
-        "Search the actions list for \u{201C}Open Finder Items\u{201D} and drag it into the workflow.",
-        "Set \u{201C}Open with\u{201D} to WatermarkFactory.",
-        "Save it, naming it something like \u{201C}Watermark with WatermarkFactory.\u{201D}"
+        String(localized: "Open Automator (Spotlight → “Automator”)."),
+        String(localized: "Choose New Document → Quick Action."),
+        String(localized: "Set “Workflow receives” to images and folders in Finder."),
+        String(localized: "Search the actions list for “Open Finder Items” and drag it into the workflow."),
+        String(localized: "Set “Open with” to WatermarkFactory."),
+        String(localized: "Save it, naming it something like “Watermark with WatermarkFactory.”")
     ]
 
     var body: some View {

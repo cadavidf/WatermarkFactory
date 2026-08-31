@@ -18,6 +18,7 @@
 		1A0000432B00000000000001 /* AcknowledgementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000442B00000000000001 /* AcknowledgementsView.swift */; };
 		1A00001A2B00000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A00001B2B00000000000001 /* Assets.xcassets */; };
 		1A0000452B00000000000001 /* automality-watermark.png in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000462B00000000000001 /* automality-watermark.png */; };
+		1A00004B2B00000000000001 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 1A00004C2B00000000000001 /* Localizable.xcstrings */; };
 		1A0000202B00000000000001 /* ImageProcessorMetadataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000212B00000000000001 /* ImageProcessorMetadataTests.swift */; };
 		1A0000352B00000000000001 /* IntentParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000362B00000000000001 /* IntentParserTests.swift */; };
 		1A0000472B00000000000001 /* WatermarkIntensityPresetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000482B00000000000001 /* WatermarkIntensityPresetTests.swift */; };
@@ -50,6 +51,7 @@
 		1A00000B2B00000000000001 /* WatermarkFactory.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WatermarkFactory.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1A00001B2B00000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1A0000462B00000000000001 /* automality-watermark.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Resources/automality-watermark.png"; sourceTree = "<group>"; };
+		1A00004C2B00000000000001 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		1A0000212B00000000000001 /* ImageProcessorMetadataTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageProcessorMetadataTests.swift; sourceTree = "<group>"; };
 		1A0000362B00000000000001 /* IntentParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntentParserTests.swift; sourceTree = "<group>"; };
 		1A0000482B00000000000001 /* WatermarkIntensityPresetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatermarkIntensityPresetTests.swift; sourceTree = "<group>"; };
@@ -99,6 +101,7 @@
 				1A0000302B00000000000001 /* SecurityScopedAccessTracker.swift */,
 				1A00001B2B00000000000001 /* Assets.xcassets */,
 				1A0000462B00000000000001 /* automality-watermark.png */,
+				1A00004C2B00000000000001 /* Localizable.xcstrings */,
 				1A0000092B00000000000001 /* Info.plist */,
 				1A00000A2B00000000000001 /* WatermarkFactory.entitlements */,
 			);
@@ -190,6 +193,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				es,
 				Base,
 			);
 			mainGroup = 1A00000D2B00000000000001;
@@ -214,6 +218,7 @@
 			files = (
 				1A00001A2B00000000000001 /* Assets.xcassets in Resources */,
 				1A0000452B00000000000001 /* automality-watermark.png in Resources */,
+				1A00004B2B00000000000001 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

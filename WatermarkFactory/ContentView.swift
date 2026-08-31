@@ -16,11 +16,11 @@ final class AppState: ObservableObject {
 
         var title: String {
             switch self {
-            case .selectImages: "Select Images"
-            case .watermark: "Watermark"
-            case .position: "Position"
-            case .orderRename: "Order & Rename (optional)"
-            case .export: "Export"
+            case .selectImages: String(localized: "Select Images")
+            case .watermark: String(localized: "Watermark")
+            case .position: String(localized: "Position")
+            case .orderRename: String(localized: "Order & Rename (optional)")
+            case .export: String(localized: "Export")
             }
         }
     }
@@ -75,7 +75,7 @@ final class AppState: ObservableObject {
     @Published var watermarkImageSize: CGSize?
     @Published var estimatedSize = ""
     @Published var estimatedFilename = ""
-    @Published var status = "Choose a folder and watermark to begin."
+    @Published var status = String(localized: "Choose a folder and watermark to begin.")
     @Published var progress = 0.0
     @Published var isExporting = false
     @Published var showQuickActionPrompt = false
@@ -84,7 +84,7 @@ final class AppState: ObservableObject {
     @Published var presets: [WatermarkPreset] = []
     @Published var orderedImageURLs: [URL] = [] { didSet { saveImageOrder() } }
     @Published var chatTranscript: [ChatMessage] = [
-        ChatMessage(role: .assistant, text: "Tell me how you want these watermarked.", chips: ["Just watermark these", "Subtle corner", "Centered bold", "Tiled brand"])
+        ChatMessage(role: .assistant, text: String(localized: "Tell me how you want these watermarked."), chips: [String(localized: "Just watermark these"), String(localized: "Subtle corner"), String(localized: "Centered bold"), String(localized: "Tiled brand")])
     ]
 
     enum OpenedURLInput: Equatable {
@@ -122,7 +122,7 @@ final class AppState: ObservableObject {
         return numbered + images.filter { !numberedURLs.contains($0.url) }
     }
     var numberedCount: Int { orderedImageURLs.filter { url in images.contains { $0.url == url } }.count }
-    var orderSummary: String { "\(numberedCount) of \(images.count) images numbered" }
+    var orderSummary: String { String(format: String(localized: "%d of %d images numbered"), numberedCount, images.count) }
     // Governs how far advance(to:) lets navigation jump ahead -- images are
     // a hard requirement (nothing else makes sense without them), but a
     // watermark is not: the Watermark stage's Skip action is a deliberate,
@@ -137,9 +137,9 @@ final class AppState: ObservableObject {
         images.isEmpty ? .selectImages : .export
     }
     var exportHint: String? {
-        if images.isEmpty { return "Choose a folder or images before export." }
-        if watermarkURL == nil { return "Choose a watermark image before export." }
-        if maxFileSizeBlocksExport { return "Max file size requires JPEG — switch format or clear this limit." }
+        if images.isEmpty { return String(localized: "Choose a folder or images before export.") }
+        if watermarkURL == nil { return String(localized: "Choose a watermark image before export.") }
+        if maxFileSizeBlocksExport { return String(localized: "Max file size requires JPEG — switch format or clear this limit.") }
         return nil
     }
     var settings: WatermarkSettings {
@@ -330,7 +330,7 @@ final class AppState: ObservableObject {
         }
         isExporting = true
         progress = 0
-        status = "Exporting 0 of \(images.count)..."
+        status = String(format: String(localized: "Exporting 0 of %d..."), images.count)
         let items = orderedItems
         let settings = settings
         let numberedOrder = Dictionary(uniqueKeysWithValues: orderedImageURLs.enumerated().map { ($0.element, $0.offset + 1) })
@@ -361,7 +361,7 @@ final class AppState: ObservableObject {
                 }
                 await MainActor.run {
                     self.progress = Double(index + 1) / Double(items.count)
-                    self.status = "Exporting \(index + 1) of \(items.count)..."
+                    self.status = String(format: String(localized: "Exporting %d of %d..."), index + 1, items.count)
                 }
             }
             await MainActor.run {
@@ -369,10 +369,10 @@ final class AppState: ObservableObject {
                     NSWorkspace.shared.activateFileViewerSelecting([revealURL])
                 }
                 self.isExporting = false
-                var text = "\(summary.success) of \(items.count) images watermarked, total output size ~\(Self.formatBytes(summary.bytes))."
-                if summary.usedHEICFallback { text += " HEIC was exported as PNG." }
-                if !summary.unmetSizeTarget.isEmpty { text += " \(summary.unmetSizeTarget.count) couldn't reach the max file size target and were shipped at their closest achievable size." }
-                if !summary.failed.isEmpty { text += " Failed: \(summary.failed.joined(separator: ", "))." }
+                var text = String(format: String(localized: "%d of %d images watermarked, total output size ~%@."), summary.success, items.count, Self.formatBytes(summary.bytes))
+                if summary.usedHEICFallback { text += " " + String(localized: "HEIC was exported as PNG.") }
+                if !summary.unmetSizeTarget.isEmpty { text += " " + String(format: String(localized: "%d couldn't reach the max file size target and were shipped at their closest achievable size."), summary.unmetSizeTarget.count) }
+                if !summary.failed.isEmpty { text += " " + String(format: String(localized: "Failed: %@."), summary.failed.joined(separator: ", ")) }
                 self.status = text
                 let succeeded = summary.success == items.count && summary.failed.isEmpty
                 // One-time, after a genuinely successful export -- not
@@ -425,7 +425,7 @@ final class AppState: ObservableObject {
             watermarkAccess.stopAll()
         }
         apply(preset.settings)
-        status = "Loaded preset \"\(preset.name)\"."
+        status = String(format: String(localized: "Loaded preset \"%@\"."), preset.name)
     }
 
     func deletePreset(_ preset: WatermarkPreset) {
@@ -438,7 +438,7 @@ final class AppState: ObservableObject {
         outputHeight = preset.height
         exportFormat = .jpeg
         jpegQuality = preset.jpegQuality
-        status = "Applied \(preset.name) export preset."
+        status = String(format: String(localized: "Applied %@ export preset."), preset.name)
     }
 
     func applyIntentSlots(_ slots: IntentSlots, message: String) {
@@ -458,7 +458,7 @@ final class AppState: ObservableObject {
             await MainActor.run {
                 self.smartPlacementProposal = proposal
                 self.isSuggestingPlacement = false
-                if proposal == nil { self.status = "Could not analyze this image for placement." }
+                if proposal == nil { self.status = String(localized: "Could not analyze this image for placement.") }
             }
         }
     }
@@ -471,7 +471,7 @@ final class AppState: ObservableObject {
         offsetY = proposal.offsetY
         watermarkTint = proposal.tint
         smartPlacementProposal = nil
-        status = "Applied suggested placement."
+        status = String(localized: "Applied suggested placement.")
     }
 
     func dismissSmartPlacement() {
@@ -494,7 +494,7 @@ final class AppState: ObservableObject {
         sourceAccess.replace(with: filtered)
         images = filtered.map(ImageItem.init)
         selected = images.first
-        status = images.isEmpty ? "No supported images selected." : "\(images.count) images selected."
+        status = images.isEmpty ? String(localized: "No supported images selected.") : String(format: String(localized: "%d images selected."), images.count)
         pruneImageOrder()
         saveImageBookmarks()
         advanceIfReady()
@@ -552,7 +552,7 @@ final class AppState: ObservableObject {
             sourceAccess.replace(with: [folderURL] + found)
             images = found.map(ImageItem.init)
             selected = images.first
-            status = images.isEmpty ? "No supported images found in this folder." : "\(images.count) images found."
+            status = images.isEmpty ? String(localized: "No supported images found in this folder.") : String(format: String(localized: "%d images found."), images.count)
             pruneImageOrder()
             saveImageBookmarks()
             advanceIfReady()
@@ -562,7 +562,7 @@ final class AppState: ObservableObject {
             images = []
             selected = nil
             pruneImageOrder()
-            status = "Couldn't access the selected folder. Please re-choose it."
+            status = String(localized: "Couldn't access the selected folder. Please re-choose it.")
         }
     }
 
@@ -630,7 +630,7 @@ final class AppState: ObservableObject {
             images = restoredImages.map(ImageItem.init)
             selected = images.first
             pruneImageOrder()
-            status = "\(images.count) images restored."
+            status = String(format: String(localized: "%d images restored."), images.count)
             updateEstimate()
         }
         advanceIfReady()
@@ -775,7 +775,7 @@ struct ContentView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("A preset named \"\(duplicatePresetName)\" already exists.")
+            Text(String(format: String(localized: "A preset named \"%@\" already exists."), duplicatePresetName))
         }
         .sheet(isPresented: $state.showQuickActionPrompt) {
             QuickActionPromptView(isPresented: $state.showQuickActionPrompt)
@@ -784,7 +784,7 @@ struct ContentView: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: AutomalitySpacing.sm) {
-            AutomalitySegmentedControl(selection: $state.flowMode)
+            AutomalitySegmentedControl(options: FlowMode.allCases, selection: $state.flowMode, label: \.label)
                 .fixedSize()
             if state.flowMode == .guided {
                 AutomalityProgressNav(steps: AppState.Stage.allCases.map(\.title), currentStep: Binding(
@@ -992,7 +992,7 @@ struct ContentView: View {
                             }
                         }
                         if state.images.count > 8 {
-                            Text("+ \(state.images.count - 8) more").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+                            Text(String(format: String(localized: "+ %d more"), state.images.count - 8)).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
                         }
                     }
                     platformPresets
@@ -1104,7 +1104,7 @@ struct ContentView: View {
                 if let url = state.watermarkURL { Thumb(url: url, size: 56) }
             }
             Text("Tint").automalityLabelText().foregroundStyle(AutomalityColor.ink)
-            AutomalitySegmentedControl(selection: $state.watermarkTint) { tint in
+            AutomalitySegmentedControl(options: WatermarkTint.allCases, selection: $state.watermarkTint, label: \.label) { tint in
                 AnyView(tintSwatch(tint))
             }
             // Smart Placement ("Suggest Placement") is disabled for this
@@ -1194,7 +1194,7 @@ struct ContentView: View {
 
     private var layoutModeSection: some View {
         ControlSection("Layout mode") {
-            AutomalitySegmentedControl(selection: $state.layoutMode)
+            AutomalitySegmentedControl(options: LayoutMode.allCases, selection: $state.layoutMode, label: \.label)
         }
     }
 
@@ -1226,7 +1226,7 @@ struct ContentView: View {
     private var exportSection: some View {
         ControlSection("Export") {
             Text("Export format").automalityLabelText().foregroundStyle(AutomalityColor.ink)
-            AutomalitySegmentedControl(selection: $state.exportFormat)
+            AutomalitySegmentedControl(options: ExportFormat.allCases, selection: $state.exportFormat, label: \.label)
             Toggle("Optimize for Web", isOn: Binding(get: { state.optimizeForWeb }, set: { state.setOptimizeForWeb($0) }))
                 .toggleStyle(.automality)
             HStack(spacing: 8) {
@@ -1235,7 +1235,7 @@ struct ContentView: View {
                 TextField("Height", value: $state.outputHeight, format: .number)
                     .textFieldStyle(.automalityData)
             }
-            Text(state.outputWidth > 0 && state.outputHeight > 0 ? "Output size \(state.outputWidth)x\(state.outputHeight) px" : "Output size original").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+            Text(state.outputWidth > 0 && state.outputHeight > 0 ? String(format: String(localized: "Output size %d×%d px"), state.outputWidth, state.outputHeight) : String(localized: "Output size original")).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             HStack(spacing: 8) {
                 TextField("Prefix", text: Binding(get: { state.outputPrefix }, set: { state.outputPrefix = AppState.sanitizedFilenameAffix($0) }))
                     .textFieldStyle(.automality)
@@ -1244,7 +1244,7 @@ struct ContentView: View {
             }
             if state.exportFormat == .jpeg {
                 AutomalitySlider(value: $state.jpegQuality, in: 0...1)
-                Text("JPEG quality \(Int(state.jpegQuality * 100))%").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+                Text(String(format: String(localized: "JPEG quality %d%%"), Int(state.jpegQuality * 100))).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             }
             Text(state.exportFormat.hint).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             HStack(spacing: 8) {
@@ -1259,15 +1259,15 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundStyle(AutomalityColor.orangeDeep)
             } else if state.maxFileSizeKB > 0 {
-                Text("Quality (and, if needed, dimensions) will be reduced to fit ~\(state.maxFileSizeKB) KB per image.")
+                Text(String(format: String(localized: "Quality (and, if needed, dimensions) will be reduced to fit ~%d KB per image."), state.maxFileSizeKB))
                     .font(.caption)
                     .foregroundStyle(AutomalityColor.inkMuted)
             }
             if !state.estimatedSize.isEmpty {
-                Text("Estimated output size \(state.estimatedSize)").font(.caption)
+                Text(String(format: String(localized: "Estimated output size %@"), state.estimatedSize)).font(.caption)
             }
             if !state.estimatedFilename.isEmpty {
-                Text("-> \(state.estimatedFilename)").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+                Text(String(format: String(localized: "-> %@"), state.estimatedFilename)).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             }
             Button("Watermark All Images") { state.exportAll() }
                 .buttonStyle(.automalityPrimary)
@@ -1470,7 +1470,7 @@ struct ContentView: View {
             AutomalitySlider(value: $state.spacing, in: 0...400)
             Text("\(Int(state.spacing)) px").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
             Picker("Rotation", selection: $state.rotationPattern) {
-                ForEach(RotationPattern.allCases) { Text($0.rawValue).tag($0) }
+                ForEach(RotationPattern.allCases) { Text($0.label).tag($0) }
             }
             if state.rotationPattern == .custom {
                 TextField("Degrees", value: $state.customAngle, format: .number)
@@ -1546,7 +1546,7 @@ struct ControlSection<Content: View>: View {
     @ViewBuilder var content: Content
 
     init(_ title: String, @ViewBuilder content: () -> Content) {
-        self.title = title
+        self.title = String(localized: String.LocalizationValue(title))
         self.content = content()
     }
 
