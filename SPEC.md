@@ -847,3 +847,132 @@ not built by scripting Automator.app's UI)
   something XCTest can verify — note in your summary that it needs a
   manual right-click check in Finder, don't claim automated coverage of it.
 - This is additive — no existing functional behavior changes.
+
+## Chat flow mode — intent-driven Q&A over local Ollama (Phase 1 of 2)
+
+Adds a third `FlowMode` — `.chat` — alongside Guided/Compact. Instead of
+navigating stages via buttons, the user types what they want in plain
+language ("watermark bottom right, subtle, for instagram") into a left-hand
+chat panel; a local Ollama model maps that to `AppState` settings and the
+app asks a follow-up question for whatever wasn't covered. This is
+**intent-first, not button-first**: the app should propose a good default
+branch of the settings tree for vague/short answers, while every control
+Guided/Compact expose stays reachable for exact custom values — chat must
+never be the only way to reach a setting.
+
+Voice is explicitly out of scope for this phase (text only) — design the
+input as a single `TextField`/`TextEditor` so a future voice-to-text layer
+is a drop-in replacement for how the text arrives, not a UI redesign.
+**An MCP server (a separate process letting an external agent like Claude
+drive the app) is Phase 2 — do not build it in this pass.** This phase is
+the in-app chat wizard only.
+
+### Model: `IntentParser`
+
+New file `WatermarkFactory/IntentParser.swift`. A small async service, not
+a general chat client — it exists to map one free-text message plus "what
+slots are still unanswered" into structured `AppState` updates.
+
+```swift
+struct IntentSlots: Codable {
+    var anchor: String?          // one of Anchor.allCases rawValue, or "tiled"
+    var sizeFraction: Double?    // 0.05...0.6
+    var opacity: Double?         // 0...1
+    var tint: String?            // WatermarkTint rawValue
+    var exportPlatform: String?  // "instagram" | "web" | "print" | "original"
+    var renamePrefix: String?
+    var needsClarification: [String]  // slot names the model could not infer
+    var assistantReply: String        // one short sentence to show back to the user
+}
+```
+
+- Call `POST http://localhost:11434/api/chat` with `model: "gpt-oss:20b"`,
+  `stream: false`, `think: false` (per this project's known-good pattern —
+  `gemma4:26b`/`gemma3` chat is broken on this machine, see
+  `~/bin/check-ollama`; `gpt-oss:20b` is confirmed working via a manual
+  `curl` test this session). Read `message.content` — ignore/discard any
+  `message.thinking` field if present.
+- System prompt: enumerate the slot names above, their valid values (pull
+  straight from `Anchor`, `WatermarkTint`, etc.'s `CaseIterable` cases so
+  the prompt can't drift out of sync with the real enums), and instruct the
+  model to reply with **only** a JSON object matching `IntentSlots` — no
+  prose outside the JSON. Decode with `JSONDecoder`; if decoding fails,
+  treat it as "could not parse" (see fallback below), don't crash or retry
+  silently more than once.
+- **Offline/unreachable fallback is required, not optional**: if Ollama
+  isn't running or the request errors/times out (use a real timeout, e.g.
+  10s — cold model load was ~10s in this session's test, budget for that
+  once then assume warm), fall back to the existing scripted one-question-
+  at-a-time flow (a fixed `[ChatQuestion]` array walked in order, each with
+  quick-reply chips, no NLP) rather than leaving the user stuck. Surface
+  this in the transcript once ("Working offline — I'll ask a few quick
+  questions instead.") not as a silent degradation.
+
+### Preset branches (the "good default" tree)
+
+A small table of named presets the parser/UI can suggest for common intents
+— each preset is just a bundle of the same `AppState` values Guided/Compact
+already set, nothing new at the settings layer:
+
+- `cornerSubtle` — anchor `.bottomRight`, size 0.18, opacity 0.5, tint
+  `.original` — the default when intent is vague ("just watermark these").
+- `centeredBold` — anchor `.center`, size 0.35, opacity 0.85.
+- `tiledBrand` — `layoutMode = .tiled`, rotation `.diagonal`, spacing 80.
+- Platform → export mapping: `instagram`→ existing Instagram preset in
+  `platformPresets`, `web`→`optimizeForWeb = true`, `print`→ `.tiff`/no
+  size cap, `original`→ `exportFormat = .keepOriginal`.
+
+When the parser returns a slot as `nil` (not mentioned and not inferable),
+apply the matching preset default rather than leaving the setting at
+whatever it happened to be — the whole point is one deliberate default
+branch, not silent inheritance of stale state from a previous session.
+
+### UI: `ChatFlowView`
+
+New file `WatermarkFactory/ChatFlowView.swift`, wired into `ContentView`'s
+`stageContent`/mode switch as a full left-hand panel (mirrors where
+`compactContent`'s image list column sits — chat replaces that column,
+`previewPane` stays on the right, unchanged).
+
+- Scrolling transcript: assistant bubbles (question/confirmation text) and
+  user bubbles (what they typed or which chip they tapped), oldest to
+  newest, auto-scrolls to bottom on new message.
+- Each assistant bubble that's still awaiting an answer shows the relevant
+  quick-reply chips inline (`AutomalityChipStyle`, matching Guided's visual
+  language) **and** a "Customize…" disclosure that expands the actual
+  underlying control (the 9-grid, the opacity slider, etc. — reuse the
+  existing `positionPaddingSection`/`sizeOpacitySection` view pieces rather
+  than rebuilding them) for anyone who wants an exact value instead of a
+  preset.
+- Bottom-anchored text input + "Send" button (`.automalityAccent` — this is
+  the flow's one continue action, consistent with the Next-button fix
+  earlier this session). While a request is in flight, show a lightweight
+  "thinking…" state on the send button (disabled, not a full-screen
+  spinner) — first real request can take ~10s (cold model load).
+- Once every slot has an answer (or the user explicitly says "just export"/
+  taps a "Skip remaining, use defaults" chip), advance to the Export stage
+  exactly like Guided mode's Next button does — don't build a parallel
+  export path.
+
+### `AppState`/`Models.swift` changes
+- Add `case chat = "Chat"` to `FlowMode`.
+- Add a `chatTranscript: [ChatMessage]` published property (`ChatMessage`:
+  `id`, `role` (.assistant/.user), `text`, optional `chips: [String]`) so
+  the transcript survives stage navigation within a session (not persisted
+  across launches — this is working conversation state, not a setting).
+
+### Verification
+- Unit-test `IntentParser`'s JSON-decoding path with fixed sample model
+  output strings (both well-formed and malformed) — this doesn't need a
+  live Ollama call to test the parsing/fallback logic, only the actual
+  network call itself is manual/live-only.
+- Unit-test the preset-application logic (`cornerSubtle` etc. → correct
+  `AppState` values) as a pure function, same pattern as existing
+  `ImageProcessorMetadataTests`.
+- `WatermarkFactoryTests` must still pass in full (currently 15 tests) —
+  this is additive, don't touch existing Guided/Compact code paths.
+- Manual verification only for: an actual live chat exchange against
+  Ollama, and the offline-fallback path with Ollama stopped — note in the
+  summary that these need a human to actually run the app, same caveat as
+  this file's Quick-Action section above.
+
