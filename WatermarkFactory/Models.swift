@@ -583,6 +583,28 @@ struct RecentFolder: Identifiable, Codable, Equatable {
     var lastUsed: Date
 }
 
+/// One completed batch export -- the source folder, watermark, and settings
+/// that produced it. Recorded once per `exportAll()` run (batch-level, not
+/// per file), since "redo this" and "swap the logo" are batch-level asks in
+/// practice: a whole shoot exported with the wrong logo or the wrong
+/// settings, not one photo at a time. Bookmarks so this stays resolvable
+/// across launches, same pattern as RecentFolder/WatermarkPreset. Being able
+/// to reload a past batch and re-export from its own untouched original
+/// means "redo it" or "swap the watermark" never has to touch
+/// already-watermarked pixels, or need a separate watermark-removal step at
+/// all when the original is still there.
+struct ExportHistoryEntry: Identifiable, Codable {
+    var id = UUID()
+    var folderName: String
+    var folderBookmark: Data
+    var watermarkName: String
+    var watermarkBookmark: Data
+    var settings: WatermarkSettings
+    var imageCount: Int
+    var succeededCount: Int
+    var date: Date
+}
+
 struct PlatformExportPreset: Identifiable {
     let id: String
     let name: String

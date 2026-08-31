@@ -90,6 +90,7 @@ final class AppState: ObservableObject {
     @Published var smartPlacementProposal: SmartPlacementProposal?
     @Published var presets: [WatermarkPreset] = []
     @Published var recentFolders: [RecentFolder] = []
+    @Published var exportHistory: [ExportHistoryEntry] = []
     @Published var orderedImageURLs: [URL] = [] { didSet { saveImageOrder() } }
     @Published var chatTranscript: [ChatMessage] = [
         ChatMessage(role: .assistant, text: String(localized: "Tell me how you want these watermarked."), chips: [String(localized: "Just watermark these"), String(localized: "Subtle corner"), String(localized: "Centered bold"), String(localized: "Tiled brand")])
@@ -341,6 +342,7 @@ final class AppState: ObservableObject {
         status = String(format: String(localized: "Exporting 0 of %d..."), images.count)
         let items = orderedItems
         let settings = settings
+        let sourceFolder = folderURL
         let numberedOrder = Dictionary(uniqueKeysWithValues: orderedImageURLs.enumerated().map { ($0.element, $0.offset + 1) })
         let numberedCount = numberedCount
         Task.detached {
@@ -385,6 +387,7 @@ final class AppState: ObservableObject {
                 if !summary.unmetSizeTarget.isEmpty { text += " " + String(format: String(localized: "%d couldn't reach the max file size target and were shipped at their closest achievable size."), summary.unmetSizeTarget.count) }
                 if !summary.failed.isEmpty { text += " " + String(format: String(localized: "Failed: %@."), summary.failed.joined(separator: ", ")) }
                 self.status = text
+                self.recordExportHistory(folder: sourceFolder, watermark: watermark, settings: settings, imageCount: items.count, succeededCount: summary.success)
                 let succeeded = summary.success == items.count && summary.failed.isEmpty
                 // Quick Action prompt is disabled for this release -- pulled
                 // per request. The underlying QuickActionPromptView and
@@ -530,6 +533,67 @@ final class AppState: ObservableObject {
         recentFolders = decoded
     }
 
+    /// Records one completed batch, so it can be redone later from its own
+    /// untouched original -- "redo with different settings" or "swap in the
+    /// new logo" without ever needing to know where the source folder was,
+    /// or reprocess an already-watermarked file. Individual-file selections
+    /// (no common folder) aren't recorded: there's no single folder to
+    /// reload from, and re-picking a handful of loose files by hand isn't
+    /// meaningfully harder than re-adding them here.
+    private func recordExportHistory(folder: URL?, watermark: URL, settings: WatermarkSettings, imageCount: Int, succeededCount: Int) {
+        guard let folder,
+              let folderBookmark = bookmarkData(for: folder),
+              let watermarkBookmark = bookmarkData(for: watermark) else { return }
+        let entry = ExportHistoryEntry(
+            folderName: folder.lastPathComponent,
+            folderBookmark: folderBookmark,
+            watermarkName: watermark.lastPathComponent,
+            watermarkBookmark: watermarkBookmark,
+            settings: settings,
+            imageCount: imageCount,
+            succeededCount: succeededCount,
+            date: Date()
+        )
+        exportHistory.insert(entry, at: 0)
+        exportHistory = Array(exportHistory.prefix(20))
+        saveExportHistory()
+    }
+
+    /// Reloads a past batch's source folder, watermark, and settings exactly
+    /// as they were -- the normal flow (adjust settings, or pick a different
+    /// watermark via Choose Watermark..., then Export) picks up from there,
+    /// starting from the untouched original rather than an already-
+    /// watermarked file.
+    func redoFromHistory(_ entry: ExportHistoryEntry) {
+        var stale = false
+        guard let folder = try? URL(resolvingBookmarkData: entry.folderBookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale) else {
+            status = String(localized: "That folder is no longer available (moved, deleted, or permission revoked).")
+            exportHistory.removeAll { $0.id == entry.id }
+            saveExportHistory()
+            return
+        }
+        guard let watermark = try? URL(resolvingBookmarkData: entry.watermarkBookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale) else {
+            status = String(localized: "That watermark file is no longer available (moved, deleted, or permission revoked).")
+            return
+        }
+        setFolder(folder)
+        setWatermark(watermark)
+        apply(entry.settings)
+        status = String(format: String(localized: "Reloaded \"%@\" with the settings from that batch. Adjust anything you need, then Watermark All Images."), entry.folderName)
+    }
+
+    private func saveExportHistory() {
+        if let data = try? JSONEncoder().encode(exportHistory) {
+            defaults.set(data, forKey: "exportHistory")
+        }
+    }
+
+    private func restoreExportHistory() {
+        guard let data = defaults.data(forKey: "exportHistory"),
+              let decoded = try? JSONDecoder().decode([ExportHistoryEntry].self, from: data) else { return }
+        exportHistory = decoded
+    }
+
     private func setImages(_ urls: [URL]) {
         folderURL = nil
         defaults.set(true, forKey: "usedIndividualImages")
@@ -634,6 +698,7 @@ final class AppState: ObservableObject {
     private func restore() {
         restorePresets()
         restoreRecentFolders()
+        restoreExportHistory()
         flowMode = FlowMode(rawValue: defaults.string(forKey: "flowMode") ?? "") ?? .guided
         if defaults.object(forKey: "sizeFraction") != nil { sizeFraction = defaults.double(forKey: "sizeFraction") }
         if defaults.object(forKey: "opacity") != nil { opacity = defaults.double(forKey: "opacity") }
@@ -1084,6 +1149,20 @@ struct ContentView: View {
             }
             if let folder = state.folderURL {
                 Text(folder.lastPathComponent).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+            }
+            // Reloads a past batch's folder, watermark, and settings exactly
+            // as they were -- for redoing a mis-applied watermark or
+            // swapping in a new logo without needing to know where the
+            // original folder was, or touch an already-watermarked file.
+            if !state.exportHistory.isEmpty {
+                Text("Redo a past batch").automalityLabelText().foregroundStyle(AutomalityColor.ink)
+                FlowLayout {
+                    ForEach(state.exportHistory) { entry in
+                        Button("\(entry.folderName) \u{2190} \(entry.watermarkName)") { state.redoFromHistory(entry) }
+                            .buttonStyle(.automalityChip(isSelected: false))
+                            .help(String(format: String(localized: "%d of %d images, %@"), entry.succeededCount, entry.imageCount, entry.date.formatted(date: .abbreviated, time: .shortened)))
+                    }
+                }
             }
         }
     }
