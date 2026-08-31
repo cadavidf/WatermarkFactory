@@ -1153,3 +1153,75 @@ its existing JSON-decoding/preset tests should still pass unchanged since
   refactor for that testability if it doesn't already).
 - All existing tests (23 as of Phase 1b) must still pass.
 
+
+## Phase 3: Quick Tasks — crop/resize and package, no watermark, no LLM
+
+**Do not start this phase until Phase 2 is merged and verified** — both
+touch the same core files and running concurrently will corrupt each
+other's edits.
+
+Not everyone opening this app wants to watermark anything — some just need
+an image cropped/resized to fit somewhere, or a folder of already-processed
+images bundled into one file to attach/upload. Forcing those people through
+watermark-flavored questions (or, worse, an LLM chat) is exactly the wrong
+shape. This phase adds a lightweight, deterministic path that needs no
+model at all.
+
+### Top-level goal picker
+Before `flowMode` (Guided/Compact/Chat), add a `WorkflowGoal` choice shown
+once per session on Select Images: **Watermark** / **Crop or resize** /
+**Just package what I have**. Watermark keeps every existing behavior
+completely unchanged (this is additive, not a restructuring of the current
+flow). The other two skip straight past all watermark-related
+sections (`watermarkSourceSection`, `sizeOpacitySection`,
+`positionPaddingSection`, layout/tiling) — those views simply aren't shown,
+not disabled/greyed.
+
+### Crop/resize (freeform drag tool)
+- New `CropOverlayView`: a draggable, resizable rectangle over
+  `previewPane`'s image, with corner/edge drag handles. Aspect ratio: free
+  by default, with quick-lock chips (1:1, 4:5, 16:9, "Custom WxH" text
+  entry) — reuse `AutomalityChipStyle` for consistency with the rest of the
+  app.
+- The crop applies as one **normalized rect** (0...1 in both axes, not
+  pixels) stored once and applied identically to every image in the batch
+  by default — this is a batch tool, re-asking per image defeats the
+  "fewer questions" goal. Add a small per-thumbnail "Adjust this one..."
+  affordance in the image list for the person who does need one exception,
+  rather than a mandatory per-image step.
+- `WatermarkSettings` gains `var cropRect: CGRect?` (nil = no crop, default
+  everywhere else). In `ImageProcessor`, apply
+  `source.cropping(to: pixelRect)` (CGImage's native crop, translate the
+  normalized rect to that image's actual pixel dimensions) as the very
+  first step in `export`/`compose`, before anything else — so if this goal
+  is later combined with watermarking, watermark placement is relative to
+  the cropped result, not the original frame.
+
+### Output packaging (a new shared final step — applies to ANY goal)
+After the existing per-file export completes (unchanged), offer one
+additional choice, not gated to Crop/Package goals — useful after
+watermarking too: **Individual files** (today's only behavior, stays
+default) / **.zip** / **PDF, one image per page**.
+- `.zip`: shell out via `Process` to `/usr/bin/zip -r -q <output>.zip
+  <exported files>` (present on every Mac, no new dependency) rather than
+  linking Apple's Archive framework for one call site — simpler, and this
+  is a one-shot batch operation, not something needing streaming/progress.
+- PDF: build with `CGContext(consumer:...)`'s native PDF page support —
+  one page per image, page size set to exactly that image's pixel
+  dimensions (points = pixels at 72dpi is fine for this use case; note in
+  code that this isn't print-resolution-accurate, it's "fits without
+  cropping or letterboxing," which is what "just needs them to fit
+  somewhere" actually means) so nothing is cropped or padded.
+
+### Verification
+- Unit test crop-rect-to-pixel-rect translation (a pure function, several
+  image dimensions × normalized rects).
+- Unit test the zip/PDF packaging functions against a small set of fixture
+  images already in the test target (reuse whatever
+  `ImageProcessorMetadataTests` already sets up) — verify the produced
+  .zip contains the expected file count/names (`Foundation`'s `URL`-based
+  zip inspection, or shell `unzip -l` via `Process` in the test itself if
+  simpler) and the PDF has the expected page count
+  (`PDFDocument(url:)?.pageCount` from PDFKit).
+- All prior tests must still pass.
+
