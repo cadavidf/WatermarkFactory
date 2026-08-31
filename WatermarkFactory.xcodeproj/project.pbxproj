@@ -18,6 +18,7 @@
 		1A0000202B00000000000001 /* ImageProcessorMetadataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000212B00000000000001 /* ImageProcessorMetadataTests.swift */; };
 		1A0000352B00000000000001 /* IntentParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000362B00000000000001 /* IntentParserTests.swift */; };
 		1A00002C2B00000000000001 /* AutomalityUI in Frameworks */ = {isa = PBXBuildFile; productRef = 1A00002E2B00000000000001 /* AutomalityUI */; };
+		1A0000402B00000000000001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 1A0000412B00000000000001 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -53,6 +54,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1A00002C2B00000000000001 /* AutomalityUI in Frameworks */,
+				1A0000402B00000000000001 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -130,6 +132,7 @@
 			productReference = 1A00000B2B00000000000001 /* WatermarkFactory.app */;
 			packageProductDependencies = (
 				1A00002E2B00000000000001 /* AutomalityUI */,
+				1A0000412B00000000000001 /* Sparkle */,
 			);
 			productType = "com.apple.product-type.application";
 		};
@@ -180,6 +183,7 @@
 			mainGroup = 1A00000D2B00000000000001;
 			packageReferences = (
 				1A00002D2B00000000000001 /* XCLocalSwiftPackageReference "../AutomalityUI" */,
+				1A0000422B00000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			productRefGroup = 1A00000F2B00000000000001 /* Products */;
 			projectDirPath = "";
@@ -477,11 +481,27 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		1A0000422B00000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.6;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		1A00002E2B00000000000001 /* AutomalityUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 1A00002D2B00000000000001 /* XCLocalSwiftPackageReference "../AutomalityUI" */;
 			productName = AutomalityUI;
+		};
+		1A0000412B00000000000001 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1A0000422B00000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

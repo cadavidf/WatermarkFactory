@@ -39,5 +39,11 @@
 	<string></string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/cadavidf/WatermarkFactory/main/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>x54VxRe72WT/X1VDTxo59qP2dp0bc2Z6ghpcsyyRCWs=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 </dict>
 </plist>
