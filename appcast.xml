@@ -3,6 +3,21 @@
     <channel>
         <title>WatermarkFactory</title>
         <item>
+            <title>1.2.6</title>
+            <pubDate>Mon, 31 Aug 2026 14:53:31 -0500</pubDate>
+            <sparkle:version>19</sparkle:version>
+            <sparkle:shortVersionString>1.2.6</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <ul>
+                    <li>Fixed missing automality.com attribution on JPEG exports (the TIFF Software/Artist tags were silently dropped by ImageIO for that format; added a working carrier via EXIF).</li>
+                    <li>New Location metadata control in Export settings: remove GPS entirely, reduce it to ~1km precision, or keep exact coordinates. Original/hidden metadata (camera info, AI-generation descriptions, embedded thumbnails) was already always removed -- this only affects GPS specifically.</li>
+                    <li>New headless CLI (wf-metadata) for scripting the same watermark/resize/metadata-privacy pipeline without opening the app.</li>
+                </ul>
+            ]]></description>
+            <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.2.6/WatermarkFactory.dmg" length="2401870" type="application/octet-stream" sparkle:edSignature="ZubACjF1R7P/gHrEdrRfI0XiFYgdFOViLmptGsCxtR2PQZlkyXIN3BLeuSEBJg1p4sxpMHJ6RJGmNuLzgCcbDQ=="/>
+        </item>
+        <item>
             <title>1.2.5</title>
             <pubDate>Mon, 31 Aug 2026 13:50:11 -0500</pubDate>
             <sparkle:version>18</sparkle:version>
@@ -27,20 +42,6 @@
                 </ul>
             ]]></description>
             <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.2.4/WatermarkFactory.dmg" length="2392474" type="application/octet-stream" sparkle:edSignature="/6Gy9/o6J6RuggdaVBpruA3LNxeoRtHrikNanBykAprlxZt0hk+HImvgPFs4nVkToZQD3CuA3DDPnPwEOYRkBg=="/>
-        </item>
-        <item>
-            <title>1.2.3</title>
-            <pubDate>Mon, 31 Aug 2026 12:11:48 -0500</pubDate>
-            <sparkle:version>16</sparkle:version>
-            <sparkle:shortVersionString>1.2.3</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <description><![CDATA[
-                <ul>
-                    <li>Added Recent folders to Select Images -- reselect a folder you've used before in one click instead of reopening the picker.</li>
-                    <li>Removed the Finder Quick Action prompt for this release (deferred, not deleted).</li>
-                </ul>
-            ]]></description>
-            <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.2.3/WatermarkFactory.dmg" length="2393111" type="application/octet-stream" sparkle:edSignature="7EFmG9tRI5N16mKUI7IaN5IKvq4TJkSmam7yoDCmTbPjGf0+POOFrGG9UWSCv4+YXUPWPG5Wntvkj2RPPB3AAg=="/>
         </item>
         <item>
             <title>1.1.2</title>
