@@ -3,6 +3,19 @@
     <channel>
         <title>WatermarkFactory</title>
         <item>
+            <title>1.1.3</title>
+            <pubDate>Mon, 31 Aug 2026 10:47:06 -0500</pubDate>
+            <sparkle:version>6</sparkle:version>
+            <sparkle:shortVersionString>1.1.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <ul>
+                    <li>Fixed a real bug: every release since v1.0.0 shipped Apple-Silicon-only despite the downloads page always claiming a universal build. xcodebuild's plain build command was silently constraining to the host architecture regardless of the ARCHS setting -- switched the release process to xcodebuild archive, which respects it correctly. This is the first genuinely universal (Intel + Apple Silicon) build.</li>
+                </ul>
+            ]]></description>
+            <enclosure url="https://github.com/cadavidf/WatermarkFactory/releases/download/v1.1.3/WatermarkFactory.dmg" length="2266454" type="application/octet-stream" sparkle:edSignature="2diuzLjbxw5EFIYQzKop7mzNY3D1oRBB/ZGxgG/UIhftyTdwcpXRzR/DIMtqSlkBkRdNXZwzS5rmldWNSMwLDg=="/>
+        </item>
+        <item>
             <title>1.1.2</title>
             <pubDate>Mon, 31 Aug 2026 10:19:19 -0500</pubDate>
             <sparkle:version>5</sparkle:version>
