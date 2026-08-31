@@ -39,7 +39,12 @@ roof = {
     3: range(1, 8),
 }
 body_rows = range(4, 9)
-window_cell = (6, 3)  # (row, col) within the body — one square, one accent.
+window_cell = (5, 1)  # (row, col) within the body — one square, one accent.
+# door: a rectangular opening with an arched top, cut into the base of the
+# house (background shows through) — distinct from the window, so it must
+# not overlap it.
+door_cols = range(3, 6)  # 3 cells wide, centered on the 9-wide body
+door_rows = range(6, 9)  # bottom 3 rows, flush with the house's base
 
 margin = 140
 grid_w = SIZE - margin * 2
@@ -85,6 +90,29 @@ for row in body_rows:
     for col in range(COLS):
         is_window = (row, col) == window_cell
         draw_cell(row, col, ORANGE if is_window else OFF_WHITE)
+
+# --- carve the door: a rectangular opening with an arched top, cut through
+# the house blocks so the dark background shows through, like a real
+# doorway. This is the one deliberate curve in an otherwise all-square icon.
+door_x0 = origin_x + door_cols.start * cell
+door_x1 = origin_x + door_cols.stop * cell
+door_y0 = origin_y + door_rows.start * cell
+door_y1 = origin_y + door_rows.stop * cell
+door_width = door_x1 - door_x0
+door_radius = door_width // 2
+door_straight_y0 = door_y0 + door_radius  # where the arch meets the jambs
+
+# jambs: a plain rectangle for the straight-sided lower portion
+draw.rectangle([door_x0, door_straight_y0, door_x1, door_y1], fill=TEAL_DEEP)
+draw.line([door_x0, door_straight_y0, door_x0, door_y1], fill=INK, width=border)
+draw.line([door_x1, door_straight_y0, door_x1, door_y1], fill=INK, width=border)
+
+# arch: a half-circle capping the top of the doorway
+draw.pieslice(
+    [door_x0, door_y0, door_x1, door_y0 + door_radius * 2],
+    180, 360,
+    fill=TEAL_DEEP, outline=INK, width=border,
+)
 
 # re-apply the rounded-square canvas mask on top of everything
 img = Image.composite(img, Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0)), mask)
