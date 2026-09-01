@@ -28,6 +28,10 @@ final class AppState: ObservableObject {
     @Published var flowMode: FlowMode = .guided { didSet { defaults.set(flowMode.rawValue, forKey: "flowMode") } }
     @Published var folderURL: URL?
     @Published var watermarkURL: URL?
+    // Compact mode's "Watermark not uploaded yet" prompt (Upload Watermark /
+    // Compress Only), shown when Watermark All Images is tapped with no
+    // watermark chosen -- see watermarkAllTapped() below.
+    @Published var showWatermarkMissingPrompt = false
     @Published var images: [ImageItem] = []
     @Published var selected: ImageItem?
     @Published var stage: Stage = .selectImages
@@ -125,6 +129,20 @@ final class AppState: ObservableObject {
         maxFileSizeKB > 0 && (exportFormat == .png || exportFormat == .tiff)
     }
     var canExport: Bool { watermarkURL != nil && !images.isEmpty && !isExporting && !maxFileSizeBlocksExport }
+    // Compact mode's always-visible Watermark All Images button stays
+    // enabled even without a watermark chosen yet -- tapping it without one
+    // opens the "Watermark not uploaded yet" prompt (Upload Watermark /
+    // Compress Only) instead of just sitting there disabled and unexplained.
+    var canTapWatermarkAll: Bool { !images.isEmpty && !isExporting && !maxFileSizeBlocksExport }
+
+    func watermarkAllTapped() {
+        guard canTapWatermarkAll else { return }
+        if watermarkURL != nil {
+            exportAll()
+        } else {
+            showWatermarkMissingPrompt = true
+        }
+    }
     var orderedItems: [ImageItem] {
         let numbered = orderedImageURLs.compactMap { url in images.first { $0.url == url } }
         let numberedURLs = Set(orderedImageURLs)
@@ -332,8 +350,15 @@ final class AppState: ObservableObject {
         }
     }
 
-    func exportAll(completion: ((Bool) -> Void)? = nil) {
-        guard let watermark = watermarkURL else {
+    /// `compressOnly: true` skips watermark compositing entirely (resize/
+    /// format/quality/max-size and metadata stripping still apply) -- the
+    /// path behind compact mode's "Compress Only" choice when someone taps
+    /// Watermark All Images before picking a watermark, so they aren't
+    /// blocked from exporting at all. Without it, a nil watermarkURL still
+    /// refuses to run, same as before.
+    func exportAll(compressOnly: Bool = false, completion: ((Bool) -> Void)? = nil) {
+        let watermark = watermarkURL
+        guard compressOnly || watermark != nil else {
             completion?(false)
             return
         }
@@ -348,10 +373,10 @@ final class AppState: ObservableObject {
         Task.detached {
             var summary = ExportSummary(success: 0, failed: [], bytes: 0, usedHEICFallback: false)
             var usedOutputURLs = Set<URL>()
-            let watermarkAccess = watermark.startAccessingSecurityScopedResource()
+            let watermarkAccess = watermark?.startAccessingSecurityScopedResource() ?? false
             var revealURL: URL?
             defer {
-                if watermarkAccess { watermark.stopAccessingSecurityScopedResource() }
+                if watermarkAccess { watermark?.stopAccessingSecurityScopedResource() }
             }
             for (index, item) in items.enumerated() {
                 let access = item.url.startAccessingSecurityScopedResource()
@@ -360,7 +385,12 @@ final class AppState: ObservableObject {
                     let output = item.url.deletingLastPathComponent().appendingPathComponent("Watermarked", isDirectory: true)
                     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
                     let outputURL = ImageProcessor.uniqueOutputURL(for: item.url, outputFolder: output, settings: settings, order: numberedOrder[item.url], numberedCount: numberedCount, usedURLs: &usedOutputURLs)
-                    let result = try ImageProcessor.export(sourceURL: item.url, watermarkURL: watermark, outputURL: outputURL, settings: settings)
+                    let result: (url: URL, bytes: Int, usedHEICFallback: Bool, metSizeTarget: Bool)
+                    if compressOnly || watermark == nil {
+                        result = try ImageProcessor.compressOnly(sourceURL: item.url, outputURL: outputURL, settings: settings)
+                    } else {
+                        result = try ImageProcessor.export(sourceURL: item.url, watermarkURL: watermark!, outputURL: outputURL, settings: settings)
+                    }
                     revealURL = revealURL ?? output
                     summary.success += 1
                     summary.bytes += result.bytes
@@ -382,12 +412,18 @@ final class AppState: ObservableObject {
                     NSWorkspace.shared.activateFileViewerSelecting([revealURL])
                 }
                 self.isExporting = false
-                var text = String(format: String(localized: "%d of %d images watermarked, total output size ~%@."), summary.success, items.count, Self.formatBytes(summary.bytes))
+                let verb = (compressOnly || watermark == nil) ? String(localized: "compressed") : String(localized: "watermarked")
+                var text = String(format: String(localized: "%d of %d images %@, total output size ~%@."), summary.success, items.count, verb, Self.formatBytes(summary.bytes))
                 if summary.usedHEICFallback { text += " " + String(localized: "HEIC was exported as PNG.") }
                 if !summary.unmetSizeTarget.isEmpty { text += " " + String(format: String(localized: "%d couldn't reach the max file size target and were shipped at their closest achievable size."), summary.unmetSizeTarget.count) }
                 if !summary.failed.isEmpty { text += " " + String(format: String(localized: "Failed: %@."), summary.failed.joined(separator: ", ")) }
                 self.status = text
-                self.recordExportHistory(folder: sourceFolder, watermark: watermark, settings: settings, imageCount: items.count, succeededCount: summary.success)
+                // History is watermark+settings reuse ("redo from history"),
+                // so a compress-only run with no watermark has nothing
+                // meaningful to record.
+                if let watermark {
+                    self.recordExportHistory(folder: sourceFolder, watermark: watermark, settings: settings, imageCount: items.count, succeededCount: summary.success)
+                }
                 let succeeded = summary.success == items.count && summary.failed.isEmpty
                 // Quick Action prompt is disabled for this release -- pulled
                 // per request. The underlying QuickActionPromptView and
@@ -990,7 +1026,7 @@ struct ContentView: View {
 
     private var compactContent: some View {
         HStack(spacing: 0) {
-            ScrollView {
+            BrandScrollBar {
                 VStack(alignment: .leading, spacing: spacing) {
                     imagePickerSection
                     imageList
@@ -1001,21 +1037,50 @@ struct ContentView: View {
             Divider()
             previewPane
             Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: spacing) {
-                    savedPresetLibrary
-                    watermarkSourceSection
-                    sizeOpacitySection
-                    layoutModeSection
-                    positionPaddingSection
-                    orderRenameSection
-                    platformPresets
-                    exportSection
+            VStack(spacing: 0) {
+                BrandScrollBar {
+                    VStack(alignment: .leading, spacing: spacing) {
+                        savedPresetLibrary
+                        watermarkSourceSection
+                        sizeOpacitySection
+                        layoutModeSection
+                        positionPaddingSection
+                        orderRenameSection
+                        platformPresets
+                        exportSection
+                    }
+                    .padding(panePadding)
                 }
-                .padding(panePadding)
+                Divider()
+                compactWatermarkAllBar
             }
             .frame(width: controlsWidth)
         }
+        .alert("Watermark not uploaded yet", isPresented: $state.showWatermarkMissingPrompt) {
+            Button("Upload Watermark") { state.chooseWatermark() }
+            Button("Compress Only") { state.exportAll(compressOnly: true) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Choose a watermark image to apply, or export the images compressed only, with no watermark.")
+        }
+    }
+
+    /// Compact mode's own persistent export action -- docked below the
+    /// controls pane's scroll area (never inside it) so it's on screen
+    /// without scrolling, same guarantee guided mode gets from its header
+    /// Next button. Orange only once a watermark is actually chosen; tapping
+    /// it before then doesn't just sit there disabled -- it opens the
+    /// upload-or-compress-only prompt instead.
+    private var compactWatermarkAllBar: some View {
+        HStack {
+            if state.isExporting { ProgressView(value: state.progress).frame(maxWidth: 120) }
+            Spacer()
+            Button("Watermark All Images") { state.watermarkAllTapped() }
+                .buttonStyle(state.watermarkURL != nil ? .automalityAccent : .automalityPrimary)
+                .disabled(!state.canTapWatermarkAll)
+        }
+        .padding(panePadding)
+        .background(AutomalityColor.offWhite)
     }
 
     private var chatContent: some View {

@@ -16,6 +16,7 @@
 		1A0000332B00000000000001 /* ChatFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000342B00000000000001 /* ChatFlowView.swift */; };
 		1A0000492B00000000000001 /* QuickActionPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A00004A2B00000000000001 /* QuickActionPromptView.swift */; };
 		1A0000432B00000000000001 /* AcknowledgementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000442B00000000000001 /* AcknowledgementsView.swift */; };
+		1A0000502B00000000000001 /* BrandScrollBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000512B00000000000001 /* BrandScrollBar.swift */; };
 		1A00001A2B00000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A00001B2B00000000000001 /* Assets.xcassets */; };
 		1A0000452B00000000000001 /* automality-watermark.png in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000462B00000000000001 /* automality-watermark.png */; };
 		1A00004B2B00000000000001 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 1A00004C2B00000000000001 /* Localizable.xcstrings */; };
@@ -45,6 +46,7 @@
 		1A0000322B00000000000001 /* IntentParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntentParser.swift; sourceTree = "<group>"; };
 		1A0000342B00000000000001 /* ChatFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatFlowView.swift; sourceTree = "<group>"; };
 		1A00004A2B00000000000001 /* QuickActionPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionPromptView.swift; sourceTree = "<group>"; };
+		1A0000512B00000000000001 /* BrandScrollBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandScrollBar.swift; sourceTree = "<group>"; };
 		1A0000442B00000000000001 /* AcknowledgementsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcknowledgementsView.swift; sourceTree = "<group>"; };
 		1A0000092B00000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		1A00000A2B00000000000001 /* WatermarkFactory.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WatermarkFactory.entitlements; sourceTree = "<group>"; };
@@ -95,6 +97,7 @@
 				1A0000342B00000000000001 /* ChatFlowView.swift */,
 				1A00004A2B00000000000001 /* QuickActionPromptView.swift */,
 				1A0000442B00000000000001 /* AcknowledgementsView.swift */,
+				1A0000512B00000000000001 /* BrandScrollBar.swift */,
 				1A0000062B00000000000001 /* ImageProcessor.swift */,
 				1A0000322B00000000000001 /* IntentParser.swift */,
 				1A0000082B00000000000001 /* Models.swift */,
@@ -233,6 +236,7 @@
 				1A0000332B00000000000001 /* ChatFlowView.swift in Sources */,
 				1A0000492B00000000000001 /* QuickActionPromptView.swift in Sources */,
 				1A0000432B00000000000001 /* AcknowledgementsView.swift in Sources */,
+				1A0000502B00000000000001 /* BrandScrollBar.swift in Sources */,
 				1A0000052B00000000000001 /* ImageProcessor.swift in Sources */,
 				1A0000312B00000000000001 /* IntentParser.swift in Sources */,
 				1A0000072B00000000000001 /* Models.swift in Sources */,
@@ -273,7 +277,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 20;
+				CURRENT_PROJECT_VERSION = 21;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -283,7 +287,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.2.7;
+				MARKETING_VERSION = 1.2.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.local.WatermarkFactory;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -302,7 +306,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 20;
+				CURRENT_PROJECT_VERSION = 21;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -312,7 +316,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.2.7;
+				MARKETING_VERSION = 1.2.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.local.WatermarkFactory;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;

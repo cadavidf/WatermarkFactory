@@ -180,6 +180,20 @@ struct ImageProcessor {
         return (outputURL, encoded.data.count, encoded.usedHEICFallback, encoded.metTarget)
     }
 
+    /// Same output pipeline (resize/format/quality/max-size, metadata
+    /// stripped) as `export`, minus the watermark compose step -- the path
+    /// behind compact mode's "Compress Only" choice when no watermark has
+    /// been picked yet, so people aren't blocked from exporting at all.
+    static func compressOnly(sourceURL: URL, outputURL: URL, settings: WatermarkSettings) throws -> (url: URL, bytes: Int, usedHEICFallback: Bool, metSizeTarget: Bool) {
+        guard let source = loadCGImage(sourceURL) else {
+            throw ImageProcessorError.loadFailed
+        }
+        let outputImage = try resizedForExport(source, settings: settings)
+        let encoded = try encodeFittingTarget(image: outputImage, sourceURL: sourceURL, settings: settings)
+        try encoded.data.write(to: outputURL, options: .atomic)
+        return (outputURL, encoded.data.count, encoded.usedHEICFallback, encoded.metTarget)
+    }
+
     private static func sanitize(_ value: String) -> String {
         value.replacingOccurrences(of: "/", with: "").replacingOccurrences(of: "\0", with: "")
     }
