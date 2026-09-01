@@ -111,7 +111,9 @@ struct BrandScrollBar<Content: View>: View {
     @StateObject private var controller = BrandScrollController()
     private let content: Content
     private let pageStep: CGFloat = 220
-    private let railWidth: CGFloat = 28
+    static var railWidth: CGFloat { 28 }
+    // Fixed-width callers need to budget this in addition to their content width.
+    private let railWidth = Self.railWidth
 
     init(@ViewBuilder content: () -> Content) {
         self.content = content()

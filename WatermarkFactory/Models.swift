@@ -1,6 +1,10 @@
 import Foundation
 import SwiftUI
 
+extension CGRect {
+    static let fullFrame = CGRect(x: 0, y: 0, width: 1, height: 1)
+}
+
 enum WatermarkSizePreset: String, CaseIterable, Identifiable, Codable {
     case tiny, small, medium, large, full
     var id: String { rawValue }
@@ -237,7 +241,6 @@ enum LayoutMode: String, CaseIterable, Identifiable, Codable {
 enum FlowMode: String, CaseIterable, Identifiable, Codable {
     case guided = "Guided"
     case compact = "Compact"
-    case chat = "Chat"
     var id: String { rawValue }
     var label: String { String(localized: String.LocalizationValue(rawValue)) }
 }
@@ -291,146 +294,6 @@ struct ImageItem: Identifiable, Hashable {
     let url: URL
     var id: URL { url }
     var filename: String { url.lastPathComponent }
-}
-
-enum ChatRole: String, Codable {
-    case assistant, user
-}
-
-struct ChatMessage: Identifiable, Codable {
-    var id = UUID()
-    var role: ChatRole
-    var text: String
-    var chips: [String]?
-}
-
-struct ChatQuestion: Identifiable {
-    let id: String
-    let text: String
-    let chips: [String]
-}
-
-struct IntentSlots: Codable, Equatable {
-    var anchor: String?
-    var additionalAnchors: [String]?
-    var sizeFraction: Double?
-    var opacity: Double?
-    var tint: String?
-    var exportPlatform: String?
-    var contentType: String?
-    var renamePrefix: String?
-    var reorder: String?
-    var maxFileSizeKB: Double?
-    var needsClarification: [String]
-    var assistantReply: String
-
-    init(anchor: String? = nil, additionalAnchors: [String]? = nil, sizeFraction: Double? = nil, opacity: Double? = nil, tint: String? = nil, exportPlatform: String? = nil, contentType: String? = nil, renamePrefix: String? = nil, reorder: String? = nil, maxFileSizeKB: Double? = nil, needsClarification: [String] = [], assistantReply: String = "") {
-        self.anchor = anchor
-        self.additionalAnchors = additionalAnchors
-        self.sizeFraction = sizeFraction
-        self.opacity = opacity
-        self.tint = tint
-        self.exportPlatform = exportPlatform
-        self.contentType = contentType
-        self.renamePrefix = renamePrefix
-        self.reorder = reorder
-        self.maxFileSizeKB = maxFileSizeKB
-        self.needsClarification = needsClarification
-        self.assistantReply = assistantReply
-    }
-}
-
-enum IntentPreset: String, CaseIterable {
-    case cornerSubtle, centeredBold, tiledBrand
-
-    static func inferred(from message: String, slots: IntentSlots) -> IntentPreset {
-        let text = message.lowercased()
-        if slots.anchor == "tiled" || text.contains("tile") || text.contains("repeat") { return .tiledBrand }
-        if slots.anchor == Anchor.center.rawValue || text.contains("center") || text.contains("bold") { return .centeredBold }
-        return .cornerSubtle
-    }
-
-    static func settings(from slots: IntentSlots, message: String, current: WatermarkSettings = .chatDefault) -> WatermarkSettings {
-        var settings = WatermarkSettings.chatDefault
-        settings.outputSuffix = current.outputSuffix
-        apply(inferred(from: message, slots: slots), to: &settings)
-
-        if let anchor = slots.anchor {
-            if anchor == "tiled" {
-                settings.layoutMode = .tiled
-            } else if let parsed = Anchor(rawValue: anchor) {
-                settings.layoutMode = .single
-                settings.anchor = parsed
-            }
-        }
-        settings.additionalAnchors = (slots.additionalAnchors ?? []).compactMap(Anchor.init(rawValue:))
-        if let size = slots.sizeFraction { settings.sizeFraction = min(max(size, 0.05), 0.6) }
-        if let opacity = slots.opacity { settings.opacity = min(max(opacity, 0), 1) }
-        if let tint = slots.tint, let parsed = WatermarkTint(rawValue: tint) { settings.watermarkTint = parsed }
-        applyPlatform(slots.exportPlatform ?? "original", to: &settings)
-        applyContentType(slots.contentType, to: &settings)
-        if let maxFileSizeKB = slots.maxFileSizeKB {
-            settings.maxFileSizeKB = max(0, Int(maxFileSizeKB.rounded()))
-        }
-        settings.outputPrefix = (slots.renamePrefix ?? "").replacingOccurrences(of: "/", with: "").replacingOccurrences(of: "\0", with: "")
-        return settings
-    }
-
-    static func apply(_ preset: IntentPreset, to settings: inout WatermarkSettings) {
-        switch preset {
-        case .cornerSubtle:
-            settings.layoutMode = .single
-            settings.anchor = .bottomRight
-            settings.sizeFraction = 0.18
-            settings.opacity = 0.5
-            settings.watermarkTint = .original
-        case .centeredBold:
-            settings.layoutMode = .single
-            settings.anchor = .center
-            settings.sizeFraction = 0.35
-            settings.opacity = 0.85
-        case .tiledBrand:
-            settings.layoutMode = .tiled
-            settings.rotationPattern = .diagonal
-            settings.spacing = 80
-        }
-    }
-
-    private static func applyPlatform(_ platform: String, to settings: inout WatermarkSettings) {
-        switch platform.lowercased() {
-        case "instagram":
-            if let preset = PlatformExportPreset.all.first(where: { $0.id == "instagram" }) {
-                settings.outputWidth = preset.width
-                settings.outputHeight = preset.height
-                settings.exportFormat = .jpeg
-                settings.jpegQuality = preset.jpegQuality
-            }
-        case "web":
-            settings.optimizeForWeb = true
-            settings.exportFormat = .jpeg
-            settings.jpegQuality = min(settings.jpegQuality, 0.8)
-        case "print":
-            settings.exportFormat = .tiff
-            settings.outputWidth = 0
-            settings.outputHeight = 0
-            settings.maxFileSizeKB = 0
-        case "original":
-            settings.exportFormat = .keepOriginal
-        default:
-            break
-        }
-    }
-
-    private static func applyContentType(_ contentType: String?, to settings: inout WatermarkSettings) {
-        switch contentType?.lowercased() {
-        case "camera": settings.exportFormat = .jpeg
-        case "graphic": settings.exportFormat = .png
-        case "geodata": settings.exportFormat = .tiff
-        case "gif": settings.exportFormat = .gif
-        case "other": settings.exportFormat = .keepOriginal
-        default: break
-        }
-    }
 }
 
 /// Governs what happens to the source image's GPS location on export.
@@ -546,10 +409,6 @@ struct WatermarkSettings: Codable {
         metadataPrivacy = try container.decodeIfPresent(MetadataPrivacyLevel.self, forKey: .metadataPrivacy) ?? .keepOriginalPrecision
         removeWatermarkBackground = try container.decodeIfPresent(Bool.self, forKey: .removeWatermarkBackground) ?? false
     }
-}
-
-extension WatermarkSettings {
-    static let chatDefault = WatermarkSettings(sizeFraction: 0.18, opacity: 0.5, anchor: .bottomRight, offsetX: 24, offsetY: 24, layoutMode: .single, padding: 16, spacing: 80, rotationPattern: .diagonal, customAngle: 30, exportFormat: .keepOriginal, jpegQuality: 0.9, outputPrefix: "", outputSuffix: "", watermarkTint: .original)
 }
 
 struct SmartPlacementProposal {

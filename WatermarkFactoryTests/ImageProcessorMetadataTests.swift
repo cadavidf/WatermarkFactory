@@ -347,6 +347,15 @@ final class ImageProcessorMetadataTests: XCTestCase {
         XCTAssertEqual(CGImageSourceGetCount(imageSource), 1)
     }
 
+    func testCroppedImageUsesFractionalRectAndFailsOpen() throws {
+        let image = try makeImage(width: 10, height: 8)
+        let cropped = ImageProcessor.croppedImage(image, cropRect: CGRect(x: 0.2, y: 0.25, width: 0.5, height: 0.5))
+
+        XCTAssertEqual(cropped.width, 5)
+        XCTAssertEqual(cropped.height, 4)
+        XCTAssertTrue(ImageProcessor.croppedImage(image, cropRect: .zero) === image)
+    }
+
     func testOutputFilenameInsertsOrderAfterPrefix() {
         let source = tempDir.appendingPathComponent("beach.jpg")
         let settings = WatermarkSettings(sizeFraction: 0.2, opacity: 0, anchor: .center, offsetX: 0, offsetY: 0, layoutMode: .single, padding: 0, spacing: 0, rotationPattern: .none, customAngle: 0, exportFormat: .jpeg, jpegQuality: 0.9, outputPrefix: "wm_", outputSuffix: "")

@@ -32,6 +32,7 @@ final class AppState: ObservableObject {
     // Compress Only), shown when Watermark All Images is tapped with no
     // watermark chosen -- see watermarkAllTapped() below.
     @Published var showWatermarkMissingPrompt = false
+    @Published var showCropScopePrompt = false
     @Published var images: [ImageItem] = []
     @Published var selected: ImageItem?
     @Published var stage: Stage = .selectImages
@@ -80,6 +81,10 @@ final class AppState: ObservableObject {
     @Published var watermarkTint: WatermarkTint = .original { didSet { saveSettings(); updateEstimate() } }
     @Published var metadataPrivacy: MetadataPrivacyLevel = .keepOriginalPrecision { didSet { saveSettings(); updateEstimate() } }
     @Published var removeWatermarkBackground = false { didSet { saveSettings(); updateEstimate() } }
+    @Published var cropEnabled = false { didSet { updateEstimate() } }
+    @Published var sharedCropRect: CGRect = .fullFrame { didSet { updateEstimate() } }
+    @Published var perImageCropRects: [URL: CGRect] = [:] { didSet { updateEstimate() } }
+    @Published var cropEditVersion = 0
     @Published var previewImage: NSImage?
     @Published var isDemoPreview = false
     @Published var sourceImageSize: CGSize?
@@ -96,9 +101,6 @@ final class AppState: ObservableObject {
     @Published var recentFolders: [RecentFolder] = []
     @Published var exportHistory: [ExportHistoryEntry] = []
     @Published var orderedImageURLs: [URL] = [] { didSet { saveImageOrder() } }
-    @Published var chatTranscript: [ChatMessage] = [
-        ChatMessage(role: .assistant, text: String(localized: "Tell me how you want these watermarked."), chips: [String(localized: "Just watermark these"), String(localized: "Subtle corner"), String(localized: "Centered bold"), String(localized: "Tiled brand")])
-    ]
 
     enum OpenedURLInput: Equatable {
         case folder(URL)
@@ -109,6 +111,8 @@ final class AppState: ObservableObject {
     private var sourceSizeURL: URL?
     private var watermarkSizeURL: URL?
     private var suppressOffsetPreview = false
+    private var pendingCropURL: URL?
+    private var pendingCropRect: CGRect?
     private let sourceAccess = SecurityScopedAccessTracker()
     private let watermarkAccess = SecurityScopedAccessTracker()
     private let defaults = UserDefaults.standard
@@ -174,6 +178,8 @@ final class AppState: ObservableObject {
     }
     var canSavePreset: Bool { watermarkURL != nil }
     var canSuggestPlacement: Bool { selected != nil && watermarkURL != nil && !isSuggestingPlacement }
+    func effectiveCropRect(for url: URL) -> CGRect { perImageCropRects[url] ?? sharedCropRect }
+    func activeCropRect(for url: URL) -> CGRect { cropEnabled ? effectiveCropRect(for: url) : .fullFrame }
 
     /// Single picker for both a folder and individual images -- there's no
     /// real reason to force a person to know in advance which of those two
@@ -293,11 +299,12 @@ final class AppState: ObservableObject {
         }
         let realWatermark = watermarkURL != nil
         let filename = realWatermark ? ImageProcessor.outputFilename(for: source, settings: settings, order: selected.flatMap(orderNumber), numberedCount: numberedCount) : ""
+        let cropRect = activeCropRect(for: source)
         previewTask = Task.detached {
             if delay > 0 { try? await Task.sleep(nanoseconds: delay) }
             if Task.isCancelled { return }
-            let image = try? ImageProcessor.watermarkedImage(sourceURL: source, watermarkURL: watermark, settings: settings)
-            let data = realWatermark ? try? ImageProcessor.encodedWatermarkData(sourceURL: source, watermarkURL: watermark, settings: settings) : nil
+            let image = try? ImageProcessor.watermarkedImage(sourceURL: source, watermarkURL: watermark, settings: settings, cropRect: cropRect)
+            let data = realWatermark ? try? ImageProcessor.encodedWatermarkData(sourceURL: source, watermarkURL: watermark, settings: settings, cropRect: cropRect) : nil
             await MainActor.run {
                 if !Task.isCancelled {
                     self.previewImage = image.map { NSImage(cgImage: $0, size: .zero) }
@@ -312,8 +319,10 @@ final class AppState: ObservableObject {
 
     func dragWatermark(startX: Double, startY: Double, delta: CGSize, displayScale: CGFloat) {
         guard let sourceImageSize, let watermarkImageSize, displayScale > 0 else { return }
+        let cropRect = selected.map { activeCropRect(for: $0.url) } ?? .fullFrame
+        let canvasSize = CGSize(width: sourceImageSize.width * cropRect.width, height: sourceImageSize.height * cropRect.height)
         let clamped = ImageProcessor.clampedWatermarkOffsets(
-            sourceSize: sourceImageSize,
+            sourceSize: canvasSize,
             watermarkSize: watermarkImageSize,
             settings: settings,
             offsetX: startX + Double(delta.width / displayScale),
@@ -324,6 +333,33 @@ final class AppState: ObservableObject {
         offsetY = clamped.y
         suppressOffsetPreview = false
         updateEstimate(delay: 0)
+    }
+
+    func proposeCrop(_ rect: CGRect, for url: URL) {
+        pendingCropURL = url
+        pendingCropRect = Self.clampedCropRect(rect)
+        showCropScopePrompt = true
+    }
+
+    func commitPendingCrop(appliedToAll: Bool) {
+        guard let url = pendingCropURL, let rect = pendingCropRect else { return }
+        if appliedToAll {
+            sharedCropRect = rect
+            perImageCropRects = [:]
+        } else {
+            perImageCropRects[url] = rect
+        }
+        clearPendingCrop()
+    }
+
+    func cancelPendingCrop() {
+        clearPendingCrop()
+    }
+
+    private func clearPendingCrop() {
+        pendingCropURL = nil
+        pendingCropRect = nil
+        cropEditVersion += 1
     }
 
     func openFromFinder(_ urls: [URL], autoQuitWhenDone: Bool) {
@@ -368,6 +404,9 @@ final class AppState: ObservableObject {
         let items = orderedItems
         let settings = settings
         let sourceFolder = folderURL
+        let cropEnabled = cropEnabled
+        let sharedCropRect = sharedCropRect
+        let perImageCropRects = perImageCropRects
         let numberedOrder = Dictionary(uniqueKeysWithValues: orderedImageURLs.enumerated().map { ($0.element, $0.offset + 1) })
         let numberedCount = numberedCount
         Task.detached {
@@ -385,11 +424,12 @@ final class AppState: ObservableObject {
                     let output = item.url.deletingLastPathComponent().appendingPathComponent("Watermarked", isDirectory: true)
                     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
                     let outputURL = ImageProcessor.uniqueOutputURL(for: item.url, outputFolder: output, settings: settings, order: numberedOrder[item.url], numberedCount: numberedCount, usedURLs: &usedOutputURLs)
+                    let cropRect = cropEnabled ? (perImageCropRects[item.url] ?? sharedCropRect) : .fullFrame
                     let result: (url: URL, bytes: Int, usedHEICFallback: Bool, metSizeTarget: Bool)
                     if compressOnly || watermark == nil {
-                        result = try ImageProcessor.compressOnly(sourceURL: item.url, outputURL: outputURL, settings: settings)
+                        result = try ImageProcessor.compressOnly(sourceURL: item.url, outputURL: outputURL, settings: settings, cropRect: cropRect)
                     } else {
-                        result = try ImageProcessor.export(sourceURL: item.url, watermarkURL: watermark!, outputURL: outputURL, settings: settings)
+                        result = try ImageProcessor.export(sourceURL: item.url, watermarkURL: watermark!, outputURL: outputURL, settings: settings, cropRect: cropRect)
                     }
                     revealURL = revealURL ?? output
                     summary.success += 1
@@ -486,20 +526,13 @@ final class AppState: ObservableObject {
         status = String(format: String(localized: "Applied %@ export preset."), preset.name)
     }
 
-    func applyIntentSlots(_ slots: IntentSlots, message: String) {
-        apply(IntentPreset.settings(from: slots, message: message, current: settings))
-        if slots.reorder == "byCurrentOrder" {
-            numberInCurrentOrder(orderedItems)
-        }
-        status = slots.assistantReply
-    }
-
     func suggestPlacement() {
         guard let source = selected?.url, let watermark = watermarkURL else { return }
         isSuggestingPlacement = true
         let settings = settings
+        let cropRect = activeCropRect(for: source)
         Task.detached {
-            let proposal = ImageProcessor.smartPlacementProposal(sourceURL: source, watermarkURL: watermark, settings: settings)
+            let proposal = ImageProcessor.smartPlacementProposal(sourceURL: source, watermarkURL: watermark, settings: settings, cropRect: cropRect)
             await MainActor.run {
                 self.smartPlacementProposal = proposal
                 self.isSuggestingPlacement = false
@@ -851,6 +884,15 @@ final class AppState: ObservableObject {
         value.replacingOccurrences(of: "/", with: "").replacingOccurrences(of: "\0", with: "")
     }
 
+    static func clampedCropRect(_ rect: CGRect) -> CGRect {
+        let minSize: CGFloat = 0.1
+        let width = min(max(rect.width, minSize), 1)
+        let height = min(max(rect.height, minSize), 1)
+        let x = min(max(rect.minX, 0), 1 - width)
+        let y = min(max(rect.minY, 0), 1 - height)
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+
     static func openedURLInput(from urls: [URL], isDirectory: (URL) -> Bool = { url in
         (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
     }) -> OpenedURLInput? {
@@ -873,6 +915,9 @@ struct ContentView: View {
     @State private var draggingItem: ImageItem?
     @State private var isFileDropTargeted = false
     private let controlsWidth: CGFloat = 360
+    private var compactControlsWidth: CGFloat { controlsWidth + BrandScrollBar<EmptyView>.railWidth }
+    private let imageListWidth: CGFloat = 300
+    private var compactImageListWidth: CGFloat { imageListWidth + BrandScrollBar<EmptyView>.railWidth }
     private let previewMinWidth: CGFloat = 560
     private let spacing: CGFloat = AutomalitySpacing.sm
     private let panePadding: CGFloat = AutomalitySpacing.sm
@@ -889,8 +934,6 @@ struct ContentView: View {
 
             if state.flowMode == .guided {
                 stageContent
-            } else if state.flowMode == .chat {
-                chatContent
             } else {
                 compactContent
             }
@@ -922,6 +965,11 @@ struct ContentView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(String(format: String(localized: "A preset named \"%@\" already exists."), duplicatePresetName))
+        }
+        .alert(String(localized: "Apply this crop to:"), isPresented: $state.showCropScopePrompt) {
+            Button(String(localized: "This Image Only")) { state.commitPendingCrop(appliedToAll: false) }
+            Button(String(localized: "All Images in Batch")) { state.commitPendingCrop(appliedToAll: true) }
+            Button(String(localized: "Cancel"), role: .cancel) { state.cancelPendingCrop() }
         }
         .sheet(isPresented: $state.showQuickActionPrompt) {
             QuickActionPromptView(isPresented: $state.showQuickActionPrompt)
@@ -1033,7 +1081,7 @@ struct ContentView: View {
                 }
                 .padding(panePadding)
             }
-            .frame(width: 300)
+            .frame(width: compactImageListWidth)
             Divider()
             previewPane
             Divider()
@@ -1041,6 +1089,7 @@ struct ContentView: View {
                 BrandScrollBar {
                     VStack(alignment: .leading, spacing: spacing) {
                         savedPresetLibrary
+                        cropSection
                         watermarkSourceSection
                         sizeOpacitySection
                         layoutModeSection
@@ -1054,7 +1103,7 @@ struct ContentView: View {
                 Divider()
                 compactWatermarkAllBar
             }
-            .frame(width: controlsWidth)
+            .frame(width: compactControlsWidth)
         }
         .alert("Watermark not uploaded yet", isPresented: $state.showWatermarkMissingPrompt) {
             Button("Upload Watermark") { state.chooseWatermark() }
@@ -1083,20 +1132,6 @@ struct ContentView: View {
         .background(AutomalityColor.offWhite)
     }
 
-    private var chatContent: some View {
-        HStack(spacing: 0) {
-            ChatFlowView(
-                state: state,
-                sizeOpacitySection: { AnyView(sizeOpacitySection) },
-                positionPaddingSection: { AnyView(positionPaddingSection) },
-                exportSection: { AnyView(exportSection) }
-            )
-            .frame(width: controlsWidth)
-            Divider()
-            previewPane
-        }
-    }
-
     private var selectImagesStage: some View {
         VStack(alignment: .leading, spacing: spacing) {
             imagePickerSection
@@ -1123,6 +1158,7 @@ struct ContentView: View {
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: spacing) {
+                    cropSection
                     watermarkSourceSection
                 }
                 .padding(panePadding)
@@ -1332,6 +1368,16 @@ struct ContentView: View {
             // underlying logic (AppState.suggestPlacement, smartPlacementCard,
             // SmartPlacementProposal) is left intact for a future version;
             // this just removes the UI entry point.
+        }
+    }
+
+    private var cropSection: some View {
+        ControlSection("Crop") {
+            Toggle(String(localized: "Enable Crop"), isOn: $state.cropEnabled)
+                .toggleStyle(.automality)
+            Text(String(localized: "Crops before the watermark is applied. Applies to this image or the whole batch - you'll be asked which."))
+                .font(.caption)
+                .foregroundStyle(AutomalityColor.inkMuted)
         }
     }
 
@@ -1914,6 +1960,17 @@ struct WatermarkPreview: View {
                     .resizable()
                     .scaledToFit()
                     .padding(padding)
+                if state.cropEnabled, let source = state.selected?.url, let sourceSize = state.sourceImageSize {
+                    CropOverlay(
+                        cropRect: state.effectiveCropRect(for: source),
+                        sourceSize: sourceSize,
+                        containerSize: proxy.size,
+                        padding: padding,
+                        resetToken: state.cropEditVersion
+                    ) { rect in
+                        state.proposeCrop(rect, for: source)
+                    }
+                }
                 if let rect = displayedWatermarkRect(in: proxy.size) {
                     Rectangle()
                         .fill(.clear)
@@ -1971,14 +2028,16 @@ struct WatermarkPreview: View {
         guard state.layoutMode == .single,
               let sourceSize = state.sourceImageSize,
               let watermarkSize = state.watermarkImageSize else { return nil }
+        let cropRect = state.selected.map { state.activeCropRect(for: $0.url) } ?? .fullFrame
+        let canvasSize = CGSize(width: sourceSize.width * cropRect.width, height: sourceSize.height * cropRect.height)
         let scale = displayScale(in: size)
         guard scale > 0 else { return nil }
-        let imageSize = CGSize(width: sourceSize.width * scale, height: sourceSize.height * scale)
+        let imageSize = CGSize(width: canvasSize.width * scale, height: canvasSize.height * scale)
         let origin = CGPoint(x: (size.width - imageSize.width) / 2, y: (size.height - imageSize.height) / 2)
-        let frame = ImageProcessor.watermarkFrame(sourceSize: sourceSize, watermarkSize: watermarkSize, settings: settings)
+        let frame = ImageProcessor.watermarkFrame(sourceSize: canvasSize, watermarkSize: watermarkSize, settings: settings)
         return CGRect(
             x: origin.x + frame.minX * scale,
-            y: origin.y + (sourceSize.height - frame.maxY) * scale,
+            y: origin.y + (canvasSize.height - frame.maxY) * scale,
             width: frame.width * scale,
             height: frame.height * scale
         )
@@ -1986,8 +2045,165 @@ struct WatermarkPreview: View {
 
     private func displayScale(in size: CGSize) -> CGFloat {
         guard let sourceSize = state.sourceImageSize, sourceSize.width > 0, sourceSize.height > 0 else { return 0 }
+        let cropRect = state.selected.map { state.activeCropRect(for: $0.url) } ?? .fullFrame
+        let canvasSize = CGSize(width: sourceSize.width * cropRect.width, height: sourceSize.height * cropRect.height)
         let available = CGSize(width: max(0, size.width - padding * 2), height: max(0, size.height - padding * 2))
-        return min(available.width / sourceSize.width, available.height / sourceSize.height)
+        return min(available.width / canvasSize.width, available.height / canvasSize.height)
+    }
+}
+
+struct CropOverlay: View {
+    let cropRect: CGRect
+    let sourceSize: CGSize
+    let containerSize: CGSize
+    let padding: CGFloat
+    let resetToken: Int
+    let onCommit: (CGRect) -> Void
+    @State private var draftRect: CGRect?
+    @State private var dragStart: CGRect?
+
+    enum Hit: Hashable {
+        case move, topLeft, topRight, bottomLeft, bottomRight
+    }
+
+    private let handleSize: CGFloat = 44
+    private let bracketLength: CGFloat = 30
+    private let bracketWidth: CGFloat = 6
+
+    var body: some View {
+        let current = draftRect ?? cropRect
+        let imageRect = imageRect()
+        let displayRect = displayRect(for: current, in: imageRect)
+        ZStack(alignment: .topLeading) {
+            CropScrim(cropRect: displayRect, imageRect: imageRect)
+                .fill(Color.black.opacity(0.42), style: FillStyle(eoFill: true))
+            Rectangle()
+                .fill(.clear)
+                .frame(width: displayRect.width, height: displayRect.height)
+                .position(x: displayRect.midX, y: displayRect.midY)
+                .contentShape(Rectangle())
+                .gesture(dragGesture(hit: .move, imageRect: imageRect))
+            ForEach(hits, id: \.0) { hit, point in
+                CornerBracket(hit: hit, length: bracketLength, width: bracketWidth)
+                    .foregroundStyle(AutomalityColor.orange)
+                    .frame(width: handleSize, height: handleSize)
+                    .position(point)
+                    .contentShape(Rectangle())
+                    .gesture(dragGesture(hit: hit, imageRect: imageRect))
+            }
+        }
+        .onChange(of: cropRect) { draftRect = $0 }
+        .onChange(of: resetToken) { _ in draftRect = cropRect }
+    }
+
+    private var hits: [(Hit, CGPoint)] {
+        let rect = displayRect(for: draftRect ?? cropRect, in: imageRect())
+        return [
+            (.topLeft, CGPoint(x: rect.minX, y: rect.minY)),
+            (.topRight, CGPoint(x: rect.maxX, y: rect.minY)),
+            (.bottomLeft, CGPoint(x: rect.minX, y: rect.maxY)),
+            (.bottomRight, CGPoint(x: rect.maxX, y: rect.maxY))
+        ]
+    }
+
+    private func dragGesture(hit: Hit, imageRect: CGRect) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                let start = dragStart ?? (draftRect ?? cropRect)
+                dragStart = start
+                draftRect = updated(start, hit: hit, translation: value.translation, imageRect: imageRect)
+            }
+            .onEnded { _ in
+                let final = draftRect ?? cropRect
+                dragStart = nil
+                if final != cropRect {
+                    onCommit(final)
+                }
+            }
+    }
+
+    private func imageRect() -> CGRect {
+        guard sourceSize.width > 0, sourceSize.height > 0 else { return .zero }
+        let available = CGSize(width: max(0, containerSize.width - padding * 2), height: max(0, containerSize.height - padding * 2))
+        let scale = min(available.width / sourceSize.width, available.height / sourceSize.height)
+        let size = CGSize(width: sourceSize.width * scale, height: sourceSize.height * scale)
+        return CGRect(x: (containerSize.width - size.width) / 2, y: (containerSize.height - size.height) / 2, width: size.width, height: size.height)
+    }
+
+    private func displayRect(for rect: CGRect, in imageRect: CGRect) -> CGRect {
+        CGRect(
+            x: imageRect.minX + rect.minX * imageRect.width,
+            y: imageRect.minY + rect.minY * imageRect.height,
+            width: rect.width * imageRect.width,
+            height: rect.height * imageRect.height
+        )
+    }
+
+    private func updated(_ start: CGRect, hit: Hit, translation: CGSize, imageRect: CGRect) -> CGRect {
+        let dx = translation.width / imageRect.width
+        let dy = translation.height / imageRect.height
+        var rect = start
+        switch hit {
+        case .move:
+            rect.origin.x += dx
+            rect.origin.y += dy
+        case .topLeft:
+            rect.origin.x += dx
+            rect.origin.y += dy
+            rect.size.width -= dx
+            rect.size.height -= dy
+        case .topRight:
+            rect.origin.y += dy
+            rect.size.width += dx
+            rect.size.height -= dy
+        case .bottomLeft:
+            rect.origin.x += dx
+            rect.size.width -= dx
+            rect.size.height += dy
+        case .bottomRight:
+            rect.size.width += dx
+            rect.size.height += dy
+        }
+        return AppState.clampedCropRect(rect)
+    }
+}
+
+struct CropScrim: Shape {
+    let cropRect: CGRect
+    let imageRect: CGRect
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.addRect(imageRect)
+        path.addRect(cropRect)
+        return path
+    }
+}
+
+struct CornerBracket: View {
+    let hit: CropOverlay.Hit
+    let length: CGFloat
+    let width: CGFloat
+
+    var body: some View {
+        Path { path in
+            let inset = (44 - length) / 2
+            let min = inset
+            let max = 44 - inset
+            switch hit {
+            case .topLeft:
+                path.move(to: CGPoint(x: min, y: max)); path.addLine(to: CGPoint(x: min, y: min)); path.addLine(to: CGPoint(x: max, y: min))
+            case .topRight:
+                path.move(to: CGPoint(x: min, y: min)); path.addLine(to: CGPoint(x: max, y: min)); path.addLine(to: CGPoint(x: max, y: max))
+            case .bottomLeft:
+                path.move(to: CGPoint(x: min, y: min)); path.addLine(to: CGPoint(x: min, y: max)); path.addLine(to: CGPoint(x: max, y: max))
+            case .bottomRight:
+                path.move(to: CGPoint(x: min, y: max)); path.addLine(to: CGPoint(x: max, y: max)); path.addLine(to: CGPoint(x: max, y: min))
+            case .move:
+                break
+            }
+        }
+        .stroke(style: StrokeStyle(lineWidth: width, lineCap: .square, lineJoin: .miter))
     }
 }
 

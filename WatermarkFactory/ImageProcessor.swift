@@ -43,8 +43,9 @@ struct ImageProcessor {
         return CGSize(width: image.width, height: image.height)
     }
 
-    static func smartPlacementProposal(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings) -> SmartPlacementProposal? {
-        guard let source = loadCGImage(sourceURL), let watermark = loadCGImage(watermarkURL) else { return nil }
+    static func smartPlacementProposal(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings, cropRect: CGRect = .fullFrame) -> SmartPlacementProposal? {
+        guard let loadedSource = loadCGImage(sourceURL), let watermark = loadCGImage(watermarkURL) else { return nil }
+        let source = croppedImage(loadedSource, cropRect: cropRect)
         let sourceSize = CGSize(width: source.width, height: source.height)
         let watermarkSize = CGSize(width: watermark.width, height: watermark.height)
         let padding = safeMargin(for: sourceSize)
@@ -132,15 +133,31 @@ struct ImageProcessor {
         return (Double(x - base.minX), Double(base.minY - y))
     }
 
-    static func watermarkedImage(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings) throws -> CGImage {
-        guard let source = loadCGImage(sourceURL), let watermark = loadCGImage(watermarkURL) else {
+    static func croppedImage(_ image: CGImage, cropRect: CGRect) -> CGImage {
+        let bounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+        let pixelRect = CGRect(
+            x: cropRect.minX * bounds.width,
+            y: cropRect.minY * bounds.height,
+            width: cropRect.width * bounds.width,
+            height: cropRect.height * bounds.height
+        )
+        .intersection(bounds)
+        .integral
+        guard pixelRect.width > 0, pixelRect.height > 0,
+              let cropped = image.cropping(to: pixelRect) else { return image }
+        return cropped
+    }
+
+    static func watermarkedImage(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings, cropRect: CGRect = .fullFrame) throws -> CGImage {
+        guard let loadedSource = loadCGImage(sourceURL), let watermark = loadCGImage(watermarkURL) else {
             throw ImageProcessorError.loadFailed
         }
+        let source = croppedImage(loadedSource, cropRect: cropRect)
         return try compose(source: source, watermark: watermark, settings: settings, destinationFormat: settings.exportFormat)
     }
 
-    static func encodedWatermarkData(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings) throws -> Data {
-        let image = try watermarkedImage(sourceURL: sourceURL, watermarkURL: watermarkURL, settings: settings)
+    static func encodedWatermarkData(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings, cropRect: CGRect = .fullFrame) throws -> Data {
+        let image = try watermarkedImage(sourceURL: sourceURL, watermarkURL: watermarkURL, settings: settings, cropRect: cropRect)
         let outputImage = try resizedForExport(image, settings: settings)
         return try encodeFittingTarget(image: outputImage, sourceURL: sourceURL, settings: settings).data
     }
@@ -172,8 +189,8 @@ struct ImageProcessor {
         return candidate
     }
 
-    static func export(sourceURL: URL, watermarkURL: URL, outputURL: URL, settings: WatermarkSettings) throws -> (url: URL, bytes: Int, usedHEICFallback: Bool, metSizeTarget: Bool) {
-        let image = try watermarkedImage(sourceURL: sourceURL, watermarkURL: watermarkURL, settings: settings)
+    static func export(sourceURL: URL, watermarkURL: URL, outputURL: URL, settings: WatermarkSettings, cropRect: CGRect = .fullFrame) throws -> (url: URL, bytes: Int, usedHEICFallback: Bool, metSizeTarget: Bool) {
+        let image = try watermarkedImage(sourceURL: sourceURL, watermarkURL: watermarkURL, settings: settings, cropRect: cropRect)
         let outputImage = try resizedForExport(image, settings: settings)
         let encoded = try encodeFittingTarget(image: outputImage, sourceURL: sourceURL, settings: settings)
         try encoded.data.write(to: outputURL, options: .atomic)
@@ -184,10 +201,11 @@ struct ImageProcessor {
     /// stripped) as `export`, minus the watermark compose step -- the path
     /// behind compact mode's "Compress Only" choice when no watermark has
     /// been picked yet, so people aren't blocked from exporting at all.
-    static func compressOnly(sourceURL: URL, outputURL: URL, settings: WatermarkSettings) throws -> (url: URL, bytes: Int, usedHEICFallback: Bool, metSizeTarget: Bool) {
-        guard let source = loadCGImage(sourceURL) else {
+    static func compressOnly(sourceURL: URL, outputURL: URL, settings: WatermarkSettings, cropRect: CGRect = .fullFrame) throws -> (url: URL, bytes: Int, usedHEICFallback: Bool, metSizeTarget: Bool) {
+        guard let loadedSource = loadCGImage(sourceURL) else {
             throw ImageProcessorError.loadFailed
         }
+        let source = croppedImage(loadedSource, cropRect: cropRect)
         let outputImage = try resizedForExport(source, settings: settings)
         let encoded = try encodeFittingTarget(image: outputImage, sourceURL: sourceURL, settings: settings)
         try encoded.data.write(to: outputURL, options: .atomic)
