@@ -1,0 +1,2449 @@
+Reading additional input from stdin...
+2026-08-28T22:29:12.676230Z ERROR codex_core::session::session: failed to load skill /Users/zentermind/.agents/skills/my-new-skill/SKILL.md: missing YAML frontmatter delimited by ---
+2026-08-28T22:29:12.742095Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Client(HttpRequest(HttpRequest("http/request failed: error sending request for url (http://localhost:3001/mcp)")))
+OpenAI Codex v0.142.5
+--------
+workdir: /Users/zentermind/Dev/WatermarkFactory
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: none
+session id: 01a04a7d-c90e-7501-8abf-559706ee4f3b
+--------
+user
+Read the '## Addendum: watermark padding (v1.2)' section at the end of SPEC.md in this directory and implement it in the existing WatermarkFactory SwiftUI project. This is an incremental feature add to a working app — do not restructure unrelated code. Verify 'xcodebuild -scheme WatermarkFactory -configuration Release build' succeeds before finishing. Commit your work with git as you go.
+2026-08-28T22:29:12.994718Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Client(HttpRequest(HttpRequest("http/request failed: error sending request for url (http://localhost:3001/mcp)")))
+2026-08-28T22:29:13.999228Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Client(HttpRequest(HttpRequest("http/request failed: error sending request for url (http://localhost:3001/mcp)")))
+hook: SessionStart
+hook: SessionStart
+hook: SessionStart Completed
+hook: SessionStart Completed
+hook: UserPromptSubmit
+hook: UserPromptSubmit
+hook: UserPromptSubmit Completed
+hook: UserPromptSubmit Completed
+codex
+I’ll read the addendum and the small slice of SwiftUI code it touches, then patch the existing flow without reshaping the project. After that I’ll run the requested Release build and commit the finished diff.
+exec
+/bin/zsh -lc "sed -n '1,220p' /Users/zentermind/.codex/plugins/cache/ponytail/ponytail/4.9.0/skills/ponytail/SKILL.md" in /Users/zentermind/Dev/WatermarkFactory
+ succeeded in 0ms:
+---
+name: ponytail
+description: >
+  Forces the laziest solution that actually works, simplest, shortest, most
+  minimal. Channels a senior dev who has seen everything: question whether the
+  task needs to exist at all (YAGNI), reach for the standard library before
+  custom code, native platform features before dependencies, one line before
+  fifty. Supports intensity levels: lite, full (default), ultra. Use on ANY
+  coding task: writing, adding, refactoring, fixing, reviewing, or designing
+  code, and choosing libraries or dependencies. Also use whenever the user
+  says "ponytail", "be lazy", "lazy mode", "simplest solution", "minimal
+  solution", "yagni", "do less", or "shortest path", or complains about
+  over-engineering, bloat, boilerplate, or unnecessary dependencies. Do NOT
+  use for non-coding requests (general knowledge, prose, translation,
+  summaries, recipes).
+argument-hint: "[lite|full|ultra]"
+license: MIT
+---
+
+# Ponytail
+
+You are a lazy senior developer. Lazy means efficient, not careless. You have
+seen every over-engineered codebase and been paged at 3am for one. The best
+code is the code never written.
+
+## Persistence
+
+ACTIVE EVERY RESPONSE. No drift back to over-building. Still active if
+unsure. Off only: "stop ponytail" / "normal mode". Default: **full**.
+Switch: `/ponytail lite|full|ultra`.
+
+## The ladder
+
+Stop at the first rung that holds:
+
+1. **Does this need to exist at all?** Speculative need = skip it, say so in one line. (YAGNI)
+2. **Already in this codebase?** A helper, util, type, or pattern that already lives here → reuse it. Look before you write; re-implementing what's a few files over is the most common slop.
+3. **Stdlib does it?** Use it.
+4. **Native platform feature covers it?** `<input type="date">` over a picker lib, CSS over JS, DB constraint over app code.
+5. **Already-installed dependency solves it?** Use it. Never add a new one for what a few lines can do.
+6. **Can it be one line?** One line.
+7. **Only then:** the minimum code that works.
+
+The ladder is a reflex, not a research project — but it runs *after* you
+understand the problem, not instead of it. Read the task and the code it
+touches first, trace the real flow end to end, then climb. Two rungs work →
+take the higher one and move on. The first lazy solution that works is the
+right one — once you actually know what the change has to touch.
+
+**Bug fix = root cause, not symptom.** A report names a symptom. Before you
+edit, grep every caller of the function you're about to touch. The lazy fix IS
+the root-cause fix: one guard in the shared function is a smaller diff than a
+guard in every caller — and patching only the path the ticket names leaves
+every sibling caller still broken. Fix it once, where all callers route through.
+
+## Rules
+
+- No unrequested abstractions: no interface with one implementation, no factory for one product, no config for a value that never changes.
+- No boilerplate, no scaffolding "for later", later can scaffold for itself.
+- Deletion over addition. Boring over clever, clever is what someone decodes at 3am.
+- Fewest files possible. Shortest working diff wins — but only once you understand the problem. The smallest change in the wrong place isn't lazy, it's a second bug.
+- Complex request? Ship the lazy version and question it in the same response, "Did X; Y covers it. Need full X? Say so." Never stall on an answer you can default.
+- Two stdlib options, same size? Take the one that's correct on edge cases. Lazy means writing less code, not picking the flimsier algorithm.
+- Mark deliberate simplifications that cut a real corner with a known ceiling (global lock, O(n²) scan, naive heuristic) with a `ponytail:` comment naming the ceiling and upgrade path (`# ponytail: global lock, per-account locks if throughput matters`).
+
+## Output
+
+Code first. Then at most three short lines: what was skipped, when to add it.
+No essays, no feature tours, no design notes. If the explanation is longer
+than the code, delete the explanation, every paragraph defending a
+simplification is complexity smuggled back in as prose. Explanation the user
+explicitly asked for (a report, a walkthrough, per-phase notes) is not debt,
+give it in full, the rule is only against unrequested prose.
+
+Pattern: `[code] → skipped: [X], add when [Y].`
+
+## Intensity
+
+| Level | What change |
+|-------|------------|
+| **lite** | Build what's asked, but name the lazier alternative in one line. User picks. |
+| **full** | The ladder enforced. Stdlib and native first. Shortest diff, shortest explanation. Default. |
+| **ultra** | YAGNI extremist. Deletion before addition. Ship the one-liner and challenge the rest of the requirement in the same breath. |
+
+Example: "Add a cache for these API responses."
+- lite: "Done, cache added. FYI: `functools.lru_cache` covers this in one line if you'd rather not own a cache class."
+- full: "`@lru_cache(maxsize=1000)` on the fetch function. Skipped custom cache class, add when lru_cache measurably falls short."
+- ultra: "No cache until a profiler says so. When it does: `@lru_cache`. A hand-rolled TTL cache class is a bug farm with a hit rate."
+
+## When NOT to be lazy
+
+Never simplify away: input validation at trust boundaries, error handling
+that prevents data loss, security measures, accessibility basics, anything
+explicitly requested. User insists on the full version → build it, no
+re-arguing.
+
+Never lazy about understanding the problem. The ladder shortens the
+solution, never the reading. Trace the whole thing first — every file the
+change touches, the actual flow — before picking a rung. Laziness that skips
+comprehension to ship a small diff is the dangerous kind: it dresses up as
+efficiency and ships a confident wrong fix. Read fully, then be lazy.
+
+Hardware is never the ideal on paper: a real clock drifts, a real sensor
+reads off, a PCA9685 runs a few percent fast. Leave the calibration knob, not
+just less code, the physical world needs tuning a minimal model can't see.
+
+Lazy code without its check is unfinished. Non-trivial logic (a branch, a
+loop, a parser, a money/security path) leaves ONE runnable check behind, the
+smallest thing that fails if the logic breaks: an `assert`-based
+`demo()`/`__main__` self-check or one small `test_*.py`. No frameworks, no
+fixtures, no per-function suites unless asked. Trivial one-liners need no
+test, YAGNI applies to tests too.
+
+## Boundaries
+
+Ponytail governs what you build, not how you talk (pair with Caveman for
+terse prose). "stop ponytail" / "normal mode": revert. Level persists until
+changed or session end.
+
+The shortest path to done is the right path.
+
+exec
+/bin/zsh -lc 'tail -n 160 SPEC.md' in /Users/zentermind/Dev/WatermarkFactory
+ succeeded in 0ms:
+- App-sandboxed with user-selected file read/write entitlement (NSOpenPanel /
+  security-scoped bookmarks) — no other entitlements.
+- Xcode project (not SPM-only), buildable via `xcodebuild -scheme WatermarkFactory
+  -configuration Release build`.
+- No third-party dependencies — Foundation/AppKit/SwiftUI/CoreImage/CoreGraphics only.
+
+## Window layout (single window, three panes)
+1. **Left sidebar** — source folder picker (button "Choose Folder…"), then a
+   scrollable list of every image found in it (thumbnail + filename). Supports
+   .jpg/.jpeg/.png/.heic/.tiff. Clicking an item selects it for the center preview.
+2. **Center** — live preview canvas showing the *selected* source image with the
+   watermark composited on top exactly as it will be exported, at current settings.
+   Below it: a filmstrip of small thumbnails for every image in the folder so the
+   user can page through previews without leaving the settings.
+3. **Right sidebar** — controls, top to bottom:
+   - **Watermark image** — "Choose Watermark…" button + thumbnail of the chosen
+     watermark. Must accept PNG/transparent images.
+   - **Size** — 5 clickable preset chips, each visibly distinct and labeled with
+     both a plain-language tier AND the underlying %, e.g.:
+     `Tiny (10%)` · `Small (20%)` · `Medium (35%)` · `Large (50%)` · `Full (75%)`
+     ("%" = watermark's longest side as a fraction of the image's matching
+     dimension). Selecting a chip highlights it. Below the chips, a fine-tune
+     slider (5%–100%) that free-adjusts from whatever preset was last clicked —
+     clicking a preset snaps the slider, dragging the slider deselects the chip
+     highlight (shows "Custom").
+   - **Opacity** — same pattern: 5 descriptive preset chips + slider, e.g.
+     `Ghost (10%)` · `Subtle (25%)` · `Balanced (50%)` · `Bold (75%)` ·
+     `Solid (100%)`. Slider range 0–100%, shown as a live percentage readout.
+   - **Position** — a 3×3 grid of buttons (like a numpad) representing the 9
+     anchor points (corners/edges/center) for single-placement mode. Selected
+     anchor is visibly highlighted. Small numeric X/Y offset fields (in px) let
+     the user nudge from that anchor.
+   - **Layout mode** — segmented control: `Single` vs `Tiled`.
+     - In `Tiled` mode, the 9-grid above is replaced/disabled and instead show:
+       - Spacing slider (gap between tile repeats, px or % of watermark size).
+       - Rotation pattern picker: `None (0°)`, `Diagonal (45°)`,
+         `Alternating rows (0°/45° every other row)`, `Custom angle` (with a
+         numeric degree field 0–359 when selected).
+   - **Live preview** updates on every control change (debounced ~100ms is fine).
+   - **Export format** — segmented/dropdown control: `Keep Original`, `JPEG`,
+     `PNG`, `TIFF`. Default `Keep Original`. When JPEG is selected, show a
+     quality slider (0–100%, default 90%) since JPEG is lossy. Show the format's
+     typical traits inline as a one-line hint (e.g. JPEG: "smaller file, no
+     transparency"; PNG: "lossless, supports transparency"; TIFF: "largest file,
+     lossless, editing-grade").
+   - Below the format picker, show a live **estimated output size** per image
+     (or at least for the currently-selected preview image) — approximate is
+     fine, computed from the actual encoded output of the preview image, updated
+     whenever format/quality/watermark settings change. Label it "~X.X MB" (or
+     KB) next to the format control.
+   - **Export** — "Watermark All Images" button. Shows a progress bar/count
+     while processing. Writes output as `<sourceFolder>/Watermarked/<original
+     filename with new extension if format changed>`. `Keep Original` preserves
+     original format where feasible (fall back to PNG for formats CoreImage
+     can't re-encode, e.g. HEIC → PNG, and say so once in the UI). On
+     completion, reveal the output folder in Finder and show a success summary
+     ("12 of 12 images watermarked, total output size ~48.3 MB").
+   - Persist last-used settings (watermark path via bookmark, size/opacity/
+     position/tiling choices) across launches via UserDefaults, so reopening the
+     app restores the previous session.
+
+## Compositing rules
+- Single mode: scale watermark to the chosen % of the *shorter* image dimension
+  (keeps it sane on both portrait/landscape), keep aspect ratio, place at chosen
+  anchor + offset, apply opacity.
+- Tiled mode: repeat the (scaled + rotated) watermark across the full image on a
+  grid defined by watermark size + spacing, applying opacity per tile. Tiles may
+  extend past the canvas edge (clip at image bounds) — don't leave visible seams
+  from rotation clipping oddly; simplest correct approach is fine (e.g. render
+  tiles onto a CGContext sized to the image and let CoreGraphics clip).
+- All compositing must be done at the source image's native pixel resolution
+  (not the preview's display resolution) when exporting — preview may downscale
+  for performance but export must not lose quality.
+
+## Error handling (this touches file I/O — do not skip)
+- No folder selected → Export button disabled with a hint label.
+- No watermark selected → Export button disabled with a hint label.
+- Empty folder / no supported images found → sidebar shows an empty-state message,
+  not a silent blank list.
+- A file that fails to load/decode/write during export → skip it, count it as a
+  failure, continue the batch, and list failed filenames in the completion summary
+  (never crash the batch over one bad file).
+- Folder/watermark picked but permission revoked before export (sandboxed apps can
+  lose access) → catch the error and show a clear "couldn't access X, please
+  re-choose" message rather than crashing.
+
+## Packaging
+- Provide a `build_dmg.sh` script at the project root that:
+  1. Builds the Release configuration via `xcodebuild`.
+  2. Assembles a `.dmg` (via `hdiutil` — no external deps like create-dmg unless
+     already on PATH, in which case prefer it for a nicer drag-to-Applications
+     layout) named `WatermarkFactory.dmg` in a `dist/` folder.
+  3. Is idempotent (safe to re-run, cleans up its own temp staging dir).
+- App icon: simple placeholder is fine (a generated .icns from an SF Symbol or
+  basic shape) — not a design priority for v1.
+
+## Deliverable / done-criteria
+- `xcodebuild -scheme WatermarkFactory -configuration Release build` succeeds
+  with zero errors.
+- `./build_dmg.sh` produces `dist/WatermarkFactory.dmg` that mounts and contains
+  a working `WatermarkFactory.app`.
+- Commit the working tree with git as you go (this is a git-tracked project,
+  already `git init`'d at ~/Dev/WatermarkFactory).
+- Write a short `README.md` covering: what it does, how to build, how to run the
+  test build, known limitations (e.g. HEIC export caveat).
+
+Do NOT ask clarifying questions back — every ambiguous point above already has a
+stated default. If you hit a genuinely blocking ambiguity not covered here, make
+the most sensible choice, note it in README.md under "Design notes", and continue.
+
+## Addendum: individual file selection (v1.1)
+The left sidebar must offer TWO ways to build the working set, both visible at once:
+- **"Choose Folder…"** (existing behavior) — picks a folder, lists every supported
+  image inside it (non-recursive is fine, matches current behavior).
+- **"Choose Images…"** (new) — opens an NSOpenPanel configured for files only
+  (`canChooseFiles = true`, `canChooseDirectories = false`, `allowsMultipleSelection
+  = true`), filtered to the same supported types (jpg/jpeg/png/heic/tiff). Adds the
+  chosen files to the same sidebar list used for folder contents.
+- Either action REPLACES the current working set (don't accumulate across separate
+  folder/image picks — one picker's result is the new list), matching how the
+  folder picker already behaves. Selecting via "Choose Images…" may pull files from
+  different parent folders — that's fine.
+- Output path rule becomes **per-image**, not per-folder: each processed image is
+  written to `<that image's own parent folder>/Watermarked/<filename>`, regardless
+  of whether it was picked via folder or individual selection. (This already matches
+  what folder-picked images do today, since they all share one parent; just apply
+  the same rule per-file so mixed-origin individual picks work correctly.)
+- The "reveal in Finder" step after export should reveal the Watermarked folder of
+  the first successfully-processed image (or, if all images share one parent, that
+  single Watermarked folder — don't open multiple Finder windows).
+- Sidebar empty-state text should mention both actions ("Choose a folder or select
+  individual images to get started").
+- Persisted last-session state should still restore sensibly even if last session
+  ended on an individual-file selection (persist the list of file paths actually
+  used, not just a folder path).
+
+## Addendum: watermark padding (v1.2)
+Add a user-adjustable **Padding** control to the right sidebar (near Position /
+Layout mode) that keeps the watermark from sitting flush against edges or other
+tiles. One slider, 0–100px, default 16px, live-numeric readout — applies
+differently depending on layout mode:
+
+- **Single mode**: padding is the minimum distance kept between the watermark and
+  whichever image edge(s) the selected 9-grid anchor touches (e.g. top-left anchor
+  pads both top and left edges; top-center pads only the top edge; center anchor
+  ignores padding since it touches no edge). This is separate from, and applied
+  before, the existing manual X/Y offset fields — padding sets the baseline
+  distance from the edge, the offset then nudges further from there. Live preview
+  must reflect this immediately.
+- **Tiled mode**: padding is the transparent margin added around each individual
+  watermark instance before it repeats — i.e. it increases the effective tile cell
+  size beyond the watermark's own bounds, distinct from the existing tile
+  "Spacing" slider (padding = margin hugging the watermark itself; spacing = extra
+  gap between tile cells on top of that). Both controls remain visible and
+  independent in Tiled mode.
+- Persist the padding value in the same session-restore mechanism as the other
+  watermark settings.
+- Label it clearly as "Padding" with a one-line hint distinguishing it from
+  Spacing when in Tiled mode (e.g. "Padding: margin around each mark · Spacing:
+  gap between tiles").
+
+exec
+/bin/zsh -lc 'rg --files' in /Users/zentermind/Dev/WatermarkFactory
+ succeeded in 0ms:
+build_dmg.sh
+SPEC.md
+WatermarkFactory/WatermarkFactory.entitlements
+WatermarkFactory/Info.plist
+WatermarkFactory/ContentView.swift
+WatermarkFactory/ImageProcessor.swift
+WatermarkFactory/Models.swift
+WatermarkFactory/WatermarkFactoryApp.swift
+WatermarkFactory/Assets.xcassets/Contents.json
+WatermarkFactory/Assets.xcassets/AppIcon.appiconset/icon_256x256.png
+WatermarkFactory/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png
+WatermarkFactory/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png
+WatermarkFactory/Assets.xcassets/AppIcon.appiconset/icon_16x16@2x.png
+WatermarkFactory/Assets.xcassets/AppIcon.appiconset/icon_16x16.png
+WatermarkFactory/Assets.xcassets/AppIcon.appiconset/Contents.json
+WatermarkFactory/Assets.xcassets/AppIcon.appiconset/icon_512x512.png
+WatermarkFactory/Assets.xcassets/AppIcon.appiconset/icon_32x32.png
+WatermarkFactory/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png
+WatermarkFactory/Assets.xcassets/AppIcon.appiconset/icon_128x128.png
+WatermarkFactory/Assets.xcassets/AppIcon.appiconset/icon_32x32@2x.png
+scripts/make_icon.py
+assets_src/icon_1024.png
+assets_src/AppIcon.icns
+assets_src/AppIcon.iconset/icon_256x256.png
+assets_src/AppIcon.iconset/icon_512x512@2x.png
+assets_src/AppIcon.iconset/icon_128x128@2x.png
+assets_src/AppIcon.iconset/icon_16x16@2x.png
+assets_src/AppIcon.iconset/icon_16x16.png
+assets_src/AppIcon.iconset/icon_512x512.png
+assets_src/AppIcon.iconset/icon_32x32.png
+assets_src/AppIcon.iconset/icon_256x256@2x.png
+assets_src/AppIcon.iconset/icon_128x128.png
+assets_src/AppIcon.iconset/icon_32x32@2x.png
+README.md
+WatermarkFactory.xcodeproj/project.pbxproj
+codex_run3.log
+codex_run2.log
+
+exec
+/bin/zsh -lc 'git status --short' in /Users/zentermind/Dev/WatermarkFactory
+ succeeded in 0ms:
+ M SPEC.md
+?? codex_run2.log
+?? codex_run3.log
+
+codex
+The addendum is only about padding: a saved setting, one slider in the right sidebar, and compositor math in single/tiled modes. I also see existing unrelated worktree changes in `SPEC.md` plus untracked logs, so I’ll leave those alone.
+exec
+/bin/zsh -lc "sed -n '1,420p' WatermarkFactory/ContentView.swift" in /Users/zentermind/Dev/WatermarkFactory
+exec
+/bin/zsh -lc "sed -n '1,320p' WatermarkFactory/ImageProcessor.swift" in /Users/zentermind/Dev/WatermarkFactory
+ succeeded in 0ms:
+import AppKit
+import CoreGraphics
+import Foundation
+import ImageIO
+import UniformTypeIdentifiers
+
+enum ImageProcessorError: Error {
+    case loadFailed
+    case contextFailed
+    case encodeFailed
+}
+
+struct ImageProcessor {
+    static let supportedExtensions: Set<String> = ["jpg", "jpeg", "png", "heic", "tif", "tiff"]
+
+    static func thumbnail(for url: URL, maxPixelSize: CGFloat = 96) -> NSImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+                kCGImageSourceCreateThumbnailWithTransform: true
+              ] as CFDictionary) else { return nil }
+        return NSImage(cgImage: image, size: .zero)
+    }
+
+    static func watermarkedImage(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings) throws -> CGImage {
+        guard let source = loadCGImage(sourceURL), let watermark = loadCGImage(watermarkURL) else {
+            throw ImageProcessorError.loadFailed
+        }
+        return try compose(source: source, watermark: watermark, settings: settings, destinationFormat: settings.exportFormat)
+    }
+
+    static func encodedWatermarkData(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings) throws -> Data {
+        let image = try watermarkedImage(sourceURL: sourceURL, watermarkURL: watermarkURL, settings: settings)
+        return try encode(image: image, sourceURL: sourceURL, format: settings.exportFormat, quality: settings.jpegQuality).data
+    }
+
+    static func export(sourceURL: URL, watermarkURL: URL, outputFolder: URL, settings: WatermarkSettings) throws -> (url: URL, bytes: Int, usedHEICFallback: Bool) {
+        let image = try watermarkedImage(sourceURL: sourceURL, watermarkURL: watermarkURL, settings: settings)
+        let encoded = try encode(image: image, sourceURL: sourceURL, format: settings.exportFormat, quality: settings.jpegQuality)
+        let base = sourceURL.deletingPathExtension().lastPathComponent
+        let outputURL = outputFolder.appendingPathComponent(base).appendingPathExtension(encoded.ext)
+        try encoded.data.write(to: outputURL, options: .atomic)
+        return (outputURL, encoded.data.count, encoded.usedHEICFallback)
+    }
+
+    private static func loadCGImage(_ url: URL) -> CGImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(source, 0, [
+            kCGImageSourceShouldCache: true,
+            kCGImageSourceCreateThumbnailWithTransform: true
+        ] as CFDictionary)
+    }
+
+    private static func compose(source: CGImage, watermark: CGImage, settings: WatermarkSettings, destinationFormat: ExportFormat) throws -> CGImage {
+        let width = source.width
+        let height = source.height
+        let alphaInfo: CGImageAlphaInfo = destinationFormat == .jpeg ? .noneSkipLast : .premultipliedLast
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace, bitmapInfo: alphaInfo.rawValue) else {
+            throw ImageProcessorError.contextFailed
+        }
+
+        if destinationFormat == .jpeg {
+            context.setFillColor(NSColor.white.cgColor)
+            context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        context.interpolationQuality = .high
+        context.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
+        context.setAlpha(settings.opacity)
+
+        let targetLongestSide = min(CGFloat(width), CGFloat(height)) * settings.sizeFraction
+        let scale = targetLongestSide / max(CGFloat(watermark.width), CGFloat(watermark.height))
+        let watermarkSize = CGSize(width: CGFloat(watermark.width) * scale, height: CGFloat(watermark.height) * scale)
+
+        switch settings.layoutMode {
+        case .single:
+            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, offsetX: settings.offsetX, offsetY: settings.offsetY))
+        case .tiled:
+            drawTiles(context: context, watermark: watermark, canvas: CGSize(width: width, height: height), size: watermarkSize, settings: settings)
+        }
+
+        guard let image = context.makeImage() else { throw ImageProcessorError.contextFailed }
+        return image
+    }
+
+    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, offsetX: Double, offsetY: Double) -> CGRect {
+        var x: CGFloat
+        var y: CGFloat
+        switch anchor {
+        case .topLeft, .left, .bottomLeft: x = 0
+        case .top, .center, .bottom: x = (canvas.width - size.width) / 2
+        case .topRight, .right, .bottomRight: x = canvas.width - size.width
+        }
+        switch anchor {
+        case .bottomLeft, .bottom, .bottomRight: y = 0
+        case .left, .center, .right: y = (canvas.height - size.height) / 2
+        case .topLeft, .top, .topRight: y = canvas.height - size.height
+        }
+        return CGRect(x: x + offsetX, y: y - offsetY, width: size.width, height: size.height)
+    }
+
+    private static func drawTiles(context: CGContext, watermark: CGImage, canvas: CGSize, size: CGSize, settings: WatermarkSettings) {
+        let stepX = max(1, size.width + settings.spacing)
+        let stepY = max(1, size.height + settings.spacing)
+        var row = 0
+        var y = -size.height
+        while y < canvas.height + size.height {
+            let angle: CGFloat
+            switch settings.rotationPattern {
+            case .none: angle = 0
+            case .diagonal: angle = 45
+            case .alternating: angle = row.isMultiple(of: 2) ? 0 : 45
+            case .custom: angle = settings.customAngle
+            }
+            var x = -size.width
+            while x < canvas.width + size.width {
+                context.saveGState()
+                context.translateBy(x: x + size.width / 2, y: y + size.height / 2)
+                context.rotate(by: angle * .pi / 180)
+                context.draw(watermark, in: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
+                context.restoreGState()
+                x += stepX
+            }
+            row += 1
+            y += stepY
+        }
+    }
+
+    private static func encode(image: CGImage, sourceURL: URL, format: ExportFormat, quality: Double) throws -> (data: Data, ext: String, usedHEICFallback: Bool) {
+        let sourceExt = sourceURL.pathExtension.lowercased()
+        let resolved: (type: UTType, ext: String, fallback: Bool) = {
+            switch format {
+            case .jpeg: return (.jpeg, "jpg", false)
+            case .png: return (.png, "png", false)
+            case .tiff: return (.tiff, "tiff", false)
+            case .keepOriginal:
+                switch sourceExt {
+                case "jpg", "jpeg": return (.jpeg, sourceExt, false)
+                case "png": return (.png, "png", false)
+                case "tif", "tiff": return (.tiff, sourceExt, false)
+                default: return (.png, "png", sourceExt == "heic")
+                }
+            }
+        }()
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, resolved.type.identifier as CFString, 1, nil) else {
+            throw ImageProcessorError.encodeFailed
+        }
+        let options = resolved.type == .jpeg ? [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary : nil
+        CGImageDestinationAddImage(destination, image, options)
+        guard CGImageDestinationFinalize(destination) else { throw ImageProcessorError.encodeFailed }
+        return (data as Data, resolved.ext, resolved.fallback)
+    }
+}
+
+ succeeded in 0ms:
+import AppKit
+import SwiftUI
+
+@MainActor
+final class AppState: ObservableObject {
+    @Published var folderURL: URL?
+    @Published var watermarkURL: URL?
+    @Published var images: [ImageItem] = []
+    @Published var selected: ImageItem?
+    @Published var sizePreset: WatermarkSizePreset? = .medium
+    @Published var opacityPreset: OpacityPreset? = .balanced
+    @Published var sizeFraction = 0.35 { didSet { saveSettings(); updateEstimate() } }
+    @Published var opacity = 0.5 { didSet { saveSettings(); updateEstimate() } }
+    @Published var anchor: Anchor = .bottomRight { didSet { saveSettings(); updateEstimate() } }
+    @Published var offsetX = 24.0 { didSet { saveSettings(); updateEstimate() } }
+    @Published var offsetY = 24.0 { didSet { saveSettings(); updateEstimate() } }
+    @Published var layoutMode: LayoutMode = .single { didSet { saveSettings(); updateEstimate() } }
+    @Published var spacing = 80.0 { didSet { saveSettings(); updateEstimate() } }
+    @Published var rotationPattern: RotationPattern = .diagonal { didSet { saveSettings(); updateEstimate() } }
+    @Published var customAngle = 30.0 { didSet { saveSettings(); updateEstimate() } }
+    @Published var exportFormat: ExportFormat = .keepOriginal { didSet { saveSettings(); updateEstimate() } }
+    @Published var jpegQuality = 0.9 { didSet { saveSettings(); updateEstimate() } }
+    @Published var previewImage: NSImage?
+    @Published var estimatedSize = ""
+    @Published var status = "Choose a folder and watermark to begin."
+    @Published var progress = 0.0
+    @Published var isExporting = false
+
+    private var previewTask: Task<Void, Never>?
+    private let defaults = UserDefaults.standard
+
+    init() {
+        restore()
+    }
+
+    var canExport: Bool { watermarkURL != nil && !images.isEmpty && !isExporting }
+    var exportHint: String? {
+        if images.isEmpty { return "Choose a folder or images before export." }
+        if watermarkURL == nil { return "Choose a watermark image before export." }
+        return nil
+    }
+    var settings: WatermarkSettings {
+        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
+    }
+
+    func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url {
+            setFolder(url)
+        }
+    }
+
+    func chooseImages() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = true
+        panel.allowedContentTypes = [.png, .jpeg, .heic, .tiff]
+        if panel.runModal() == .OK {
+            setImages(panel.urls)
+        }
+    }
+
+    func chooseWatermark() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.png, .jpeg, .heic, .tiff]
+        if panel.runModal() == .OK, let url = panel.url {
+            setWatermark(url)
+        }
+    }
+
+    func select(_ item: ImageItem) {
+        selected = item
+        updateEstimate()
+    }
+
+    func updateEstimate() {
+        previewTask?.cancel()
+        guard let source = selected?.url, let watermark = watermarkURL else {
+            previewImage = selected.flatMap { ImageProcessor.thumbnail(for: $0.url, maxPixelSize: 900) }
+            estimatedSize = ""
+            return
+        }
+        let settings = settings
+        previewTask = Task.detached {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            if Task.isCancelled { return }
+            let image = try? ImageProcessor.watermarkedImage(sourceURL: source, watermarkURL: watermark, settings: settings)
+            let data = try? ImageProcessor.encodedWatermarkData(sourceURL: source, watermarkURL: watermark, settings: settings)
+            await MainActor.run {
+                if !Task.isCancelled {
+                    self.previewImage = image.map { NSImage(cgImage: $0, size: .zero) }
+                    self.estimatedSize = data.map { "~" + Self.formatBytes($0.count) } ?? ""
+                }
+            }
+        }
+    }
+
+    func exportAll() {
+        guard let watermark = watermarkURL else { return }
+        isExporting = true
+        progress = 0
+        status = "Exporting 0 of \(images.count)..."
+        let items = images
+        let settings = settings
+        Task.detached {
+            var summary = ExportSummary(success: 0, failed: [], bytes: 0, usedHEICFallback: false)
+            let watermarkAccess = watermark.startAccessingSecurityScopedResource()
+            var revealURL: URL?
+            defer {
+                if watermarkAccess { watermark.stopAccessingSecurityScopedResource() }
+            }
+            for (index, item) in items.enumerated() {
+                let access = item.url.startAccessingSecurityScopedResource()
+                defer { if access { item.url.stopAccessingSecurityScopedResource() } }
+                do {
+                    let output = item.url.deletingLastPathComponent().appendingPathComponent("Watermarked", isDirectory: true)
+                    try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+                    let result = try ImageProcessor.export(sourceURL: item.url, watermarkURL: watermark, outputFolder: output, settings: settings)
+                    revealURL = revealURL ?? output
+                    summary.success += 1
+                    summary.bytes += result.bytes
+                    summary.usedHEICFallback = summary.usedHEICFallback || result.usedHEICFallback
+                } catch {
+                    summary.failed.append(item.filename)
+                }
+                await MainActor.run {
+                    self.progress = Double(index + 1) / Double(items.count)
+                    self.status = "Exporting \(index + 1) of \(items.count)..."
+                }
+            }
+            await MainActor.run {
+                if let revealURL {
+                    NSWorkspace.shared.activateFileViewerSelecting([revealURL])
+                }
+                self.isExporting = false
+                var text = "\(summary.success) of \(items.count) images watermarked, total output size ~\(Self.formatBytes(summary.bytes))."
+                if summary.usedHEICFallback { text += " HEIC was exported as PNG." }
+                if !summary.failed.isEmpty { text += " Failed: \(summary.failed.joined(separator: ", "))." }
+                self.status = text
+            }
+        }
+    }
+
+    private func setFolder(_ url: URL) {
+        folderURL = url
+        saveBookmark(url, key: "folderBookmark")
+        reloadImages()
+    }
+
+    private func setImages(_ urls: [URL]) {
+        folderURL = nil
+        defaults.set(true, forKey: "usedIndividualImages")
+        let filtered = urls
+            .filter { ImageProcessor.supportedExtensions.contains($0.pathExtension.lowercased()) }
+            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+        images = filtered.map(ImageItem.init)
+        selected = images.first
+        status = images.isEmpty ? "No supported images selected." : "\(images.count) images selected."
+        saveImageBookmarks()
+        updateEstimate()
+    }
+
+    private func setWatermark(_ url: URL) {
+        watermarkURL = url
+        saveBookmark(url, key: "watermarkBookmark")
+        updateEstimate()
+    }
+
+    private func reloadImages() {
+        guard let folderURL else { return }
+        let access = folderURL.startAccessingSecurityScopedResource()
+        defer { if access { folderURL.stopAccessingSecurityScopedResource() } }
+        do {
+            defaults.set(false, forKey: "usedIndividualImages")
+            images = try FileManager.default.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: nil)
+                .filter { ImageProcessor.supportedExtensions.contains($0.pathExtension.lowercased()) }
+                .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+                .map(ImageItem.init)
+            selected = images.first
+            status = images.isEmpty ? "No supported images found in this folder." : "\(images.count) images found."
+            saveImageBookmarks()
+            updateEstimate()
+        } catch {
+            images = []
+            selected = nil
+            status = "Couldn't access the selected folder. Please re-choose it."
+        }
+    }
+
+    private func saveSettings() {
+        defaults.set(sizeFraction, forKey: "sizeFraction")
+        defaults.set(opacity, forKey: "opacity")
+        defaults.set(anchor.rawValue, forKey: "anchor")
+        defaults.set(offsetX, forKey: "offsetX")
+        defaults.set(offsetY, forKey: "offsetY")
+        defaults.set(layoutMode.rawValue, forKey: "layoutMode")
+        defaults.set(spacing, forKey: "spacing")
+        defaults.set(rotationPattern.rawValue, forKey: "rotationPattern")
+        defaults.set(customAngle, forKey: "customAngle")
+        defaults.set(exportFormat.rawValue, forKey: "exportFormat")
+        defaults.set(jpegQuality, forKey: "jpegQuality")
+    }
+
+    private func restore() {
+        if defaults.object(forKey: "sizeFraction") != nil { sizeFraction = defaults.double(forKey: "sizeFraction") }
+        if defaults.object(forKey: "opacity") != nil { opacity = defaults.double(forKey: "opacity") }
+        anchor = Anchor(rawValue: defaults.string(forKey: "anchor") ?? "") ?? .bottomRight
+        offsetX = defaults.object(forKey: "offsetX") == nil ? 24 : defaults.double(forKey: "offsetX")
+        offsetY = defaults.object(forKey: "offsetY") == nil ? 24 : defaults.double(forKey: "offsetY")
+        layoutMode = LayoutMode(rawValue: defaults.string(forKey: "layoutMode") ?? "") ?? .single
+        spacing = defaults.object(forKey: "spacing") == nil ? 80 : defaults.double(forKey: "spacing")
+        rotationPattern = RotationPattern(rawValue: defaults.string(forKey: "rotationPattern") ?? "") ?? .diagonal
+        customAngle = defaults.object(forKey: "customAngle") == nil ? 30 : defaults.double(forKey: "customAngle")
+        exportFormat = ExportFormat(rawValue: defaults.string(forKey: "exportFormat") ?? "") ?? .keepOriginal
+        jpegQuality = defaults.object(forKey: "jpegQuality") == nil ? 0.9 : defaults.double(forKey: "jpegQuality")
+        folderURL = restoreBookmark("folderBookmark")
+        watermarkURL = restoreBookmark("watermarkBookmark")
+        let restoredImages = restoreImageBookmarks()
+        if restoredImages.isEmpty {
+            reloadImages()
+        } else {
+            if defaults.bool(forKey: "usedIndividualImages") { folderURL = nil }
+            images = restoredImages.map(ImageItem.init)
+            selected = images.first
+            status = "\(images.count) images restored."
+            updateEstimate()
+        }
+    }
+
+    private func saveBookmark(_ url: URL, key: String) {
+        if let data = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) {
+            defaults.set(data, forKey: key)
+        }
+    }
+
+    private func restoreBookmark(_ key: String) -> URL? {
+        guard let data = defaults.data(forKey: key) else { return nil }
+        var stale = false
+        return try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)
+    }
+
+    private func saveImageBookmarks() {
+        let bookmarks = images.compactMap {
+            try? $0.url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+        }
+        defaults.set(bookmarks, forKey: "imageBookmarks")
+    }
+
+    private func restoreImageBookmarks() -> [URL] {
+        guard let bookmarks = defaults.array(forKey: "imageBookmarks") as? [Data] else { return [] }
+        return bookmarks.compactMap { data in
+            var stale = false
+            return try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale)
+        }
+    }
+
+    static func formatBytes(_ count: Int) -> String {
+        let value = Double(count)
+        return value >= 1_048_576 ? String(format: "%.1f MB", value / 1_048_576) : String(format: "%.0f KB", value / 1024)
+    }
+}
+
+struct ContentView: View {
+    @StateObject private var state = AppState()
+
+    var body: some View {
+        HStack(spacing: 0) {
+            sidebar
+            Divider()
+            previewPane
+            Divider()
+            controls
+        }
+    }
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button("Choose Folder...") { state.chooseFolder() }
+            Button("Choose Images...") { state.chooseImages() }
+            if let folder = state.folderURL {
+                Text(folder.lastPathComponent).font(.caption).foregroundStyle(.secondary)
+            }
+            if state.images.isEmpty {
+                Spacer()
+                Text("Choose a folder or select individual images to get started.").foregroundStyle(.secondary).frame(maxWidth: .infinity)
+                Spacer()
+            } else {
+                List(state.images, selection: Binding(get: { state.selected }, set: { if let item = $0 { state.select(item) } })) { item in
+                    HStack {
+                        Thumb(url: item.url, size: 42)
+                        Text(item.filename).lineLimit(1)
+                    }
+                    .tag(item as ImageItem?)
+                }
+            }
+        }
+        .padding()
+        .frame(width: 260)
+    }
+
+    private var previewPane: some View {
+        VStack(spacing: 12) {
+            ZStack {
+                Color(NSColor.windowBackgroundColor)
+                if let image = state.previewImage {
+                    Image(nsImage: image).resizable().scaledToFit().padding()
+                } else {
+                    Text("Select an image to preview.").foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
+            ScrollView(.horizontal) {
+                HStack {
+                    ForEach(state.images) { item in
+                        Thumb(url: item.url, size: 64)
+                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(state.selected == item ? Color.accentColor : .clear, lineWidth: 3))
+                            .onTapGesture { state.select(item) }
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .frame(height: 86)
+            Text(state.status).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+        }
+        .frame(minWidth: 500)
+    }
+
+    private var controls: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                GroupBox("Watermark image") {
+                    HStack {
+                        Button("Choose Watermark...") { state.chooseWatermark() }
+                        if let url = state.watermarkURL { Thumb(url: url, size: 56) }
+                    }
+                }
+                presetSection("Size", presets: WatermarkSizePreset.allCases, selected: state.sizePreset?.id, valueText: state.sizePreset?.label ?? "Custom") { preset in
+                    state.sizePreset = preset
+                    state.sizeFraction = preset.value
+                }
+                Slider(value: Binding(get: { state.sizeFraction }, set: { state.sizePreset = nil; state.sizeFraction = $0 }), in: 0.05...1.0)
+                Text("\(Int(state.sizeFraction * 100))%").font(.caption)
+
+                presetSection("Opacity", presets: OpacityPreset.allCases, selected: state.opacityPreset?.id, valueText: state.opacityPreset?.label ?? "Custom") { preset in
+                    state.opacityPreset = preset
+                    state.opacity = preset.value
+                }
+                Slider(value: Binding(get: { state.opacity }, set: { state.opacityPreset = nil; state.opacity = $0 }), in: 0...1)
+                Text("\(Int(state.opacity * 100))%").font(.caption)
+
+                Picker("Layout mode", selection: $state.layoutMode) {
+                    ForEach(LayoutMode.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+
+                if state.layoutMode == .single { singleControls } else { tiledControls }
+
+                Picker("Export format", selection: $state.exportFormat) {
+                    ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                if state.exportFormat == .jpeg {
+                    Slider(value: $state.jpegQuality, in: 0...1)
+                    Text("JPEG quality \(Int(state.jpegQuality * 100))%").font(.caption)
+                }
+                Text(state.exportFormat.hint).font(.caption).foregroundStyle(.secondary)
+                if !state.estimatedSize.isEmpty {
+                    Text("Estimated output size \(state.estimatedSize)").font(.caption)
+                }
+                Button("Watermark All Images") { state.exportAll() }
+                    .disabled(!state.canExport)
+                if let hint = state.exportHint { Text(hint).font(.caption).foregroundStyle(.secondary) }
+                if state.isExporting { ProgressView(value: state.progress) }
+            }
+            .padding()
+        }
+        .frame(width: 340)
+    }
+
+    private var singleControls: some View {
+        VStack(alignment: .leading) {
+            Text("Position").font(.headline)
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(44)), count: 3), spacing: 8) {
+                ForEach(Anchor.allCases) { anchor in
+                    Button { state.anchor = anchor } label: {
+                        Image(systemName: anchor.symbol).frame(width: 32, height: 28)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(state.anchor == anchor ? .accentColor : .secondary)
+                }
+            }
+            HStack {
+                TextField("X", value: $state.offsetX, format: .number).frame(width: 70)
+                TextField("Y", value: $state.offsetY, format: .number).frame(width: 70)
+            }
+        }
+    }
+
+    private var tiledControls: some View {
+        VStack(alignment: .leading) {
+            Slider(value: $state.spacing, in: 0...400) { Text("Spacing") }
+            Text("Spacing \(Int(state.spacing)) px").font(.caption)
+            Picker("Rotation", selection: $state.rotationPattern) {
+                ForEach(RotationPattern.allCases) { Text($0.rawValue).tag($0) }
+            }
+            if state.rotationPattern == .custom {
+                TextField("Degrees", value: $state.customAngle, format: .number).frame(width: 90)
+            }
+        }
+    }
+
+    private func presetSection<P: Identifiable>(_ title: String, presets: [P], selected: P.ID?, valueText: String, action: @escaping (P) -> Void) -> some View where P.ID == String {
+        VStack(alignment: .leading, spacing: 8) {
+
+exec
+/bin/zsh -lc "sed -n '1,260p' WatermarkFactory/Models.swift" in /Users/zentermind/Dev/WatermarkFactory
+ succeeded in 0ms:
+import Foundation
+import SwiftUI
+
+enum WatermarkSizePreset: String, CaseIterable, Identifiable {
+    case tiny, small, medium, large, full
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .tiny: "Tiny (10%)"
+        case .small: "Small (20%)"
+        case .medium: "Medium (35%)"
+        case .large: "Large (50%)"
+        case .full: "Full (75%)"
+        }
+    }
+    var value: Double {
+        switch self {
+        case .tiny: 0.10
+        case .small: 0.20
+        case .medium: 0.35
+        case .large: 0.50
+        case .full: 0.75
+        }
+    }
+}
+
+enum OpacityPreset: String, CaseIterable, Identifiable {
+    case ghost, subtle, balanced, bold, solid
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .ghost: "Ghost (10%)"
+        case .subtle: "Subtle (25%)"
+        case .balanced: "Balanced (50%)"
+        case .bold: "Bold (75%)"
+        case .solid: "Solid (100%)"
+        }
+    }
+    var value: Double {
+        switch self {
+        case .ghost: 0.10
+        case .subtle: 0.25
+        case .balanced: 0.50
+        case .bold: 0.75
+        case .solid: 1.00
+        }
+    }
+}
+
+enum Anchor: String, CaseIterable, Identifiable {
+    case topLeft, top, topRight, left, center, right, bottomLeft, bottom, bottomRight
+    var id: String { rawValue }
+    var symbol: String {
+        switch self {
+        case .topLeft: "arrow.up.left"
+        case .top: "arrow.up"
+        case .topRight: "arrow.up.right"
+        case .left: "arrow.left"
+        case .center: "dot.scope"
+        case .right: "arrow.right"
+        case .bottomLeft: "arrow.down.left"
+        case .bottom: "arrow.down"
+        case .bottomRight: "arrow.down.right"
+        }
+    }
+}
+
+enum LayoutMode: String, CaseIterable, Identifiable {
+    case single = "Single"
+    case tiled = "Tiled"
+    var id: String { rawValue }
+}
+
+enum RotationPattern: String, CaseIterable, Identifiable {
+    case none = "None (0deg)"
+    case diagonal = "Diagonal (45deg)"
+    case alternating = "Alternating rows (0deg/45deg)"
+    case custom = "Custom angle"
+    var id: String { rawValue }
+}
+
+enum ExportFormat: String, CaseIterable, Identifiable {
+    case keepOriginal = "Keep Original"
+    case jpeg = "JPEG"
+    case png = "PNG"
+    case tiff = "TIFF"
+    var id: String { rawValue }
+    var hint: String {
+        switch self {
+        case .keepOriginal: "Preserves source type where possible; HEIC falls back to PNG."
+        case .jpeg: "Smaller file, no transparency."
+        case .png: "Lossless, supports transparency."
+        case .tiff: "Largest file, lossless, editing-grade."
+        }
+    }
+    var fileExtension: String? {
+        switch self {
+        case .keepOriginal: nil
+        case .jpeg: "jpg"
+        case .png: "png"
+        case .tiff: "tiff"
+        }
+    }
+}
+
+struct ImageItem: Identifiable, Hashable {
+    let url: URL
+    var id: URL { url }
+    var filename: String { url.lastPathComponent }
+}
+
+struct WatermarkSettings {
+    var sizeFraction: Double
+    var opacity: Double
+    var anchor: Anchor
+    var offsetX: Double
+    var offsetY: Double
+    var layoutMode: LayoutMode
+    var spacing: Double
+    var rotationPattern: RotationPattern
+    var customAngle: Double
+    var exportFormat: ExportFormat
+    var jpegQuality: Double
+}
+
+struct ExportSummary {
+    var success: Int
+    var failed: [String]
+    var bytes: Int
+    var usedHEICFallback: Bool
+}
+
+exec
+/bin/zsh -lc 'rg -n "spacing|offset|anchor|UserDefaults|WatermarkSettings|tile|position|Padding" WatermarkFactory' in /Users/zentermind/Dev/WatermarkFactory
+ succeeded in 0ms:
+WatermarkFactory/Models.swift:70:    case tiled = "Tiled"
+WatermarkFactory/Models.swift:112:struct WatermarkSettings {
+WatermarkFactory/Models.swift:115:    var anchor: Anchor
+WatermarkFactory/Models.swift:116:    var offsetX: Double
+WatermarkFactory/Models.swift:117:    var offsetY: Double
+WatermarkFactory/Models.swift:119:    var spacing: Double
+WatermarkFactory/ContentView.swift:14:    @Published var anchor: Anchor = .bottomRight { didSet { saveSettings(); updateEstimate() } }
+WatermarkFactory/ContentView.swift:15:    @Published var offsetX = 24.0 { didSet { saveSettings(); updateEstimate() } }
+WatermarkFactory/ContentView.swift:16:    @Published var offsetY = 24.0 { didSet { saveSettings(); updateEstimate() } }
+WatermarkFactory/ContentView.swift:18:    @Published var spacing = 80.0 { didSet { saveSettings(); updateEstimate() } }
+WatermarkFactory/ContentView.swift:30:    private let defaults = UserDefaults.standard
+WatermarkFactory/ContentView.swift:42:    var settings: WatermarkSettings {
+WatermarkFactory/ContentView.swift:43:        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
+WatermarkFactory/ContentView.swift:199:        defaults.set(anchor.rawValue, forKey: "anchor")
+WatermarkFactory/ContentView.swift:200:        defaults.set(offsetX, forKey: "offsetX")
+WatermarkFactory/ContentView.swift:201:        defaults.set(offsetY, forKey: "offsetY")
+WatermarkFactory/ContentView.swift:203:        defaults.set(spacing, forKey: "spacing")
+WatermarkFactory/ContentView.swift:213:        anchor = Anchor(rawValue: defaults.string(forKey: "anchor") ?? "") ?? .bottomRight
+WatermarkFactory/ContentView.swift:214:        offsetX = defaults.object(forKey: "offsetX") == nil ? 24 : defaults.double(forKey: "offsetX")
+WatermarkFactory/ContentView.swift:215:        offsetY = defaults.object(forKey: "offsetY") == nil ? 24 : defaults.double(forKey: "offsetY")
+WatermarkFactory/ContentView.swift:217:        spacing = defaults.object(forKey: "spacing") == nil ? 80 : defaults.double(forKey: "spacing")
+WatermarkFactory/ContentView.swift:273:        HStack(spacing: 0) {
+WatermarkFactory/ContentView.swift:283:        VStack(alignment: .leading, spacing: 12) {
+WatermarkFactory/ContentView.swift:308:        VStack(spacing: 12) {
+WatermarkFactory/ContentView.swift:337:            VStack(alignment: .leading, spacing: 18) {
+WatermarkFactory/ContentView.swift:363:                if state.layoutMode == .single { singleControls } else { tiledControls }
+WatermarkFactory/ContentView.swift:390:            LazyVGrid(columns: Array(repeating: GridItem(.fixed(44)), count: 3), spacing: 8) {
+WatermarkFactory/ContentView.swift:391:                ForEach(Anchor.allCases) { anchor in
+WatermarkFactory/ContentView.swift:392:                    Button { state.anchor = anchor } label: {
+WatermarkFactory/ContentView.swift:393:                        Image(systemName: anchor.symbol).frame(width: 32, height: 28)
+WatermarkFactory/ContentView.swift:396:                    .tint(state.anchor == anchor ? .accentColor : .secondary)
+WatermarkFactory/ContentView.swift:400:                TextField("X", value: $state.offsetX, format: .number).frame(width: 70)
+WatermarkFactory/ContentView.swift:401:                TextField("Y", value: $state.offsetY, format: .number).frame(width: 70)
+WatermarkFactory/ContentView.swift:406:    private var tiledControls: some View {
+WatermarkFactory/ContentView.swift:408:            Slider(value: $state.spacing, in: 0...400) { Text("Spacing") }
+WatermarkFactory/ContentView.swift:409:            Text("Spacing \(Int(state.spacing)) px").font(.caption)
+WatermarkFactory/ContentView.swift:420:        VStack(alignment: .leading, spacing: 8) {
+WatermarkFactory/ImageProcessor.swift:26:    static func watermarkedImage(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings) throws -> CGImage {
+WatermarkFactory/ImageProcessor.swift:33:    static func encodedWatermarkData(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings) throws -> Data {
+WatermarkFactory/ImageProcessor.swift:38:    static func export(sourceURL: URL, watermarkURL: URL, outputFolder: URL, settings: WatermarkSettings) throws -> (url: URL, bytes: Int, usedHEICFallback: Bool) {
+WatermarkFactory/ImageProcessor.swift:55:    private static func compose(source: CGImage, watermark: CGImage, settings: WatermarkSettings, destinationFormat: ExportFormat) throws -> CGImage {
+WatermarkFactory/ImageProcessor.swift:78:            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, offsetX: settings.offsetX, offsetY: settings.offsetY))
+WatermarkFactory/ImageProcessor.swift:79:        case .tiled:
+WatermarkFactory/ImageProcessor.swift:87:    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, offsetX: Double, offsetY: Double) -> CGRect {
+WatermarkFactory/ImageProcessor.swift:90:        switch anchor {
+WatermarkFactory/ImageProcessor.swift:95:        switch anchor {
+WatermarkFactory/ImageProcessor.swift:100:        return CGRect(x: x + offsetX, y: y - offsetY, width: size.width, height: size.height)
+WatermarkFactory/ImageProcessor.swift:103:    private static func drawTiles(context: CGContext, watermark: CGImage, canvas: CGSize, size: CGSize, settings: WatermarkSettings) {
+WatermarkFactory/ImageProcessor.swift:104:        let stepX = max(1, size.width + settings.spacing)
+WatermarkFactory/ImageProcessor.swift:105:        let stepY = max(1, size.height + settings.spacing)
+
+codex
+The implementation is compact: `WatermarkSettings` feeds one compositor, and UI state already persists via `UserDefaults`. I’m going to add `padding` to that path and adjust the shared placement/tile math once.
+exec
+/bin/zsh -lc "sed -n '420,520p' WatermarkFactory/ContentView.swift" in /Users/zentermind/Dev/WatermarkFactory
+ succeeded in 0ms:
+        VStack(alignment: .leading, spacing: 8) {
+            Text("\(title): \(valueText)").font(.headline)
+            FlowLayout {
+                ForEach(presets) { preset in
+                    Button(label(for: preset)) { action(preset) }
+                        .buttonStyle(.bordered)
+                        .tint(selected == preset.id ? .accentColor : .secondary)
+                }
+            }
+        }
+    }
+
+    private func label<P>(for preset: P) -> String {
+        if let preset = preset as? WatermarkSizePreset { return preset.label }
+        if let preset = preset as? OpacityPreset { return preset.label }
+        return ""
+    }
+}
+
+struct Thumb: View {
+    let url: URL
+    let size: CGFloat
+    @State private var image: NSImage?
+
+    var body: some View {
+        ZStack {
+            Color.gray.opacity(0.12)
+            if let image { Image(nsImage: image).resizable().scaledToFit() }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .task(id: url) { image = ImageProcessor.thumbnail(for: url, maxPixelSize: size * 2) }
+    }
+}
+
+struct FlowLayout<Content: View>: View {
+    @ViewBuilder var content: Content
+    var body: some View { VStack(alignment: .leading) { content } }
+}
+
+codex
+I’m editing three existing spots only: the settings model, the persisted `AppState` properties/UI slider, and the compositor’s existing rect/tile helpers. No new dependency or side system is needed.
+apply patch
+patch: completed
+/Users/zentermind/Dev/WatermarkFactory/WatermarkFactory/ContentView.swift
+/Users/zentermind/Dev/WatermarkFactory/WatermarkFactory/ImageProcessor.swift
+/Users/zentermind/Dev/WatermarkFactory/WatermarkFactory/Models.swift
+diff --git a/WatermarkFactory/ContentView.swift b/WatermarkFactory/ContentView.swift
+index bee8ed7c34e47350bcf5e2b2657dbef160fcec13..a6647cb8c17f14efd92a3e1cbbc8637415e6ccb9
+--- a/WatermarkFactory/ContentView.swift
++++ b/WatermarkFactory/ContentView.swift
+@@ -15,6 +15,7 @@
+     @Published var offsetX = 24.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var offsetY = 24.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var layoutMode: LayoutMode = .single { didSet { saveSettings(); updateEstimate() } }
++    @Published var padding = 16.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var spacing = 80.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var rotationPattern: RotationPattern = .diagonal { didSet { saveSettings(); updateEstimate() } }
+     @Published var customAngle = 30.0 { didSet { saveSettings(); updateEstimate() } }
+@@ -40,7 +41,7 @@
+         return nil
+     }
+     var settings: WatermarkSettings {
+-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
++        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
+     }
+ 
+     func chooseFolder() {
+@@ -200,6 +201,7 @@
+         defaults.set(offsetX, forKey: "offsetX")
+         defaults.set(offsetY, forKey: "offsetY")
+         defaults.set(layoutMode.rawValue, forKey: "layoutMode")
++        defaults.set(padding, forKey: "padding")
+         defaults.set(spacing, forKey: "spacing")
+         defaults.set(rotationPattern.rawValue, forKey: "rotationPattern")
+         defaults.set(customAngle, forKey: "customAngle")
+@@ -214,6 +216,7 @@
+         offsetX = defaults.object(forKey: "offsetX") == nil ? 24 : defaults.double(forKey: "offsetX")
+         offsetY = defaults.object(forKey: "offsetY") == nil ? 24 : defaults.double(forKey: "offsetY")
+         layoutMode = LayoutMode(rawValue: defaults.string(forKey: "layoutMode") ?? "") ?? .single
++        padding = defaults.object(forKey: "padding") == nil ? 16 : defaults.double(forKey: "padding")
+         spacing = defaults.object(forKey: "spacing") == nil ? 80 : defaults.double(forKey: "spacing")
+         rotationPattern = RotationPattern(rawValue: defaults.string(forKey: "rotationPattern") ?? "") ?? .diagonal
+         customAngle = defaults.object(forKey: "customAngle") == nil ? 30 : defaults.double(forKey: "customAngle")
+@@ -361,6 +364,11 @@
+                 .pickerStyle(.segmented)
+ 
+                 if state.layoutMode == .single { singleControls } else { tiledControls }
++                Slider(value: $state.padding, in: 0...100) { Text("Padding") }
++                Text("Padding \(Int(state.padding)) px").font(.caption)
++                if state.layoutMode == .tiled {
++                    Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(.secondary)
++                }
+ 
+                 Picker("Export format", selection: $state.exportFormat) {
+                     ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
+diff --git a/WatermarkFactory/ImageProcessor.swift b/WatermarkFactory/ImageProcessor.swift
+index 1d086834f55eb94ee1046108c60445046fd1d58b..dd952c7aeca8509c3d162099166446614786bbe6
+--- a/WatermarkFactory/ImageProcessor.swift
++++ b/WatermarkFactory/ImageProcessor.swift
+@@ -75,7 +75,7 @@
+ 
+         switch settings.layoutMode {
+         case .single:
+-            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, offsetX: settings.offsetX, offsetY: settings.offsetY))
++            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, padding: settings.padding, offsetX: settings.offsetX, offsetY: settings.offsetY))
+         case .tiled:
+             drawTiles(context: context, watermark: watermark, canvas: CGSize(width: width, height: height), size: watermarkSize, settings: settings)
+         }
+@@ -84,28 +84,31 @@
+         return image
+     }
+ 
+-    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, offsetX: Double, offsetY: Double) -> CGRect {
++    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, padding: Double, offsetX: Double, offsetY: Double) -> CGRect {
+         var x: CGFloat
+         var y: CGFloat
++        let padding = CGFloat(padding)
+         switch anchor {
+-        case .topLeft, .left, .bottomLeft: x = 0
++        case .topLeft, .left, .bottomLeft: x = padding
+         case .top, .center, .bottom: x = (canvas.width - size.width) / 2
+-        case .topRight, .right, .bottomRight: x = canvas.width - size.width
++        case .topRight, .right, .bottomRight: x = canvas.width - size.width - padding
+         }
+         switch anchor {
+-        case .bottomLeft, .bottom, .bottomRight: y = 0
++        case .bottomLeft, .bottom, .bottomRight: y = padding
+         case .left, .center, .right: y = (canvas.height - size.height) / 2
+-        case .topLeft, .top, .topRight: y = canvas.height - size.height
++        case .topLeft, .top, .topRight: y = canvas.height - size.height - padding
+         }
+         return CGRect(x: x + offsetX, y: y - offsetY, width: size.width, height: size.height)
+     }
+ 
+     private static func drawTiles(context: CGContext, watermark: CGImage, canvas: CGSize, size: CGSize, settings: WatermarkSettings) {
+-        let stepX = max(1, size.width + settings.spacing)
+-        let stepY = max(1, size.height + settings.spacing)
++        let padding = CGFloat(settings.padding)
++        let cellSize = CGSize(width: size.width + padding * 2, height: size.height + padding * 2)
++        let stepX = max(1, cellSize.width + settings.spacing)
++        let stepY = max(1, cellSize.height + settings.spacing)
+         var row = 0
+-        var y = -size.height
+-        while y < canvas.height + size.height {
++        var y = -cellSize.height
++        while y < canvas.height + cellSize.height {
+             let angle: CGFloat
+             switch settings.rotationPattern {
+             case .none: angle = 0
+@@ -113,10 +116,10 @@
+             case .alternating: angle = row.isMultiple(of: 2) ? 0 : 45
+             case .custom: angle = settings.customAngle
+             }
+-            var x = -size.width
+-            while x < canvas.width + size.width {
++            var x = -cellSize.width
++            while x < canvas.width + cellSize.width {
+                 context.saveGState()
+-                context.translateBy(x: x + size.width / 2, y: y + size.height / 2)
++                context.translateBy(x: x + padding + size.width / 2, y: y + padding + size.height / 2)
+                 context.rotate(by: angle * .pi / 180)
+                 context.draw(watermark, in: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
+                 context.restoreGState()
+diff --git a/WatermarkFactory/Models.swift b/WatermarkFactory/Models.swift
+index 72b28a81fce2468ec9fe544cc989e6a4d777af3f..694cd1f7178c0c234445c5e45d3b26d5c0085255
+--- a/WatermarkFactory/Models.swift
++++ b/WatermarkFactory/Models.swift
+@@ -116,6 +116,7 @@
+     var offsetX: Double
+     var offsetY: Double
+     var layoutMode: LayoutMode
++    var padding: Double
+     var spacing: Double
+     var rotationPattern: RotationPattern
+     var customAngle: Double
+
+diff --git a/WatermarkFactory/ContentView.swift b/WatermarkFactory/ContentView.swift
+index bee8ed7c34e47350bcf5e2b2657dbef160fcec13..a6647cb8c17f14efd92a3e1cbbc8637415e6ccb9
+--- a/WatermarkFactory/ContentView.swift
++++ b/WatermarkFactory/ContentView.swift
+@@ -15,6 +15,7 @@
+     @Published var offsetX = 24.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var offsetY = 24.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var layoutMode: LayoutMode = .single { didSet { saveSettings(); updateEstimate() } }
++    @Published var padding = 16.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var spacing = 80.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var rotationPattern: RotationPattern = .diagonal { didSet { saveSettings(); updateEstimate() } }
+     @Published var customAngle = 30.0 { didSet { saveSettings(); updateEstimate() } }
+@@ -40,7 +41,7 @@
+         return nil
+     }
+     var settings: WatermarkSettings {
+-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
++        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
+     }
+ 
+     func chooseFolder() {
+@@ -200,6 +201,7 @@
+         defaults.set(offsetX, forKey: "offsetX")
+         defaults.set(offsetY, forKey: "offsetY")
+         defaults.set(layoutMode.rawValue, forKey: "layoutMode")
++        defaults.set(padding, forKey: "padding")
+         defaults.set(spacing, forKey: "spacing")
+         defaults.set(rotationPattern.rawValue, forKey: "rotationPattern")
+         defaults.set(customAngle, forKey: "customAngle")
+@@ -214,6 +216,7 @@
+         offsetX = defaults.object(forKey: "offsetX") == nil ? 24 : defaults.double(forKey: "offsetX")
+         offsetY = defaults.object(forKey: "offsetY") == nil ? 24 : defaults.double(forKey: "offsetY")
+         layoutMode = LayoutMode(rawValue: defaults.string(forKey: "layoutMode") ?? "") ?? .single
++        padding = defaults.object(forKey: "padding") == nil ? 16 : defaults.double(forKey: "padding")
+         spacing = defaults.object(forKey: "spacing") == nil ? 80 : defaults.double(forKey: "spacing")
+         rotationPattern = RotationPattern(rawValue: defaults.string(forKey: "rotationPattern") ?? "") ?? .diagonal
+         customAngle = defaults.object(forKey: "customAngle") == nil ? 30 : defaults.double(forKey: "customAngle")
+@@ -361,6 +364,11 @@
+                 .pickerStyle(.segmented)
+ 
+                 if state.layoutMode == .single { singleControls } else { tiledControls }
++                Slider(value: $state.padding, in: 0...100) { Text("Padding") }
++                Text("Padding \(Int(state.padding)) px").font(.caption)
++                if state.layoutMode == .tiled {
++                    Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(.secondary)
++                }
+ 
+                 Picker("Export format", selection: $state.exportFormat) {
+                     ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
+diff --git a/WatermarkFactory/ImageProcessor.swift b/WatermarkFactory/ImageProcessor.swift
+index 1d086834f55eb94ee1046108c60445046fd1d58b..dd952c7aeca8509c3d162099166446614786bbe6
+--- a/WatermarkFactory/ImageProcessor.swift
++++ b/WatermarkFactory/ImageProcessor.swift
+@@ -75,7 +75,7 @@
+ 
+         switch settings.layoutMode {
+         case .single:
+-            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, offsetX: settings.offsetX, offsetY: settings.offsetY))
++            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, padding: settings.padding, offsetX: settings.offsetX, offsetY: settings.offsetY))
+         case .tiled:
+             drawTiles(context: context, watermark: watermark, canvas: CGSize(width: width, height: height), size: watermarkSize, settings: settings)
+         }
+@@ -84,28 +84,31 @@
+         return image
+     }
+ 
+-    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, offsetX: Double, offsetY: Double) -> CGRect {
++    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, padding: Double, offsetX: Double, offsetY: Double) -> CGRect {
+         var x: CGFloat
+         var y: CGFloat
++        let padding = CGFloat(padding)
+         switch anchor {
+-        case .topLeft, .left, .bottomLeft: x = 0
++        case .topLeft, .left, .bottomLeft: x = padding
+         case .top, .center, .bottom: x = (canvas.width - size.width) / 2
+-        case .topRight, .right, .bottomRight: x = canvas.width - size.width
++        case .topRight, .right, .bottomRight: x = canvas.width - size.width - padding
+         }
+         switch anchor {
+-        case .bottomLeft, .bottom, .bottomRight: y = 0
++        case .bottomLeft, .bottom, .bottomRight: y = padding
+         case .left, .center, .right: y = (canvas.height - size.height) / 2
+-        case .topLeft, .top, .topRight: y = canvas.height - size.height
++        case .topLeft, .top, .topRight: y = canvas.height - size.height - padding
+         }
+         return CGRect(x: x + offsetX, y: y - offsetY, width: size.width, height: size.height)
+     }
+ 
+     private static func drawTiles(context: CGContext, watermark: CGImage, canvas: CGSize, size: CGSize, settings: WatermarkSettings) {
+-        let stepX = max(1, size.width + settings.spacing)
+-        let stepY = max(1, size.height + settings.spacing)
++        let padding = CGFloat(settings.padding)
++        let cellSize = CGSize(width: size.width + padding * 2, height: size.height + padding * 2)
++        let stepX = max(1, cellSize.width + settings.spacing)
++        let stepY = max(1, cellSize.height + settings.spacing)
+         var row = 0
+-        var y = -size.height
+-        while y < canvas.height + size.height {
++        var y = -cellSize.height
++        while y < canvas.height + cellSize.height {
+             let angle: CGFloat
+             switch settings.rotationPattern {
+             case .none: angle = 0
+@@ -113,10 +116,10 @@
+             case .alternating: angle = row.isMultiple(of: 2) ? 0 : 45
+             case .custom: angle = settings.customAngle
+             }
+-            var x = -size.width
+-            while x < canvas.width + size.width {
++            var x = -cellSize.width
++            while x < canvas.width + cellSize.width {
+                 context.saveGState()
+-                context.translateBy(x: x + size.width / 2, y: y + size.height / 2)
++                context.translateBy(x: x + padding + size.width / 2, y: y + padding + size.height / 2)
+                 context.rotate(by: angle * .pi / 180)
+                 context.draw(watermark, in: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
+                 context.restoreGState()
+diff --git a/WatermarkFactory/Models.swift b/WatermarkFactory/Models.swift
+index 72b28a81fce2468ec9fe544cc989e6a4d777af3f..694cd1f7178c0c234445c5e45d3b26d5c0085255
+--- a/WatermarkFactory/Models.swift
++++ b/WatermarkFactory/Models.swift
+@@ -116,6 +116,7 @@
+     var offsetX: Double
+     var offsetY: Double
+     var layoutMode: LayoutMode
++    var padding: Double
+     var spacing: Double
+     var rotationPattern: RotationPattern
+     var customAngle: Double
+
+exec
+/bin/zsh -lc 'git diff -- WatermarkFactory/Models.swift WatermarkFactory/ContentView.swift WatermarkFactory/ImageProcessor.swift' in /Users/zentermind/Dev/WatermarkFactory
+ succeeded in 0ms:
+diff --git a/WatermarkFactory/ContentView.swift b/WatermarkFactory/ContentView.swift
+index bee8ed7..a6647cb 100644
+--- a/WatermarkFactory/ContentView.swift
++++ b/WatermarkFactory/ContentView.swift
+@@ -15,6 +15,7 @@ final class AppState: ObservableObject {
+     @Published var offsetX = 24.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var offsetY = 24.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var layoutMode: LayoutMode = .single { didSet { saveSettings(); updateEstimate() } }
++    @Published var padding = 16.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var spacing = 80.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var rotationPattern: RotationPattern = .diagonal { didSet { saveSettings(); updateEstimate() } }
+     @Published var customAngle = 30.0 { didSet { saveSettings(); updateEstimate() } }
+@@ -40,7 +41,7 @@ final class AppState: ObservableObject {
+         return nil
+     }
+     var settings: WatermarkSettings {
+-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
++        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
+     }
+ 
+     func chooseFolder() {
+@@ -200,6 +201,7 @@ final class AppState: ObservableObject {
+         defaults.set(offsetX, forKey: "offsetX")
+         defaults.set(offsetY, forKey: "offsetY")
+         defaults.set(layoutMode.rawValue, forKey: "layoutMode")
++        defaults.set(padding, forKey: "padding")
+         defaults.set(spacing, forKey: "spacing")
+         defaults.set(rotationPattern.rawValue, forKey: "rotationPattern")
+         defaults.set(customAngle, forKey: "customAngle")
+@@ -214,6 +216,7 @@ final class AppState: ObservableObject {
+         offsetX = defaults.object(forKey: "offsetX") == nil ? 24 : defaults.double(forKey: "offsetX")
+         offsetY = defaults.object(forKey: "offsetY") == nil ? 24 : defaults.double(forKey: "offsetY")
+         layoutMode = LayoutMode(rawValue: defaults.string(forKey: "layoutMode") ?? "") ?? .single
++        padding = defaults.object(forKey: "padding") == nil ? 16 : defaults.double(forKey: "padding")
+         spacing = defaults.object(forKey: "spacing") == nil ? 80 : defaults.double(forKey: "spacing")
+         rotationPattern = RotationPattern(rawValue: defaults.string(forKey: "rotationPattern") ?? "") ?? .diagonal
+         customAngle = defaults.object(forKey: "customAngle") == nil ? 30 : defaults.double(forKey: "customAngle")
+@@ -361,6 +364,11 @@ struct ContentView: View {
+                 .pickerStyle(.segmented)
+ 
+                 if state.layoutMode == .single { singleControls } else { tiledControls }
++                Slider(value: $state.padding, in: 0...100) { Text("Padding") }
++                Text("Padding \(Int(state.padding)) px").font(.caption)
++                if state.layoutMode == .tiled {
++                    Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(.secondary)
++                }
+ 
+                 Picker("Export format", selection: $state.exportFormat) {
+                     ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
+diff --git a/WatermarkFactory/ImageProcessor.swift b/WatermarkFactory/ImageProcessor.swift
+index 1d08683..dd952c7 100644
+--- a/WatermarkFactory/ImageProcessor.swift
++++ b/WatermarkFactory/ImageProcessor.swift
+@@ -75,7 +75,7 @@ struct ImageProcessor {
+ 
+         switch settings.layoutMode {
+         case .single:
+-            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, offsetX: settings.offsetX, offsetY: settings.offsetY))
++            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, padding: settings.padding, offsetX: settings.offsetX, offsetY: settings.offsetY))
+         case .tiled:
+             drawTiles(context: context, watermark: watermark, canvas: CGSize(width: width, height: height), size: watermarkSize, settings: settings)
+         }
+@@ -84,28 +84,31 @@ struct ImageProcessor {
+         return image
+     }
+ 
+-    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, offsetX: Double, offsetY: Double) -> CGRect {
++    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, padding: Double, offsetX: Double, offsetY: Double) -> CGRect {
+         var x: CGFloat
+         var y: CGFloat
++        let padding = CGFloat(padding)
+         switch anchor {
+-        case .topLeft, .left, .bottomLeft: x = 0
++        case .topLeft, .left, .bottomLeft: x = padding
+         case .top, .center, .bottom: x = (canvas.width - size.width) / 2
+-        case .topRight, .right, .bottomRight: x = canvas.width - size.width
++        case .topRight, .right, .bottomRight: x = canvas.width - size.width - padding
+         }
+         switch anchor {
+-        case .bottomLeft, .bottom, .bottomRight: y = 0
++        case .bottomLeft, .bottom, .bottomRight: y = padding
+         case .left, .center, .right: y = (canvas.height - size.height) / 2
+-        case .topLeft, .top, .topRight: y = canvas.height - size.height
++        case .topLeft, .top, .topRight: y = canvas.height - size.height - padding
+         }
+         return CGRect(x: x + offsetX, y: y - offsetY, width: size.width, height: size.height)
+     }
+ 
+     private static func drawTiles(context: CGContext, watermark: CGImage, canvas: CGSize, size: CGSize, settings: WatermarkSettings) {
+-        let stepX = max(1, size.width + settings.spacing)
+-        let stepY = max(1, size.height + settings.spacing)
++        let padding = CGFloat(settings.padding)
++        let cellSize = CGSize(width: size.width + padding * 2, height: size.height + padding * 2)
++        let stepX = max(1, cellSize.width + settings.spacing)
++        let stepY = max(1, cellSize.height + settings.spacing)
+         var row = 0
+-        var y = -size.height
+-        while y < canvas.height + size.height {
++        var y = -cellSize.height
++        while y < canvas.height + cellSize.height {
+             let angle: CGFloat
+             switch settings.rotationPattern {
+             case .none: angle = 0
+@@ -113,10 +116,10 @@ struct ImageProcessor {
+             case .alternating: angle = row.isMultiple(of: 2) ? 0 : 45
+             case .custom: angle = settings.customAngle
+             }
+-            var x = -size.width
+-            while x < canvas.width + size.width {
++            var x = -cellSize.width
++            while x < canvas.width + cellSize.width {
+                 context.saveGState()
+-                context.translateBy(x: x + size.width / 2, y: y + size.height / 2)
++                context.translateBy(x: x + padding + size.width / 2, y: y + padding + size.height / 2)
+                 context.rotate(by: angle * .pi / 180)
+                 context.draw(watermark, in: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
+                 context.restoreGState()
+diff --git a/WatermarkFactory/Models.swift b/WatermarkFactory/Models.swift
+index 72b28a8..694cd1f 100644
+--- a/WatermarkFactory/Models.swift
++++ b/WatermarkFactory/Models.swift
+@@ -116,6 +116,7 @@ struct WatermarkSettings {
+     var offsetX: Double
+     var offsetY: Double
+     var layoutMode: LayoutMode
++    var padding: Double
+     var spacing: Double
+     var rotationPattern: RotationPattern
+     var customAngle: Double
+
+exec
+/bin/zsh -lc 'xcodebuild -scheme WatermarkFactory -configuration Release build' in /Users/zentermind/Dev/WatermarkFactory
+diff --git a/WatermarkFactory/ContentView.swift b/WatermarkFactory/ContentView.swift
+index bee8ed7c34e47350bcf5e2b2657dbef160fcec13..a6647cb8c17f14efd92a3e1cbbc8637415e6ccb9
+--- a/WatermarkFactory/ContentView.swift
++++ b/WatermarkFactory/ContentView.swift
+@@ -15,6 +15,7 @@
+     @Published var offsetX = 24.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var offsetY = 24.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var layoutMode: LayoutMode = .single { didSet { saveSettings(); updateEstimate() } }
++    @Published var padding = 16.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var spacing = 80.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var rotationPattern: RotationPattern = .diagonal { didSet { saveSettings(); updateEstimate() } }
+     @Published var customAngle = 30.0 { didSet { saveSettings(); updateEstimate() } }
+@@ -40,7 +41,7 @@
+         return nil
+     }
+     var settings: WatermarkSettings {
+-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
++        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
+     }
+ 
+     func chooseFolder() {
+@@ -200,6 +201,7 @@
+         defaults.set(offsetX, forKey: "offsetX")
+         defaults.set(offsetY, forKey: "offsetY")
+         defaults.set(layoutMode.rawValue, forKey: "layoutMode")
++        defaults.set(padding, forKey: "padding")
+         defaults.set(spacing, forKey: "spacing")
+         defaults.set(rotationPattern.rawValue, forKey: "rotationPattern")
+         defaults.set(customAngle, forKey: "customAngle")
+@@ -214,6 +216,7 @@
+         offsetX = defaults.object(forKey: "offsetX") == nil ? 24 : defaults.double(forKey: "offsetX")
+         offsetY = defaults.object(forKey: "offsetY") == nil ? 24 : defaults.double(forKey: "offsetY")
+         layoutMode = LayoutMode(rawValue: defaults.string(forKey: "layoutMode") ?? "") ?? .single
++        padding = defaults.object(forKey: "padding") == nil ? 16 : defaults.double(forKey: "padding")
+         spacing = defaults.object(forKey: "spacing") == nil ? 80 : defaults.double(forKey: "spacing")
+         rotationPattern = RotationPattern(rawValue: defaults.string(forKey: "rotationPattern") ?? "") ?? .diagonal
+         customAngle = defaults.object(forKey: "customAngle") == nil ? 30 : defaults.double(forKey: "customAngle")
+@@ -361,6 +364,11 @@
+                 .pickerStyle(.segmented)
+ 
+                 if state.layoutMode == .single { singleControls } else { tiledControls }
++                Slider(value: $state.padding, in: 0...100) { Text("Padding") }
++                Text("Padding \(Int(state.padding)) px").font(.caption)
++                if state.layoutMode == .tiled {
++                    Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(.secondary)
++                }
+ 
+                 Picker("Export format", selection: $state.exportFormat) {
+                     ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
+diff --git a/WatermarkFactory/ImageProcessor.swift b/WatermarkFactory/ImageProcessor.swift
+index 1d086834f55eb94ee1046108c60445046fd1d58b..dd952c7aeca8509c3d162099166446614786bbe6
+--- a/WatermarkFactory/ImageProcessor.swift
++++ b/WatermarkFactory/ImageProcessor.swift
+@@ -75,7 +75,7 @@
+ 
+         switch settings.layoutMode {
+         case .single:
+-            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, offsetX: settings.offsetX, offsetY: settings.offsetY))
++            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, padding: settings.padding, offsetX: settings.offsetX, offsetY: settings.offsetY))
+         case .tiled:
+             drawTiles(context: context, watermark: watermark, canvas: CGSize(width: width, height: height), size: watermarkSize, settings: settings)
+         }
+@@ -84,28 +84,31 @@
+         return image
+     }
+ 
+-    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, offsetX: Double, offsetY: Double) -> CGRect {
++    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, padding: Double, offsetX: Double, offsetY: Double) -> CGRect {
+         var x: CGFloat
+         var y: CGFloat
++        let padding = CGFloat(padding)
+         switch anchor {
+-        case .topLeft, .left, .bottomLeft: x = 0
++        case .topLeft, .left, .bottomLeft: x = padding
+         case .top, .center, .bottom: x = (canvas.width - size.width) / 2
+-        case .topRight, .right, .bottomRight: x = canvas.width - size.width
++        case .topRight, .right, .bottomRight: x = canvas.width - size.width - padding
+         }
+         switch anchor {
+-        case .bottomLeft, .bottom, .bottomRight: y = 0
++        case .bottomLeft, .bottom, .bottomRight: y = padding
+         case .left, .center, .right: y = (canvas.height - size.height) / 2
+-        case .topLeft, .top, .topRight: y = canvas.height - size.height
++        case .topLeft, .top, .topRight: y = canvas.height - size.height - padding
+         }
+         return CGRect(x: x + offsetX, y: y - offsetY, width: size.width, height: size.height)
+     }
+ 
+     private static func drawTiles(context: CGContext, watermark: CGImage, canvas: CGSize, size: CGSize, settings: WatermarkSettings) {
+-        let stepX = max(1, size.width + settings.spacing)
+-        let stepY = max(1, size.height + settings.spacing)
++        let padding = CGFloat(settings.padding)
++        let cellSize = CGSize(width: size.width + padding * 2, height: size.height + padding * 2)
++        let stepX = max(1, cellSize.width + settings.spacing)
++        let stepY = max(1, cellSize.height + settings.spacing)
+         var row = 0
+-        var y = -size.height
+-        while y < canvas.height + size.height {
++        var y = -cellSize.height
++        while y < canvas.height + cellSize.height {
+             let angle: CGFloat
+             switch settings.rotationPattern {
+             case .none: angle = 0
+@@ -113,10 +116,10 @@
+             case .alternating: angle = row.isMultiple(of: 2) ? 0 : 45
+             case .custom: angle = settings.customAngle
+             }
+-            var x = -size.width
+-            while x < canvas.width + size.width {
++            var x = -cellSize.width
++            while x < canvas.width + cellSize.width {
+                 context.saveGState()
+-                context.translateBy(x: x + size.width / 2, y: y + size.height / 2)
++                context.translateBy(x: x + padding + size.width / 2, y: y + padding + size.height / 2)
+                 context.rotate(by: angle * .pi / 180)
+                 context.draw(watermark, in: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
+                 context.restoreGState()
+diff --git a/WatermarkFactory/Models.swift b/WatermarkFactory/Models.swift
+index 72b28a81fce2468ec9fe544cc989e6a4d777af3f..694cd1f7178c0c234445c5e45d3b26d5c0085255
+--- a/WatermarkFactory/Models.swift
++++ b/WatermarkFactory/Models.swift
+@@ -116,6 +116,7 @@
+     var offsetX: Double
+     var offsetY: Double
+     var layoutMode: LayoutMode
++    var padding: Double
+     var spacing: Double
+     var rotationPattern: RotationPattern
+     var customAngle: Double
+
+ succeeded in 4617ms:
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -scheme WatermarkFactory -configuration Release build
+
+2026-08-28 17:30:24.937 xcodebuild[69840:15637776] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:macOS, arch:arm64, id:00008142-0009784122F3801C, name:My Mac }
+{ platform:macOS, arch:x86_64, id:00008142-0009784122F3801C, name:My Mac }
+{ platform:macOS, name:Any Mac }
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (1 target)
+    Target 'WatermarkFactory' in project 'WatermarkFactory' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --version --output-format xml1
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+
+Build description signature: a75564259db5e2c1a3d05a680c96429c
+Build description path: /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/XCBuildData/a75564259db5e2c1a3d05a680c96429c.xcbuilddata
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk /Users/zentermind/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache
+    cd /Users/zentermind/Dev/WatermarkFactory/WatermarkFactory.xcodeproj
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -o /Users/zentermind/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache
+
+SwiftDriver WatermarkFactory normal arm64 com.apple.xcode.tools.swift.compiler (in target 'WatermarkFactory' from project 'WatermarkFactory')
+    cd /Users/zentermind/Dev/WatermarkFactory
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name WatermarkFactory -O -whole-module-optimization @/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory.SwiftFileList -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-macos13.0 -g -module-cache-path /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -swift-version 5 -I /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release -F /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release -c -num-threads 10 -Xcc -ivfsstatcache -Xcc /Users/zentermind/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache -output-file-map /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory_const_extract_protocols.json -Xcc -iquote -Xcc /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/WatermarkFactory-generated-files.hmap -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/WatermarkFactory-own-target-headers.hmap -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/WatermarkFactory-all-target-headers.hmap -Xcc -iquote -Xcc /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/WatermarkFactory-project-headers.hmap -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/include -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/DerivedSources-normal/arm64 -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/DerivedSources/arm64 -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory-Swift.h -working-directory /Users/zentermind/Dev/WatermarkFactory -no-emit-module-separately-wmo
+
+ProcessInfoPlistFile /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app/Contents/Info.plist /Users/zentermind/Dev/WatermarkFactory/WatermarkFactory/Info.plist (in target 'WatermarkFactory' from project 'WatermarkFactory')
+    cd /Users/zentermind/Dev/WatermarkFactory
+    builtin-infoPlistUtility /Users/zentermind/Dev/WatermarkFactory/WatermarkFactory/Info.plist -producttype com.apple.product-type.application -genpkginfo /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app/Contents/PkgInfo -expandbuildsettings -platform macosx -additionalcontentfile /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/assetcatalog_generated_info.plist -o /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app/Contents/Info.plist
+
+SwiftCompile normal arm64 Compiling\ ContentView.swift,\ ImageProcessor.swift,\ Models.swift,\ WatermarkFactoryApp.swift,\ GeneratedAssetSymbols.swift /Users/zentermind/Dev/WatermarkFactory/WatermarkFactory/ContentView.swift /Users/zentermind/Dev/WatermarkFactory/WatermarkFactory/ImageProcessor.swift /Users/zentermind/Dev/WatermarkFactory/WatermarkFactory/Models.swift /Users/zentermind/Dev/WatermarkFactory/WatermarkFactory/WatermarkFactoryApp.swift /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/DerivedSources/GeneratedAssetSymbols.swift /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/QuartzCore.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/Swift.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/CoreData.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/CoreText.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/SwiftUI.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/_StringProcessing.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/DataDetection.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/simd.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/DeveloperToolsSupport.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/Dispatch.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/_Builtin_float.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/OSLog.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/Spatial.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/CoreVideo.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/CoreGraphics.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/os.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/SwiftUICore.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/_DarwinFoundation3.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/_DarwinFoundation1.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/CoreTransferable.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/UniformTypeIdentifiers.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/ObjectiveC.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/_DarwinFoundation2.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/Observation.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/XPC.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/System.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/AppKit.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/Accessibility.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/IOKit.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/CoreFoundation.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/Metal.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/Symbols.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/Combine.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/CoreImage.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/Darwin.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/Foundation.swiftmodule/arm64e-apple-macos.swiftmodule /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx/prebuilt-modules/26.5/_Concurrency.swiftmodule/arm64e-apple-macos.swiftmodule /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/DiskArbitration-8JRQAYGFRSLOW9YKDFYVHYHXZ.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CUPS-ETVD2WO9PRD471DJMUGS432Q0.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/sys_types-2ZNKT9VG7YY61LTN6UNWWCZAU.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_inttypes-3SI6FSNHHNNH3DMRTXFWHIOZJ.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CoreText-7FZIJFUG64M9OSP4O8MR0JGFM.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/ColorSync-A95LKEGBDAHX59RM7COI7HPYP.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Dispatch-69ZTQB9N53N5TZYBJWVJEZVU.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/SwiftShims-9XXCSWVYBHSJ6KK16UUUUTDWL.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/ImageIO-8BQGM4MBFRDJ1L9PFRUJL46WQ.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_tgmath-EF9TVGLFFTCZSMWVSV1R6PV62.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/SwiftUICore-10O03EW5KHT8X39JL1B488SGJ.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Symbols-30XY1IMD2J4MK3PJSNPVCWD2D.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_stdarg-AR40YKIIMVYG9XUFX2VZ1QE5H.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/UniformTypeIdentifiers-4E5XD74PX04I9V8PZBNIQ4QAE.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CoreImage-7RQH6NMKXRJ6YTHY90NQHD696.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/launch-B77W5OA8CX5T03A7ZG8S77WO.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Spatial-2MWS2MY17RWKHYNMEZCMRR1QJ.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/OSLog-2CFDXY08H8MD4DDJ1ANI9XC1Z.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/ApplicationServices-1ZVFK40EAJ22R83ETL718V85K.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/os_workgroup-7MXWABHJD307A8RNJIXTBMT3M.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CoreData-4AJXPQJBFOM56A57GKK168PHB.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/libDER-3IZII16EA7QRUCB3DOCNIXYDH.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_limits-GEHX0TZSHZEP2D7AJJIJ10Y1.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Darwin-9KDEIVJ39SX21UW1RL688Z6CK.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_DarwinFoundation1-9ELIE2IWEK8XE5SYT98X07JE7.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/IOSurface-7RJDQWC988E8WEKZ9PV22RI7M.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/OpenGL-7JVOBNKOAD2YB27DTBK2BXX6X.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_AvailabilityInternal-CL9U23UO3A0HPERSZTRJZO59B.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/XPC-3SW0H0LWRQCYTAJLSK08UN7RH.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_SwiftConcurrencyShims-4V436PR42WH8XI19ACK7W8I6C.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_stdatomic-2EZECBFE9Y52BVJUIKNIJV8YV.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/QuartzCore-6XEXP1V2FAW9JANGZ1VVFJHJ0.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/DataDetection-RPGWMXGBDPH6F3FGVS3WB69.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/IOKit-EJKI7W812SP0FL5K9NRFG6XW0.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_stdbool-B7WBCITHH0GGG04FXWLEVIN1X.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_intrinsics-EJLJBX74X5L3Z02IB0EKSDHT2.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/ObjectiveC-EGNDATQSTVV40AFUM8P6AKS3M.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CoreServices-3YF22RYQKC4BW8XK2XG69PEJ3.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/AppKit-3LJKONYQ5UVYLTJVUJUF3KX13.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CoreGraphics-95V0ERH75C139OJHATLSTC9P9.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/DeveloperToolsSupport-1V5OBS2XHYMZ55Z24LXXCEZER.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/SwiftUI-29KVG5BCM8F1CZNPZZSRO54ZJ.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CoreFoundation-8KW2WX3VRSEGL4RPB0ADNHI9K.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Foundation-10W7KDNEI7HFTBIUXA5CUODD2.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CFNetwork-2123GMB3R1DMTUSDNZVZ8CTY7.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CoreTransferable-C8LO4H01ALF77SGC5INBRTK9K.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/MachO-41SL6GMEYOXEM5OG5816DD04.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_float-10O1GGUJGIIRNSQV3ZJX3EY3K.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/simd-6CKYTYMFYCBM12Y3TRSICBY0A.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Metal-1C5LN02R3FL71WQN7PA6H9LZ0.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_stdint-D92UB96A8H0622497HLX7MCRE.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/ptrauth-2O23A4J7W6ZO0PDKODYHCBDKO.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_Builtin_stddef-4NL5IUNI0JRQ7EFTATKX3FHJ6.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/libkern-F5IH9G0Q2WWR1HEJ6DE8GKJ3O.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Accessibility-69JN3AZOUEY5CRH47I0M2246L.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/ptrcheck-EQWXI73LHAADSQX7V4XPQ0WJ6.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Security-7FI25GIXQ1H330TULWRUZMLWJ.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_DarwinFoundation2-77CJFSRALXMVLIPORPRTDOF0D.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/os-4D1YSMMZEHZZKPNOCARWINHG9.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/_DarwinFoundation3-73B9E53IQ3K82UHP8EHS6TTQG.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/CoreVideo-E63DLCC685MJIZK6BL113ZNR1.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/os_object-8B54SDS8KWQVNDJPE3AHNDWIR.pcm /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory-dependencies-1.json (in target 'WatermarkFactory' from project 'WatermarkFactory')
+
+CompileSwift normal arm64 (in target 'WatermarkFactory' from project 'WatermarkFactory')
+    cd /Users/zentermind/Dev/WatermarkFactory
+    
+/Users/zentermind/Dev/WatermarkFactory/WatermarkFactory/ContentView.swift:139:24: warning: reference to captured var 'revealURL' in concurrently-executing code; this is an error in the Swift 6 language mode
+                if let revealURL {
+                       ^
+/Users/zentermind/Dev/WatermarkFactory/WatermarkFactory/ContentView.swift:143:31: warning: reference to captured var 'summary' in concurrently-executing code; this is an error in the Swift 6 language mode
+                var text = "\(summary.success) of \(items.count) images watermarked, total output size ~\(Self.formatBytes(summary.bytes))."
+                              ^
+/Users/zentermind/Dev/WatermarkFactory/WatermarkFactory/ContentView.swift:143:124: warning: reference to captured var 'summary' in concurrently-executing code; this is an error in the Swift 6 language mode
+                var text = "\(summary.success) of \(items.count) images watermarked, total output size ~\(Self.formatBytes(summary.bytes))."
+                                                                                                                           ^
+/Users/zentermind/Dev/WatermarkFactory/WatermarkFactory/ContentView.swift:144:20: warning: reference to captured var 'summary' in concurrently-executing code; this is an error in the Swift 6 language mode
+                if summary.usedHEICFallback { text += " HEIC was exported as PNG." }
+                   ^
+/Users/zentermind/Dev/WatermarkFactory/WatermarkFactory/ContentView.swift:145:21: warning: reference to captured var 'summary' in concurrently-executing code; this is an error in the Swift 6 language mode
+                if !summary.failed.isEmpty { text += " Failed: \(summary.failed.joined(separator: ", "))." }
+                    ^
+/Users/zentermind/Dev/WatermarkFactory/WatermarkFactory/ContentView.swift:145:66: warning: reference to captured var 'summary' in concurrently-executing code; this is an error in the Swift 6 language mode
+                if !summary.failed.isEmpty { text += " Failed: \(summary.failed.joined(separator: ", "))." }
+                                                                 ^
+
+SwiftDriverJobDiscovery normal arm64 Compiling ContentView.swift, ImageProcessor.swift, Models.swift, WatermarkFactoryApp.swift, GeneratedAssetSymbols.swift (in target 'WatermarkFactory' from project 'WatermarkFactory')
+
+SwiftDriver\ Compilation\ Requirements WatermarkFactory normal arm64 com.apple.xcode.tools.swift.compiler (in target 'WatermarkFactory' from project 'WatermarkFactory')
+    cd /Users/zentermind/Dev/WatermarkFactory
+    builtin-Swift-Compilation-Requirements -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name WatermarkFactory -O -whole-module-optimization @/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory.SwiftFileList -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-macos13.0 -g -module-cache-path /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -swift-version 5 -I /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release -F /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release -c -num-threads 10 -Xcc -ivfsstatcache -Xcc /Users/zentermind/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache -output-file-map /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory_const_extract_protocols.json -Xcc -iquote -Xcc /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/WatermarkFactory-generated-files.hmap -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/WatermarkFactory-own-target-headers.hmap -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/WatermarkFactory-all-target-headers.hmap -Xcc -iquote -Xcc /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/WatermarkFactory-project-headers.hmap -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/include -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/DerivedSources-normal/arm64 -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/DerivedSources/arm64 -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory-Swift.h -working-directory /Users/zentermind/Dev/WatermarkFactory -no-emit-module-separately-wmo
+
+SwiftDriver\ Compilation WatermarkFactory normal arm64 com.apple.xcode.tools.swift.compiler (in target 'WatermarkFactory' from project 'WatermarkFactory')
+    cd /Users/zentermind/Dev/WatermarkFactory
+    builtin-Swift-Compilation -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name WatermarkFactory -O -whole-module-optimization @/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory.SwiftFileList -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-macos13.0 -g -module-cache-path /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -swift-version 5 -I /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release -F /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release -c -num-threads 10 -Xcc -ivfsstatcache -Xcc /Users/zentermind/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx26.5-25F70-688ef53f1462e2c8f657fdc38a81448fe082c4a02f00227109f4ed75e425c832.sdkstatcache -output-file-map /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/zentermind/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory_const_extract_protocols.json -Xcc -iquote -Xcc /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/WatermarkFactory-generated-files.hmap -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/WatermarkFactory-own-target-headers.hmap -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/WatermarkFactory-all-target-headers.hmap -Xcc -iquote -Xcc /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/WatermarkFactory-project-headers.hmap -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/include -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/DerivedSources-normal/arm64 -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/DerivedSources/arm64 -Xcc -I/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory-Swift.h -working-directory /Users/zentermind/Dev/WatermarkFactory -no-emit-module-separately-wmo
+
+Copy /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.swiftmodule/arm64-apple-macos.swiftmodule /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory.swiftmodule (in target 'WatermarkFactory' from project 'WatermarkFactory')
+    cd /Users/zentermind/Dev/WatermarkFactory
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory.swiftmodule /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.swiftmodule/arm64-apple-macos.swiftmodule
+
+Copy /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.swiftmodule/arm64-apple-macos.abi.json /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory.abi.json (in target 'WatermarkFactory' from project 'WatermarkFactory')
+    cd /Users/zentermind/Dev/WatermarkFactory
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory.abi.json /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.swiftmodule/arm64-apple-macos.abi.json
+
+Copy /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory.swiftsourceinfo (in target 'WatermarkFactory' from project 'WatermarkFactory')
+    cd /Users/zentermind/Dev/WatermarkFactory
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory.swiftsourceinfo /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo
+
+Ld /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app/Contents/MacOS/WatermarkFactory normal (in target 'WatermarkFactory' from project 'WatermarkFactory')
+    cd /Users/zentermind/Dev/WatermarkFactory
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-macos13.0 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -Os -L/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/EagerLinkingTBDs/Release -L/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release -F/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/EagerLinkingTBDs/Release -F/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release -filelist /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory.LinkFileList -Xlinker -rpath -Xlinker /usr/lib/swift -Xlinker -rpath -Xlinker @executable_path/../Frameworks -Xlinker -dead_strip -Xlinker -object_path_lto -Xlinker /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory_lto.o -Xlinker -dependency_info -Xlinker /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory_dependency_info.dat -fobjc-link-runtime -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx -L/usr/lib/swift -Xlinker -add_ast_path -Xlinker /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory.swiftmodule @/Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory-linker-args.resp -Xlinker -no_adhoc_codesign -o /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app/Contents/MacOS/WatermarkFactory
+
+GenerateDSYMFile /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app.dSYM /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app/Contents/MacOS/WatermarkFactory (in target 'WatermarkFactory' from project 'WatermarkFactory')
+    cd /Users/zentermind/Dev/WatermarkFactory
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/dsymutil /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app/Contents/MacOS/WatermarkFactory -o /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app.dSYM
+
+CopySwiftLibs /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app (in target 'WatermarkFactory' from project 'WatermarkFactory')
+    cd /Users/zentermind/Dev/WatermarkFactory
+    builtin-swiftStdLibTool --copy --verbose --sign - --scan-executable /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app/Contents/MacOS/WatermarkFactory --scan-folder /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app/Contents/Frameworks --scan-folder /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app/Contents/PlugIns --scan-folder /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app/Contents/Library/SystemExtensions --scan-folder /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app/Contents/Extensions --platform macosx --toolchain /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.42.0.MNDGIH/Metal.xctoolchain --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app/Contents/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os --back-deploy-swift-span
+
+ExtractAppIntentsMetadata (in target 'WatermarkFactory' from project 'WatermarkFactory')
+    cd /Users/zentermind/Dev/WatermarkFactory
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.42.0.MNDGIH/Metal.xctoolchain --module-name WatermarkFactory --sdk-root /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk --xcode-version 17F42 --platform-family macOS --deployment-target 13.0 --bundle-identifier com.local.WatermarkFactory --output /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app/Contents/Resources --target-triple arm64-apple-macos13.0 --binary-file /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app/Contents/MacOS/WatermarkFactory --dependency-file /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory_dependency_info.dat --stringsdata-file /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory.SwiftFileList --metadata-file-list /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/WatermarkFactory.DependencyMetadataFileList --static-metadata-file-list /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/WatermarkFactory.DependencyStaticMetadataFileList --swift-const-vals-list /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/Objects-normal/arm64/WatermarkFactory.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
+2026-08-28 17:30:28.726 appintentsmetadataprocessor[69865:15637995] Starting appintentsmetadataprocessor export
+2026-08-28 17:30:28.729 appintentsmetadataprocessor[69865:15637995] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
+
+CodeSign /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app (in target 'WatermarkFactory' from project 'WatermarkFactory')
+    cd /Users/zentermind/Dev/WatermarkFactory
+    
+    Signing Identity:     "Sign to Run Locally"
+    
+    /usr/bin/codesign --force --sign - -o runtime --entitlements /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Intermediates.noindex/WatermarkFactory.build/Release/WatermarkFactory.build/WatermarkFactory.app.xcent --timestamp\=none --generate-entitlement-der /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app
+
+Validate /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app (in target 'WatermarkFactory' from project 'WatermarkFactory')
+    cd /Users/zentermind/Dev/WatermarkFactory
+    builtin-validationUtility /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app -no-validate-extension -infoplist-subpath Contents/Info.plist
+
+RegisterWithLaunchServices /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app (in target 'WatermarkFactory' from project 'WatermarkFactory')
+    cd /Users/zentermind/Dev/WatermarkFactory
+    /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -f -R -trusted /Users/zentermind/Library/Developer/Xcode/DerivedData/WatermarkFactory-cfxogncauuvhnrewylkqactowfdj/Build/Products/Release/WatermarkFactory.app
+
+** BUILD SUCCEEDED **
+
+
+codex
+The Release build already succeeds with the padding changes. I’m checking the final diff/status now and will commit only the files I changed, leaving the pre-existing `SPEC.md`/log noise untouched.
+exec
+/bin/zsh -lc 'git diff --check -- WatermarkFactory/Models.swift WatermarkFactory/ContentView.swift WatermarkFactory/ImageProcessor.swift' in /Users/zentermind/Dev/WatermarkFactory
+exec
+/bin/zsh -lc 'git status --short' in /Users/zentermind/Dev/WatermarkFactory
+ succeeded in 0ms:
+ M SPEC.md
+ M WatermarkFactory/ContentView.swift
+ M WatermarkFactory/ImageProcessor.swift
+ M WatermarkFactory/Models.swift
+?? codex_run2.log
+?? codex_run3.log
+
+ succeeded in 0ms:
+exec
+/bin/zsh -lc 'git diff --stat -- WatermarkFactory/Models.swift WatermarkFactory/ContentView.swift WatermarkFactory/ImageProcessor.swift' in /Users/zentermind/Dev/WatermarkFactory
+ succeeded in 0ms:
+ WatermarkFactory/ContentView.swift    | 10 +++++++++-
+ WatermarkFactory/ImageProcessor.swift | 29 ++++++++++++++++-------------
+ WatermarkFactory/Models.swift         |  1 +
+ 3 files changed, 26 insertions(+), 14 deletions(-)
+
+diff --git a/WatermarkFactory/ContentView.swift b/WatermarkFactory/ContentView.swift
+index bee8ed7c34e47350bcf5e2b2657dbef160fcec13..a6647cb8c17f14efd92a3e1cbbc8637415e6ccb9
+--- a/WatermarkFactory/ContentView.swift
++++ b/WatermarkFactory/ContentView.swift
+@@ -15,6 +15,7 @@
+     @Published var offsetX = 24.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var offsetY = 24.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var layoutMode: LayoutMode = .single { didSet { saveSettings(); updateEstimate() } }
++    @Published var padding = 16.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var spacing = 80.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var rotationPattern: RotationPattern = .diagonal { didSet { saveSettings(); updateEstimate() } }
+     @Published var customAngle = 30.0 { didSet { saveSettings(); updateEstimate() } }
+@@ -40,7 +41,7 @@
+         return nil
+     }
+     var settings: WatermarkSettings {
+-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
++        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
+     }
+ 
+     func chooseFolder() {
+@@ -200,6 +201,7 @@
+         defaults.set(offsetX, forKey: "offsetX")
+         defaults.set(offsetY, forKey: "offsetY")
+         defaults.set(layoutMode.rawValue, forKey: "layoutMode")
++        defaults.set(padding, forKey: "padding")
+         defaults.set(spacing, forKey: "spacing")
+         defaults.set(rotationPattern.rawValue, forKey: "rotationPattern")
+         defaults.set(customAngle, forKey: "customAngle")
+@@ -214,6 +216,7 @@
+         offsetX = defaults.object(forKey: "offsetX") == nil ? 24 : defaults.double(forKey: "offsetX")
+         offsetY = defaults.object(forKey: "offsetY") == nil ? 24 : defaults.double(forKey: "offsetY")
+         layoutMode = LayoutMode(rawValue: defaults.string(forKey: "layoutMode") ?? "") ?? .single
++        padding = defaults.object(forKey: "padding") == nil ? 16 : defaults.double(forKey: "padding")
+         spacing = defaults.object(forKey: "spacing") == nil ? 80 : defaults.double(forKey: "spacing")
+         rotationPattern = RotationPattern(rawValue: defaults.string(forKey: "rotationPattern") ?? "") ?? .diagonal
+         customAngle = defaults.object(forKey: "customAngle") == nil ? 30 : defaults.double(forKey: "customAngle")
+@@ -361,6 +364,11 @@
+                 .pickerStyle(.segmented)
+ 
+                 if state.layoutMode == .single { singleControls } else { tiledControls }
++                Slider(value: $state.padding, in: 0...100) { Text("Padding") }
++                Text("Padding \(Int(state.padding)) px").font(.caption)
++                if state.layoutMode == .tiled {
++                    Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(.secondary)
++                }
+ 
+                 Picker("Export format", selection: $state.exportFormat) {
+                     ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
+diff --git a/WatermarkFactory/ImageProcessor.swift b/WatermarkFactory/ImageProcessor.swift
+index 1d086834f55eb94ee1046108c60445046fd1d58b..dd952c7aeca8509c3d162099166446614786bbe6
+--- a/WatermarkFactory/ImageProcessor.swift
++++ b/WatermarkFactory/ImageProcessor.swift
+@@ -75,7 +75,7 @@
+ 
+         switch settings.layoutMode {
+         case .single:
+-            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, offsetX: settings.offsetX, offsetY: settings.offsetY))
++            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, padding: settings.padding, offsetX: settings.offsetX, offsetY: settings.offsetY))
+         case .tiled:
+             drawTiles(context: context, watermark: watermark, canvas: CGSize(width: width, height: height), size: watermarkSize, settings: settings)
+         }
+@@ -84,28 +84,31 @@
+         return image
+     }
+ 
+-    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, offsetX: Double, offsetY: Double) -> CGRect {
++    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, padding: Double, offsetX: Double, offsetY: Double) -> CGRect {
+         var x: CGFloat
+         var y: CGFloat
++        let padding = CGFloat(padding)
+         switch anchor {
+-        case .topLeft, .left, .bottomLeft: x = 0
++        case .topLeft, .left, .bottomLeft: x = padding
+         case .top, .center, .bottom: x = (canvas.width - size.width) / 2
+-        case .topRight, .right, .bottomRight: x = canvas.width - size.width
++        case .topRight, .right, .bottomRight: x = canvas.width - size.width - padding
+         }
+         switch anchor {
+-        case .bottomLeft, .bottom, .bottomRight: y = 0
++        case .bottomLeft, .bottom, .bottomRight: y = padding
+         case .left, .center, .right: y = (canvas.height - size.height) / 2
+-        case .topLeft, .top, .topRight: y = canvas.height - size.height
++        case .topLeft, .top, .topRight: y = canvas.height - size.height - padding
+         }
+         return CGRect(x: x + offsetX, y: y - offsetY, width: size.width, height: size.height)
+     }
+ 
+     private static func drawTiles(context: CGContext, watermark: CGImage, canvas: CGSize, size: CGSize, settings: WatermarkSettings) {
+-        let stepX = max(1, size.width + settings.spacing)
+-        let stepY = max(1, size.height + settings.spacing)
++        let padding = CGFloat(settings.padding)
++        let cellSize = CGSize(width: size.width + padding * 2, height: size.height + padding * 2)
++        let stepX = max(1, cellSize.width + settings.spacing)
++        let stepY = max(1, cellSize.height + settings.spacing)
+         var row = 0
+-        var y = -size.height
+-        while y < canvas.height + size.height {
++        var y = -cellSize.height
++        while y < canvas.height + cellSize.height {
+             let angle: CGFloat
+             switch settings.rotationPattern {
+             case .none: angle = 0
+@@ -113,10 +116,10 @@
+             case .alternating: angle = row.isMultiple(of: 2) ? 0 : 45
+             case .custom: angle = settings.customAngle
+             }
+-            var x = -size.width
+-            while x < canvas.width + size.width {
++            var x = -cellSize.width
++            while x < canvas.width + cellSize.width {
+                 context.saveGState()
+-                context.translateBy(x: x + size.width / 2, y: y + size.height / 2)
++                context.translateBy(x: x + padding + size.width / 2, y: y + padding + size.height / 2)
+                 context.rotate(by: angle * .pi / 180)
+                 context.draw(watermark, in: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
+                 context.restoreGState()
+diff --git a/WatermarkFactory/Models.swift b/WatermarkFactory/Models.swift
+index 72b28a81fce2468ec9fe544cc989e6a4d777af3f..694cd1f7178c0c234445c5e45d3b26d5c0085255
+--- a/WatermarkFactory/Models.swift
++++ b/WatermarkFactory/Models.swift
+@@ -116,6 +116,7 @@
+     var offsetX: Double
+     var offsetY: Double
+     var layoutMode: LayoutMode
++    var padding: Double
+     var spacing: Double
+     var rotationPattern: RotationPattern
+     var customAngle: Double
+
+codex
+Whitespace check is clean. I’m committing the three implementation files now, scoped to the padding feature.
+exec
+/bin/zsh -lc 'git add WatermarkFactory/Models.swift WatermarkFactory/ContentView.swift WatermarkFactory/ImageProcessor.swift && git commit -m "Add watermark padding control"' in /Users/zentermind/Dev/WatermarkFactory
+ succeeded in 0ms:
+[main 2f5e161] Add watermark padding control
+ 3 files changed, 26 insertions(+), 14 deletions(-)
+
+diff --git a/WatermarkFactory/ContentView.swift b/WatermarkFactory/ContentView.swift
+index bee8ed7c34e47350bcf5e2b2657dbef160fcec13..a6647cb8c17f14efd92a3e1cbbc8637415e6ccb9
+--- a/WatermarkFactory/ContentView.swift
++++ b/WatermarkFactory/ContentView.swift
+@@ -15,6 +15,7 @@
+     @Published var offsetX = 24.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var offsetY = 24.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var layoutMode: LayoutMode = .single { didSet { saveSettings(); updateEstimate() } }
++    @Published var padding = 16.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var spacing = 80.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var rotationPattern: RotationPattern = .diagonal { didSet { saveSettings(); updateEstimate() } }
+     @Published var customAngle = 30.0 { didSet { saveSettings(); updateEstimate() } }
+@@ -40,7 +41,7 @@
+         return nil
+     }
+     var settings: WatermarkSettings {
+-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
++        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
+     }
+ 
+     func chooseFolder() {
+@@ -200,6 +201,7 @@
+         defaults.set(offsetX, forKey: "offsetX")
+         defaults.set(offsetY, forKey: "offsetY")
+         defaults.set(layoutMode.rawValue, forKey: "layoutMode")
++        defaults.set(padding, forKey: "padding")
+         defaults.set(spacing, forKey: "spacing")
+         defaults.set(rotationPattern.rawValue, forKey: "rotationPattern")
+         defaults.set(customAngle, forKey: "customAngle")
+@@ -214,6 +216,7 @@
+         offsetX = defaults.object(forKey: "offsetX") == nil ? 24 : defaults.double(forKey: "offsetX")
+         offsetY = defaults.object(forKey: "offsetY") == nil ? 24 : defaults.double(forKey: "offsetY")
+         layoutMode = LayoutMode(rawValue: defaults.string(forKey: "layoutMode") ?? "") ?? .single
++        padding = defaults.object(forKey: "padding") == nil ? 16 : defaults.double(forKey: "padding")
+         spacing = defaults.object(forKey: "spacing") == nil ? 80 : defaults.double(forKey: "spacing")
+         rotationPattern = RotationPattern(rawValue: defaults.string(forKey: "rotationPattern") ?? "") ?? .diagonal
+         customAngle = defaults.object(forKey: "customAngle") == nil ? 30 : defaults.double(forKey: "customAngle")
+@@ -361,6 +364,11 @@
+                 .pickerStyle(.segmented)
+ 
+                 if state.layoutMode == .single { singleControls } else { tiledControls }
++                Slider(value: $state.padding, in: 0...100) { Text("Padding") }
++                Text("Padding \(Int(state.padding)) px").font(.caption)
++                if state.layoutMode == .tiled {
++                    Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(.secondary)
++                }
+ 
+                 Picker("Export format", selection: $state.exportFormat) {
+                     ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
+diff --git a/WatermarkFactory/ImageProcessor.swift b/WatermarkFactory/ImageProcessor.swift
+index 1d086834f55eb94ee1046108c60445046fd1d58b..dd952c7aeca8509c3d162099166446614786bbe6
+--- a/WatermarkFactory/ImageProcessor.swift
++++ b/WatermarkFactory/ImageProcessor.swift
+@@ -75,7 +75,7 @@
+ 
+         switch settings.layoutMode {
+         case .single:
+-            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, offsetX: settings.offsetX, offsetY: settings.offsetY))
++            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, padding: settings.padding, offsetX: settings.offsetX, offsetY: settings.offsetY))
+         case .tiled:
+             drawTiles(context: context, watermark: watermark, canvas: CGSize(width: width, height: height), size: watermarkSize, settings: settings)
+         }
+@@ -84,28 +84,31 @@
+         return image
+     }
+ 
+-    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, offsetX: Double, offsetY: Double) -> CGRect {
++    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, padding: Double, offsetX: Double, offsetY: Double) -> CGRect {
+         var x: CGFloat
+         var y: CGFloat
++        let padding = CGFloat(padding)
+         switch anchor {
+-        case .topLeft, .left, .bottomLeft: x = 0
++        case .topLeft, .left, .bottomLeft: x = padding
+         case .top, .center, .bottom: x = (canvas.width - size.width) / 2
+-        case .topRight, .right, .bottomRight: x = canvas.width - size.width
++        case .topRight, .right, .bottomRight: x = canvas.width - size.width - padding
+         }
+         switch anchor {
+-        case .bottomLeft, .bottom, .bottomRight: y = 0
++        case .bottomLeft, .bottom, .bottomRight: y = padding
+         case .left, .center, .right: y = (canvas.height - size.height) / 2
+-        case .topLeft, .top, .topRight: y = canvas.height - size.height
++        case .topLeft, .top, .topRight: y = canvas.height - size.height - padding
+         }
+         return CGRect(x: x + offsetX, y: y - offsetY, width: size.width, height: size.height)
+     }
+ 
+     private static func drawTiles(context: CGContext, watermark: CGImage, canvas: CGSize, size: CGSize, settings: WatermarkSettings) {
+-        let stepX = max(1, size.width + settings.spacing)
+-        let stepY = max(1, size.height + settings.spacing)
++        let padding = CGFloat(settings.padding)
++        let cellSize = CGSize(width: size.width + padding * 2, height: size.height + padding * 2)
++        let stepX = max(1, cellSize.width + settings.spacing)
++        let stepY = max(1, cellSize.height + settings.spacing)
+         var row = 0
+-        var y = -size.height
+-        while y < canvas.height + size.height {
++        var y = -cellSize.height
++        while y < canvas.height + cellSize.height {
+             let angle: CGFloat
+             switch settings.rotationPattern {
+             case .none: angle = 0
+@@ -113,10 +116,10 @@
+             case .alternating: angle = row.isMultiple(of: 2) ? 0 : 45
+             case .custom: angle = settings.customAngle
+             }
+-            var x = -size.width
+-            while x < canvas.width + size.width {
++            var x = -cellSize.width
++            while x < canvas.width + cellSize.width {
+                 context.saveGState()
+-                context.translateBy(x: x + size.width / 2, y: y + size.height / 2)
++                context.translateBy(x: x + padding + size.width / 2, y: y + padding + size.height / 2)
+                 context.rotate(by: angle * .pi / 180)
+                 context.draw(watermark, in: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
+                 context.restoreGState()
+diff --git a/WatermarkFactory/Models.swift b/WatermarkFactory/Models.swift
+index 72b28a81fce2468ec9fe544cc989e6a4d777af3f..694cd1f7178c0c234445c5e45d3b26d5c0085255
+--- a/WatermarkFactory/Models.swift
++++ b/WatermarkFactory/Models.swift
+@@ -116,6 +116,7 @@
+     var offsetX: Double
+     var offsetY: Double
+     var layoutMode: LayoutMode
++    var padding: Double
+     var spacing: Double
+     var rotationPattern: RotationPattern
+     var customAngle: Double
+
+codex
+The commit landed as `2f5e161`. I’m doing one final status check so the handoff is accurate.
+exec
+/bin/zsh -lc 'git status --short' in /Users/zentermind/Dev/WatermarkFactory
+ succeeded in 0ms:
+ M SPEC.md
+?? codex_run2.log
+?? codex_run3.log
+
+exec
+/bin/zsh -lc 'git show --stat --oneline --no-renames HEAD' in /Users/zentermind/Dev/WatermarkFactory
+ succeeded in 0ms:
+2f5e161 Add watermark padding control
+ WatermarkFactory/ContentView.swift    | 10 +++++++++-
+ WatermarkFactory/ImageProcessor.swift | 29 ++++++++++++++++-------------
+ WatermarkFactory/Models.swift         |  1 +
+ 3 files changed, 26 insertions(+), 14 deletions(-)
+
+diff --git a/WatermarkFactory/ContentView.swift b/WatermarkFactory/ContentView.swift
+index bee8ed7c34e47350bcf5e2b2657dbef160fcec13..a6647cb8c17f14efd92a3e1cbbc8637415e6ccb9
+--- a/WatermarkFactory/ContentView.swift
++++ b/WatermarkFactory/ContentView.swift
+@@ -15,6 +15,7 @@
+     @Published var offsetX = 24.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var offsetY = 24.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var layoutMode: LayoutMode = .single { didSet { saveSettings(); updateEstimate() } }
++    @Published var padding = 16.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var spacing = 80.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var rotationPattern: RotationPattern = .diagonal { didSet { saveSettings(); updateEstimate() } }
+     @Published var customAngle = 30.0 { didSet { saveSettings(); updateEstimate() } }
+@@ -40,7 +41,7 @@
+         return nil
+     }
+     var settings: WatermarkSettings {
+-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
++        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
+     }
+ 
+     func chooseFolder() {
+@@ -200,6 +201,7 @@
+         defaults.set(offsetX, forKey: "offsetX")
+         defaults.set(offsetY, forKey: "offsetY")
+         defaults.set(layoutMode.rawValue, forKey: "layoutMode")
++        defaults.set(padding, forKey: "padding")
+         defaults.set(spacing, forKey: "spacing")
+         defaults.set(rotationPattern.rawValue, forKey: "rotationPattern")
+         defaults.set(customAngle, forKey: "customAngle")
+@@ -214,6 +216,7 @@
+         offsetX = defaults.object(forKey: "offsetX") == nil ? 24 : defaults.double(forKey: "offsetX")
+         offsetY = defaults.object(forKey: "offsetY") == nil ? 24 : defaults.double(forKey: "offsetY")
+         layoutMode = LayoutMode(rawValue: defaults.string(forKey: "layoutMode") ?? "") ?? .single
++        padding = defaults.object(forKey: "padding") == nil ? 16 : defaults.double(forKey: "padding")
+         spacing = defaults.object(forKey: "spacing") == nil ? 80 : defaults.double(forKey: "spacing")
+         rotationPattern = RotationPattern(rawValue: defaults.string(forKey: "rotationPattern") ?? "") ?? .diagonal
+         customAngle = defaults.object(forKey: "customAngle") == nil ? 30 : defaults.double(forKey: "customAngle")
+@@ -361,6 +364,11 @@
+                 .pickerStyle(.segmented)
+ 
+                 if state.layoutMode == .single { singleControls } else { tiledControls }
++                Slider(value: $state.padding, in: 0...100) { Text("Padding") }
++                Text("Padding \(Int(state.padding)) px").font(.caption)
++                if state.layoutMode == .tiled {
++                    Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(.secondary)
++                }
+ 
+                 Picker("Export format", selection: $state.exportFormat) {
+                     ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
+diff --git a/WatermarkFactory/ImageProcessor.swift b/WatermarkFactory/ImageProcessor.swift
+index 1d086834f55eb94ee1046108c60445046fd1d58b..dd952c7aeca8509c3d162099166446614786bbe6
+--- a/WatermarkFactory/ImageProcessor.swift
++++ b/WatermarkFactory/ImageProcessor.swift
+@@ -75,7 +75,7 @@
+ 
+         switch settings.layoutMode {
+         case .single:
+-            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, offsetX: settings.offsetX, offsetY: settings.offsetY))
++            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, padding: settings.padding, offsetX: settings.offsetX, offsetY: settings.offsetY))
+         case .tiled:
+             drawTiles(context: context, watermark: watermark, canvas: CGSize(width: width, height: height), size: watermarkSize, settings: settings)
+         }
+@@ -84,28 +84,31 @@
+         return image
+     }
+ 
+-    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, offsetX: Double, offsetY: Double) -> CGRect {
++    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, padding: Double, offsetX: Double, offsetY: Double) -> CGRect {
+         var x: CGFloat
+         var y: CGFloat
++        let padding = CGFloat(padding)
+         switch anchor {
+-        case .topLeft, .left, .bottomLeft: x = 0
++        case .topLeft, .left, .bottomLeft: x = padding
+         case .top, .center, .bottom: x = (canvas.width - size.width) / 2
+-        case .topRight, .right, .bottomRight: x = canvas.width - size.width
++        case .topRight, .right, .bottomRight: x = canvas.width - size.width - padding
+         }
+         switch anchor {
+-        case .bottomLeft, .bottom, .bottomRight: y = 0
++        case .bottomLeft, .bottom, .bottomRight: y = padding
+         case .left, .center, .right: y = (canvas.height - size.height) / 2
+-        case .topLeft, .top, .topRight: y = canvas.height - size.height
++        case .topLeft, .top, .topRight: y = canvas.height - size.height - padding
+         }
+         return CGRect(x: x + offsetX, y: y - offsetY, width: size.width, height: size.height)
+     }
+ 
+     private static func drawTiles(context: CGContext, watermark: CGImage, canvas: CGSize, size: CGSize, settings: WatermarkSettings) {
+-        let stepX = max(1, size.width + settings.spacing)
+-        let stepY = max(1, size.height + settings.spacing)
++        let padding = CGFloat(settings.padding)
++        let cellSize = CGSize(width: size.width + padding * 2, height: size.height + padding * 2)
++        let stepX = max(1, cellSize.width + settings.spacing)
++        let stepY = max(1, cellSize.height + settings.spacing)
+         var row = 0
+-        var y = -size.height
+-        while y < canvas.height + size.height {
++        var y = -cellSize.height
++        while y < canvas.height + cellSize.height {
+             let angle: CGFloat
+             switch settings.rotationPattern {
+             case .none: angle = 0
+@@ -113,10 +116,10 @@
+             case .alternating: angle = row.isMultiple(of: 2) ? 0 : 45
+             case .custom: angle = settings.customAngle
+             }
+-            var x = -size.width
+-            while x < canvas.width + size.width {
++            var x = -cellSize.width
++            while x < canvas.width + cellSize.width {
+                 context.saveGState()
+-                context.translateBy(x: x + size.width / 2, y: y + size.height / 2)
++                context.translateBy(x: x + padding + size.width / 2, y: y + padding + size.height / 2)
+                 context.rotate(by: angle * .pi / 180)
+                 context.draw(watermark, in: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
+                 context.restoreGState()
+diff --git a/WatermarkFactory/Models.swift b/WatermarkFactory/Models.swift
+index 72b28a81fce2468ec9fe544cc989e6a4d777af3f..694cd1f7178c0c234445c5e45d3b26d5c0085255
+--- a/WatermarkFactory/Models.swift
++++ b/WatermarkFactory/Models.swift
+@@ -116,6 +116,7 @@
+     var offsetX: Double
+     var offsetY: Double
+     var layoutMode: LayoutMode
++    var padding: Double
+     var spacing: Double
+     var rotationPattern: RotationPattern
+     var customAngle: Double
+
+codex
+Implemented and committed watermark padding.
+
+Commit: `2f5e161 Add watermark padding control`
+
+Changed:
+- Added persisted `padding` setting, default `16px`.
+- Added right-sidebar Padding slider/readout with tiled-mode hint.
+- Applied padding in single anchor placement and tiled repeat cell sizing.
+
+Verified:
+- `xcodebuild -scheme WatermarkFactory -configuration Release build` succeeded.
+
+Left untouched:
+- Pre-existing `SPEC.md` modification.
+- Untracked `codex_run2.log` / `codex_run3.log`.
+diff --git a/WatermarkFactory/ContentView.swift b/WatermarkFactory/ContentView.swift
+index bee8ed7c34e47350bcf5e2b2657dbef160fcec13..a6647cb8c17f14efd92a3e1cbbc8637415e6ccb9
+--- a/WatermarkFactory/ContentView.swift
++++ b/WatermarkFactory/ContentView.swift
+@@ -15,6 +15,7 @@
+     @Published var offsetX = 24.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var offsetY = 24.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var layoutMode: LayoutMode = .single { didSet { saveSettings(); updateEstimate() } }
++    @Published var padding = 16.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var spacing = 80.0 { didSet { saveSettings(); updateEstimate() } }
+     @Published var rotationPattern: RotationPattern = .diagonal { didSet { saveSettings(); updateEstimate() } }
+     @Published var customAngle = 30.0 { didSet { saveSettings(); updateEstimate() } }
+@@ -40,7 +41,7 @@
+         return nil
+     }
+     var settings: WatermarkSettings {
+-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
++        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality)
+     }
+ 
+     func chooseFolder() {
+@@ -200,6 +201,7 @@
+         defaults.set(offsetX, forKey: "offsetX")
+         defaults.set(offsetY, forKey: "offsetY")
+         defaults.set(layoutMode.rawValue, forKey: "layoutMode")
++        defaults.set(padding, forKey: "padding")
+         defaults.set(spacing, forKey: "spacing")
+         defaults.set(rotationPattern.rawValue, forKey: "rotationPattern")
+         defaults.set(customAngle, forKey: "customAngle")
+@@ -214,6 +216,7 @@
+         offsetX = defaults.object(forKey: "offsetX") == nil ? 24 : defaults.double(forKey: "offsetX")
+         offsetY = defaults.object(forKey: "offsetY") == nil ? 24 : defaults.double(forKey: "offsetY")
+         layoutMode = LayoutMode(rawValue: defaults.string(forKey: "layoutMode") ?? "") ?? .single
++        padding = defaults.object(forKey: "padding") == nil ? 16 : defaults.double(forKey: "padding")
+         spacing = defaults.object(forKey: "spacing") == nil ? 80 : defaults.double(forKey: "spacing")
+         rotationPattern = RotationPattern(rawValue: defaults.string(forKey: "rotationPattern") ?? "") ?? .diagonal
+         customAngle = defaults.object(forKey: "customAngle") == nil ? 30 : defaults.double(forKey: "customAngle")
+@@ -361,6 +364,11 @@
+                 .pickerStyle(.segmented)
+ 
+                 if state.layoutMode == .single { singleControls } else { tiledControls }
++                Slider(value: $state.padding, in: 0...100) { Text("Padding") }
++                Text("Padding \(Int(state.padding)) px").font(.caption)
++                if state.layoutMode == .tiled {
++                    Text("Padding: margin around each mark · Spacing: gap between tiles").font(.caption).foregroundStyle(.secondary)
++                }
+ 
+                 Picker("Export format", selection: $state.exportFormat) {
+                     ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
+diff --git a/WatermarkFactory/ImageProcessor.swift b/WatermarkFactory/ImageProcessor.swift
+index 1d086834f55eb94ee1046108c60445046fd1d58b..dd952c7aeca8509c3d162099166446614786bbe6
+--- a/WatermarkFactory/ImageProcessor.swift
++++ b/WatermarkFactory/ImageProcessor.swift
+@@ -75,7 +75,7 @@
+ 
+         switch settings.layoutMode {
+         case .single:
+-            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, offsetX: settings.offsetX, offsetY: settings.offsetY))
++            context.draw(watermark, in: rect(for: watermarkSize, canvas: CGSize(width: width, height: height), anchor: settings.anchor, padding: settings.padding, offsetX: settings.offsetX, offsetY: settings.offsetY))
+         case .tiled:
+             drawTiles(context: context, watermark: watermark, canvas: CGSize(width: width, height: height), size: watermarkSize, settings: settings)
+         }
+@@ -84,28 +84,31 @@
+         return image
+     }
+ 
+-    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, offsetX: Double, offsetY: Double) -> CGRect {
++    private static func rect(for size: CGSize, canvas: CGSize, anchor: Anchor, padding: Double, offsetX: Double, offsetY: Double) -> CGRect {
+         var x: CGFloat
+         var y: CGFloat
++        let padding = CGFloat(padding)
+         switch anchor {
+-        case .topLeft, .left, .bottomLeft: x = 0
++        case .topLeft, .left, .bottomLeft: x = padding
+         case .top, .center, .bottom: x = (canvas.width - size.width) / 2
+-        case .topRight, .right, .bottomRight: x = canvas.width - size.width
++        case .topRight, .right, .bottomRight: x = canvas.width - size.width - padding
+         }
+         switch anchor {
+-        case .bottomLeft, .bottom, .bottomRight: y = 0
++        case .bottomLeft, .bottom, .bottomRight: y = padding
+         case .left, .center, .right: y = (canvas.height - size.height) / 2
+-        case .topLeft, .top, .topRight: y = canvas.height - size.height
++        case .topLeft, .top, .topRight: y = canvas.height - size.height - padding
+         }
+         return CGRect(x: x + offsetX, y: y - offsetY, width: size.width, height: size.height)
+     }
+ 
+     private static func drawTiles(context: CGContext, watermark: CGImage, canvas: CGSize, size: CGSize, settings: WatermarkSettings) {
+-        let stepX = max(1, size.width + settings.spacing)
+-        let stepY = max(1, size.height + settings.spacing)
++        let padding = CGFloat(settings.padding)
++        let cellSize = CGSize(width: size.width + padding * 2, height: size.height + padding * 2)
++        let stepX = max(1, cellSize.width + settings.spacing)
++        let stepY = max(1, cellSize.height + settings.spacing)
+         var row = 0
+-        var y = -size.height
+-        while y < canvas.height + size.height {
++        var y = -cellSize.height
++        while y < canvas.height + cellSize.height {
+             let angle: CGFloat
+             switch settings.rotationPattern {
+             case .none: angle = 0
+@@ -113,10 +116,10 @@
+             case .alternating: angle = row.isMultiple(of: 2) ? 0 : 45
+             case .custom: angle = settings.customAngle
+             }
+-            var x = -size.width
+-            while x < canvas.width + size.width {
++            var x = -cellSize.width
++            while x < canvas.width + cellSize.width {
+                 context.saveGState()
+-                context.translateBy(x: x + size.width / 2, y: y + size.height / 2)
++                context.translateBy(x: x + padding + size.width / 2, y: y + padding + size.height / 2)
+                 context.rotate(by: angle * .pi / 180)
+                 context.draw(watermark, in: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
+                 context.restoreGState()
+diff --git a/WatermarkFactory/Models.swift b/WatermarkFactory/Models.swift
+index 72b28a81fce2468ec9fe544cc989e6a4d777af3f..694cd1f7178c0c234445c5e45d3b26d5c0085255
+--- a/WatermarkFactory/Models.swift
++++ b/WatermarkFactory/Models.swift
+@@ -116,6 +116,7 @@
+     var offsetX: Double
+     var offsetY: Double
+     var layoutMode: LayoutMode
++    var padding: Double
+     var spacing: Double
+     var rotationPattern: RotationPattern
+     var customAngle: Double
+
+tokens used
+44,900
+Implemented and committed watermark padding.
+
+Commit: `2f5e161 Add watermark padding control`
+
+Changed:
+- Added persisted `padding` setting, default `16px`.
+- Added right-sidebar Padding slider/readout with tiled-mode hint.
+- Applied padding in single anchor placement and tiled repeat cell sizing.
+
+Verified:
+- `xcodebuild -scheme WatermarkFactory -configuration Release build` succeeded.
+
+Left untouched:
+- Pre-existing `SPEC.md` modification.
+- Untracked `codex_run2.log` / `codex_run3.log`.

@@ -1,5 +1,6 @@
 import AppKit
 import AutomalityUI
+import DesignSystemKit
 import SwiftUI
 
 /// Backs BrandScrollBar's up/down buttons and thumb with the real NSScrollView
@@ -108,6 +109,8 @@ private struct BrandScrollHost<Content: View>: NSViewRepresentable {
 /// (image list, controls) both use this instead of a bare ScrollView so
 /// there's an obvious, on-brand way to move through them.
 struct BrandScrollBar<Content: View>: View {
+    @Environment(\.brandTheme) private var theme
+
     @StateObject private var controller = BrandScrollController()
     private let content: Content
     private let pageStep: CGFloat = 220
@@ -132,7 +135,7 @@ struct BrandScrollBar<Content: View>: View {
                         Capsule().fill(AutomalityColor.gray300.opacity(0.4))
                         if controller.contentHeight > controller.visibleHeight {
                             Capsule()
-                                .fill(AutomalityColor.teal)
+                                .fill(theme.primary)
                                 .frame(height: thumbHeight)
                                 .offset(y: (geo.size.height - thumbHeight) * controller.thumbPosition)
                         }
@@ -158,8 +161,8 @@ struct BrandScrollBar<Content: View>: View {
                 .frame(width: railWidth - 6, height: railWidth - 6)
         }
         .buttonStyle(.plain)
-        .background(enabled ? AutomalityColor.tealPale : Color.clear)
-        .foregroundStyle(enabled ? AutomalityColor.tealDeep : AutomalityColor.gray300)
+        .background(enabled ? theme.primary.opacity(0.12) : Color.clear)
+        .foregroundStyle(enabled ? theme.primaryDeep : AutomalityColor.gray300)
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .disabled(!enabled)
     }

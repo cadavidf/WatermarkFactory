@@ -238,11 +238,15 @@ enum LayoutMode: String, CaseIterable, Identifiable, Codable {
     var label: String { String(localized: String.LocalizationValue(rawValue)) }
 }
 
-enum FlowMode: String, CaseIterable, Identifiable, Codable {
-    case guided = "Guided"
-    case compact = "Compact"
+enum CropScope: String, CaseIterable, Identifiable, Codable {
+    case thisImageOnly, allImages
     var id: String { rawValue }
-    var label: String { String(localized: String.LocalizationValue(rawValue)) }
+    var label: String {
+        switch self {
+        case .thisImageOnly: String(localized: "Only This Image")
+        case .allImages: String(localized: "All Images")
+        }
+    }
 }
 
 enum RotationPattern: String, CaseIterable, Identifiable, Codable {
@@ -351,7 +355,7 @@ struct WatermarkSettings: Codable {
     /// background silently stripped just because this exists.
     var removeWatermarkBackground: Bool
 
-    init(sizeFraction: Double, opacity: Double, anchor: Anchor, additionalAnchors: [Anchor] = [], offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputWidth: Int = 0, outputHeight: Int = 0, outputPrefix: String, outputSuffix: String, maxFileSizeKB: Int = 0, watermarkTint: WatermarkTint = .original, metadataPrivacy: MetadataPrivacyLevel = .keepOriginalPrecision, removeWatermarkBackground: Bool = false) {
+    init(sizeFraction: Double, opacity: Double, anchor: Anchor, additionalAnchors: [Anchor] = [], offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputWidth: Int = 0, outputHeight: Int = 0, outputPrefix: String, outputSuffix: String, maxFileSizeKB: Int = 0, watermarkTint: WatermarkTint = .original, metadataPrivacy: MetadataPrivacyLevel = .removeLocation, removeWatermarkBackground: Bool = false) {
         self.sizeFraction = sizeFraction
         self.opacity = opacity
         self.anchor = anchor
@@ -402,11 +406,7 @@ struct WatermarkSettings: Codable {
         outputSuffix = try container.decode(String.self, forKey: .outputSuffix)
         maxFileSizeKB = try container.decodeIfPresent(Int.self, forKey: .maxFileSizeKB) ?? 0
         watermarkTint = try container.decodeIfPresent(WatermarkTint.self, forKey: .watermarkTint) ?? .original
-        // Default preserves the pre-existing, unconditional behavior for
-        // any settings saved before this option existed -- keepOriginalPrecision,
-        // not removeLocation, so nobody's saved presets silently start
-        // stripping GPS they were previously relying on.
-        metadataPrivacy = try container.decodeIfPresent(MetadataPrivacyLevel.self, forKey: .metadataPrivacy) ?? .keepOriginalPrecision
+        metadataPrivacy = try container.decodeIfPresent(MetadataPrivacyLevel.self, forKey: .metadataPrivacy) ?? .removeLocation
         removeWatermarkBackground = try container.decodeIfPresent(Bool.self, forKey: .removeWatermarkBackground) ?? false
     }
 }

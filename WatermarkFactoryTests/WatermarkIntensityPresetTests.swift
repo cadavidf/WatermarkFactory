@@ -76,4 +76,31 @@ final class WatermarkIntensityPresetTests: XCTestCase {
     func testBundledAutomalityWatermarkResourceExists() {
         XCTAssertNotNil(AppState.demoWatermarkURL, "automality-watermark.png must be bundled as a plain resource for the demo preview to work")
     }
+
+    @MainActor
+    func testExportETAUsesCoarseFriendlyText() {
+        XCTAssertEqual(AppState.formatExportETA(elapsed: 10, progress: 0.5), "~10s left")
+        XCTAssertEqual(AppState.formatExportETA(elapsed: 90, progress: 0.5), "~2m left")
+        XCTAssertEqual(AppState.formatExportETA(elapsed: 10, progress: 0), "")
+        XCTAssertEqual(AppState.formatExportETA(elapsed: 10, progress: 1), "")
+    }
+
+    @MainActor
+    func testUpdateCropRespectsScope() {
+        let state = AppState()
+        let first = URL(fileURLWithPath: "/fake/first.jpg")
+        let second = URL(fileURLWithPath: "/fake/second.jpg")
+        let crop = CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4)
+
+        state.cropScope = .thisImageOnly
+        state.updateCrop(crop, for: first)
+        XCTAssertEqual(state.perImageCropRects[first], crop)
+        XCTAssertEqual(state.sharedCropRect, .fullFrame)
+
+        state.perImageCropRects[second] = CGRect(x: 0.2, y: 0.2, width: 0.5, height: 0.5)
+        state.cropScope = .allImages
+        state.updateCrop(crop, for: first)
+        XCTAssertEqual(state.sharedCropRect, crop)
+        XCTAssertTrue(state.perImageCropRects.isEmpty)
+    }
 }

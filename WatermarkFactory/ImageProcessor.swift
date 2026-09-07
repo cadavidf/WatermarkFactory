@@ -25,6 +25,20 @@ enum ImageProcessorError: Error, LocalizedError {
 
 struct ImageProcessor {
     static let supportedExtensions: Set<String> = ["jpg", "jpeg", "png", "heic", "tif", "tiff", "gif"]
+    static let roomLabelMap: [String: String] = [
+        "kitchen": "Kitchen", "kitchen_countertop": "Kitchen", "kitchen_oven": "Kitchen", "kitchen_sink": "Kitchen",
+        "bathroom": "Bathroom", "bathroom_faucet": "Bathroom",
+        "bedroom": "Bedroom",
+        "balcony": "Balcony",
+        "living_room": "Living Room",
+        "dining_room": "Dining Room",
+        "garage": "Garage",
+        "patio": "Patio",
+        "pool": "Pool",
+        "closet": "Closet",
+        "garden": "Garden",
+        "porch": "Porch",
+    ]
     private static let webMaxPixelSize = 2048
     private static let minSizeTargetLongestEdge = 400
 
@@ -169,14 +183,36 @@ struct ImageProcessor {
         resolvedFormat(sourceURL: sourceURL, format: format).type == .jpeg
     }
 
-    static func outputFilename(for sourceURL: URL, settings: WatermarkSettings, order: Int? = nil, numberedCount: Int = 0) -> String {
+    // Initial threshold: repo fixtures are synthetic/icon assets, so tune
+    // this against Felipe's real listing photos once available.
+    static func classifyRoom(sourceURL: URL, minConfidence: Float = 0.15) -> String? {
+        let request = VNClassifyImageRequest()
+        let handler = VNImageRequestHandler(url: sourceURL)
+        do {
+            try handler.perform([request])
+            return request.results?
+                .compactMap { observation -> (String, Float)? in
+                    guard observation.confidence >= minConfidence,
+                          let label = roomLabelMap[observation.identifier] else { return nil }
+                    return (label, observation.confidence)
+                }
+                .max { $0.1 < $1.1 }?
+                .0
+        } catch {
+            return nil
+        }
+    }
+
+    static func outputFilename(for sourceURL: URL, settings: WatermarkSettings, order: Int? = nil, numberedCount: Int = 0, roomLabel: String? = nil) -> String {
         let prefix = sanitize(settings.outputPrefix)
-        let sequence = order.map { String(format: "%0\(numberedCount >= 10 ? String(numberedCount).count : 1)d_", $0) } ?? ""
+        let roomSequence = roomLabel.flatMap(roomSlug).map { "\($0)_" }
+        let numberSequence = order.map { String(format: "%0\(numberedCount >= 10 ? String(numberedCount).count : 1)d_", $0) }
+        let sequence = roomSequence ?? numberSequence ?? ""
         return "\(prefix)\(sequence)\(sourceURL.deletingPathExtension().lastPathComponent)\(sanitize(settings.outputSuffix)).\(resolvedFormat(sourceURL: sourceURL, format: settings.exportFormat).ext)"
     }
 
-    static func uniqueOutputURL(for sourceURL: URL, outputFolder: URL, settings: WatermarkSettings, order: Int? = nil, numberedCount: Int = 0, usedURLs: inout Set<URL>) -> URL {
-        let filename = outputFilename(for: sourceURL, settings: settings, order: order, numberedCount: numberedCount)
+    static func uniqueOutputURL(for sourceURL: URL, outputFolder: URL, settings: WatermarkSettings, order: Int? = nil, numberedCount: Int = 0, roomLabel: String? = nil, usedURLs: inout Set<URL>) -> URL {
+        let filename = outputFilename(for: sourceURL, settings: settings, order: order, numberedCount: numberedCount, roomLabel: roomLabel)
         let base = (filename as NSString).deletingPathExtension
         let ext = (filename as NSString).pathExtension
         var candidate = outputFolder.appendingPathComponent(filename)
@@ -214,6 +250,13 @@ struct ImageProcessor {
 
     private static func sanitize(_ value: String) -> String {
         value.replacingOccurrences(of: "/", with: "").replacingOccurrences(of: "\0", with: "")
+    }
+
+    private static func roomSlug(_ value: String) -> String? {
+        let slug = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "_")
+        return slug.isEmpty ? nil : sanitize(slug)
     }
 
     private static func loadCGImage(_ url: URL) -> CGImage? {

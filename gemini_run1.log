@@ -1,0 +1,6 @@
+YOLO mode is enabled. All tool calls will be automatically approved.
+Loaded cached credentials.
+Loading extension: conductor
+Loading extension: elevenlabs
+Loading extension: nanobanana
+This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://goo.gle/gemini-cli-auth-docs#workspace-gca

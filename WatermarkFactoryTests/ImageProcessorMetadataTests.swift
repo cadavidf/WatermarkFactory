@@ -54,7 +54,7 @@ final class ImageProcessorMetadataTests: XCTestCase {
             kCGImagePropertyIPTCDictionary: [kCGImagePropertyIPTCCopyrightNotice: "private"]
         ])
 
-        try export(source, to: output, format: .tiff)
+        try export(source, to: output, format: .tiff, metadataPrivacy: .keepOriginalPrecision)
         let properties = try imageProperties(output)
 
         XCTAssertEqual(properties.object(forKey: kCGImagePropertyGPSDictionary) as? NSDictionary, gps as NSDictionary)
@@ -113,7 +113,7 @@ final class ImageProcessorMetadataTests: XCTestCase {
         XCTAssertEqual(gps?.object(forKey: kCGImagePropertyGPSLatitudeRef) as? String, "N")
     }
 
-    func testMetadataPrivacyKeepOriginalPrecisionIsTheDefaultAndPreservesExactCoordinates() throws {
+    func testMetadataPrivacyRemoveLocationIsTheDefaultAndDropsCoordinates() throws {
         let source = tempDir.appendingPathComponent("source.tiff")
         let output = tempDir.appendingPathComponent("output.tiff")
         try writeImage(source, type: .tiff, properties: [
@@ -124,20 +124,11 @@ final class ImageProcessorMetadataTests: XCTestCase {
         ])
 
         // No metadataPrivacy argument -- exercises WatermarkSettings' own
-        // default (.keepOriginalPrecision), the same default used for any
-        // settings saved before this option existed, so old presets don't
-        // silently start stripping GPS they were previously relying on.
+        // safe default.
         try export(source, to: output, format: .tiff)
         let properties = try imageProperties(output)
-        let gps = properties.object(forKey: kCGImagePropertyGPSDictionary) as? NSDictionary
 
-        // GPS coordinates round-trip through TIFF's rational (numerator/
-        // denominator) encoding, not raw doubles -- confirmed live this
-        // produces ~1e-6 degree rounding (40.712834591 -> 40.712833333...),
-        // a normal, expected artifact of that format, not data loss this
-        // code introduces. accuracy here is set to what real GPS EXIF
-        // storage actually delivers, not an idealized exact match.
-        XCTAssertEqual(gps?.object(forKey: kCGImagePropertyGPSLatitude) as? Double ?? 0, 40.712834591, accuracy: 0.00001)
+        XCTAssertNil(properties.object(forKey: kCGImagePropertyGPSDictionary))
     }
 
     func testNoGPSSourceProducesNoGPSBlock() throws {
@@ -364,6 +355,18 @@ final class ImageProcessorMetadataTests: XCTestCase {
         XCTAssertEqual(ImageProcessor.outputFilename(for: source, settings: settings, numberedCount: 12), "wm_beach.jpg")
     }
 
+    func testRoomLabelReplacesNumberedSequenceAndStillUsesUniqueURLs() {
+        let first = tempDir.appendingPathComponent("photo.jpg")
+        let second = tempDir.appendingPathComponent("photo.jpg")
+        let output = tempDir.appendingPathComponent("Watermarked", isDirectory: true)
+        let settings = WatermarkSettings(sizeFraction: 0.2, opacity: 0, anchor: .center, offsetX: 0, offsetY: 0, layoutMode: .single, padding: 0, spacing: 0, rotationPattern: .none, customAngle: 0, exportFormat: .jpeg, jpegQuality: 0.9, outputPrefix: "wm_", outputSuffix: "")
+        var used = Set<URL>()
+
+        XCTAssertEqual(ImageProcessor.outputFilename(for: first, settings: settings, order: 3, numberedCount: 12, roomLabel: "Living Room"), "wm_living_room_photo.jpg")
+        XCTAssertEqual(ImageProcessor.uniqueOutputURL(for: first, outputFolder: output, settings: settings, order: 1, numberedCount: 2, roomLabel: "Bathroom", usedURLs: &used).lastPathComponent, "wm_bathroom_photo.jpg")
+        XCTAssertEqual(ImageProcessor.uniqueOutputURL(for: second, outputFolder: output, settings: settings, order: 2, numberedCount: 2, roomLabel: "Bathroom", usedURLs: &used).lastPathComponent, "wm_bathroom_photo (2).jpg")
+    }
+
     func testSmartPlacementMarginAndOpticalOffset() {
         XCTAssertEqual(ImageProcessor.safeMargin(for: CGSize(width: 1000, height: 800)), 32)
         XCTAssertEqual(ImageProcessor.opticalYOffset(for: CGSize(width: 1000, height: 800), anchor: .center), 40)
@@ -460,7 +463,7 @@ final class ImageProcessorMetadataTests: XCTestCase {
         XCTAssertNil(AppState.openedURLInput(from: [], isDirectory: { _ in false }))
     }
 
-    private func export(_ source: URL, to output: URL, format: ExportFormat, metadataPrivacy: MetadataPrivacyLevel = .keepOriginalPrecision) throws {
+    private func export(_ source: URL, to output: URL, format: ExportFormat, metadataPrivacy: MetadataPrivacyLevel = .removeLocation) throws {
         let watermark = tempDir.appendingPathComponent("watermark.png")
         try writeImage(watermark, type: .png)
         _ = try ImageProcessor.export(sourceURL: source, watermarkURL: watermark, outputURL: output, settings: WatermarkSettings(sizeFraction: 0.2, opacity: 0, anchor: .center, offsetX: 0, offsetY: 0, layoutMode: .single, padding: 0, spacing: 0, rotationPattern: .none, customAngle: 0, exportFormat: format, jpegQuality: 0.9, outputPrefix: "", outputSuffix: "", metadataPrivacy: metadataPrivacy))
