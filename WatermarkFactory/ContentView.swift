@@ -216,6 +216,13 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Renders `text` to a PNG and uses it as the watermark, same as
+    /// picking an image file -- see ImageProcessor.renderTextWatermark.
+    func createTextWatermark(_ text: String) {
+        guard let url = ImageProcessor.renderTextWatermark(text) else { return }
+        setWatermark(url)
+    }
+
     func select(_ item: ImageItem) {
         selected = item
         smartPlacementProposal = nil
@@ -1050,6 +1057,8 @@ struct ContentView: View {
     }
     @State private var settingsTab: SettingsTab = .watermark
     @State private var showExportSheet = false
+    @State private var showTextWatermarkSheet = false
+    @State private var textWatermarkInput = ""
 
     init(state: AppState = .shared) {
         self.state = state
@@ -1108,6 +1117,38 @@ struct ContentView: View {
         .sheet(isPresented: $showExportSheet) {
             exportOptionsSheet
         }
+        .sheet(isPresented: $showTextWatermarkSheet) {
+            textWatermarkSheet
+        }
+    }
+
+    private var textWatermarkSheet: some View {
+        let looksLikePhone = ImageProcessor.looksLikePhoneNumber(textWatermarkInput)
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("Create My Watermark").font(.headline)
+            Text("Type a name or label to use as your watermark instead of an image.")
+                .font(.caption)
+                .foregroundStyle(Color.secondary)
+            TextField("e.g. Jane Smith Realty", text: $textWatermarkInput)
+                .textFieldStyle(.roundedBorder)
+            if looksLikePhone {
+                Label("This looks like it includes a phone number. Many real estate portals prohibit contact info embedded in watermarks — check your portal's rules before using it.", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(Color.orange)
+            }
+            HStack {
+                Button("Cancel", role: .cancel) { showTextWatermarkSheet = false }
+                Spacer()
+                Button(looksLikePhone ? "Use Anyway" : "Use This Watermark") {
+                    state.createTextWatermark(textWatermarkInput)
+                    showTextWatermarkSheet = false
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(textWatermarkInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding()
+        .frame(width: 420)
     }
 
     private var exportOptionsSheet: some View {
@@ -1391,13 +1432,10 @@ struct ContentView: View {
             .clipped()
             // Thumbnail selection lives in the sidebar (imageList) -- this
             // pane doesn't need its own duplicate strip.
-            Text(state.status)
-                .font(.caption)
-                .foregroundStyle(Color.secondary)
-                .lineLimit(3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, panePadding)
-                .padding(.bottom, 8)
+            // Status bar removed (2026-09-08, Felipe) -- export
+            // failures/permission issues already surface via the
+            // permission-retry alert; progress already shows in the
+            // toolbar's GlowingProgressBar during export.
         }
         .frame(minWidth: previewMinWidth)
     }
@@ -1416,6 +1454,11 @@ struct ContentView: View {
             } else {
                 chooseWatermarkButton.buttonStyle(.bordered)
             }
+            Button("Create My Watermark...") {
+                textWatermarkInput = ""
+                showTextWatermarkSheet = true
+            }
+            .buttonStyle(.bordered)
             Spacer()
             if let url = state.watermarkURL { Thumb(url: url, size: 56) }
         }
@@ -1485,6 +1528,9 @@ struct ContentView: View {
         groupHeader("Padding")
         AutomalitySlider(value: $state.padding, in: 0...100)
         Text("\(Int(state.padding)) px").font(.caption).foregroundStyle(Color.secondary)
+        Divider()
+        groupHeader("Rotation")
+        rotationControls
         Divider()
         groupHeader("Spacing")
         tiledControls
@@ -1706,11 +1752,20 @@ struct ContentView: View {
         }
     }
 
+    // Spacing (gap between tiles) only means something when tiled.
     private var tiledControls: some View {
         VStack(alignment: .leading, spacing: 8) {
             AutomalitySlider(value: $state.spacing, in: 0...400)
             Text("\(Int(state.spacing)) px").font(.caption).foregroundStyle(Color.secondary)
-            groupHeader("Rotation")
+        }
+    }
+
+    // Rotation applies to a single watermark exactly as much as a tiled
+    // one -- ImageProcessor.drawSingleWatermark reads the same
+    // rotationPattern/customAngle as drawTiles does. Unlike Spacing, this
+    // stays enabled in both Single and Tiled.
+    private var rotationControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
             Picker("Rotation", selection: $state.rotationPattern) {
                 ForEach(RotationPattern.allCases) { Text($0.label).tag($0) }
             }

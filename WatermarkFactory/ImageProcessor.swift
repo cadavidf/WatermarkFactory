@@ -57,6 +57,45 @@ struct ImageProcessor {
         return CGSize(width: image.width, height: image.height)
     }
 
+    /// True if `text` contains a run of 7+ digits (ignoring separators like
+    /// spaces/dashes/dots/parens) -- the same loose heuristic real portals'
+    /// own listing-photo scanners use, so a typed watermark label gets
+    /// flagged before export, not after a listing gets pulled for it.
+    static func looksLikePhoneNumber(_ text: String) -> Bool {
+        text.filter(\.isNumber).count >= 7
+    }
+
+    /// Renders a typed label to a transparent PNG so it can flow through
+    /// the exact same pipeline as a chosen watermark image -- tint, size,
+    /// opacity, position, tiling all already work on "a watermark image";
+    /// this just makes the source of that image text instead of a file.
+    static func renderTextWatermark(_ text: String) -> URL? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let font = NSFont.boldSystemFont(ofSize: 200)
+        let attributed = NSAttributedString(string: trimmed, attributes: [.font: font, .foregroundColor: NSColor.black])
+        let textSize = attributed.size()
+        let padding: CGFloat = 40
+        let canvasSize = NSSize(width: textSize.width + padding * 2, height: textSize.height + padding * 2)
+        let image = NSImage(size: canvasSize)
+        image.lockFocus()
+        attributed.draw(at: NSPoint(x: padding, y: padding))
+        image.unlockFocus()
+        guard let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else { return nil }
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("WatermarkFactory", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let fileURL = dir.appendingPathComponent("text-watermark.png")
+        do {
+            try png.write(to: fileURL)
+            return fileURL
+        } catch {
+            return nil
+        }
+    }
+
     static func smartPlacementProposal(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings, cropRect: CGRect = .fullFrame) -> SmartPlacementProposal? {
         guard let loadedSource = loadCGImage(sourceURL), let watermark = loadCGImage(watermarkURL) else { return nil }
         let source = croppedImage(loadedSource, cropRect: cropRect)
