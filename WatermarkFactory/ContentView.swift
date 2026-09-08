@@ -4,6 +4,8 @@ import DesignSystemKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+// AcknowledgementsView.swift (untouched, outside this PRD's scope) still
+// relies on this token.
 extension AutomalityColor {
     static let inkMuted = ink.opacity(0.68)
 }
@@ -12,23 +14,6 @@ extension AutomalityColor {
 final class AppState: ObservableObject {
     static let shared = AppState()
 
-    enum Stage: Int, CaseIterable {
-        case selectImages, watermark, position, orderRename, export
-
-        var title: String {
-            switch self {
-            case .selectImages: String(localized: "Select Images")
-            case .watermark: String(localized: "Watermark")
-            case .position: String(localized: "Position")
-            case .orderRename: String(localized: "Order & Rename (optional)")
-            case .export: String(localized: "Export")
-            }
-        }
-    }
-
-    @AppStorage("hasCompletedFirstExport") var hasCompletedFirstExport = false {
-        willSet { objectWillChange.send() }
-    }
     @Published var folderURL: URL?
     @Published var watermarkURL: URL?
     // Compact mode's "Watermark not uploaded yet" prompt (Upload Watermark /
@@ -37,7 +22,6 @@ final class AppState: ObservableObject {
     @Published var showWatermarkMissingPrompt = false
     @Published var images: [ImageItem] = []
     @Published var selected: ImageItem?
-    @Published var stage: Stage = .selectImages
     @Published var sizePreset: WatermarkSizePreset? = .medium
     @Published var opacityPreset: OpacityPreset? = .balanced
     // The intensity matrix binds directly to sizeFraction (X, below) and
@@ -137,7 +121,6 @@ final class AppState: ObservableObject {
     var maxFileSizeBlocksExport: Bool {
         maxFileSizeKB > 0 && (exportFormat == .png || exportFormat == .tiff)
     }
-    var isWalkthroughActive: Bool { !hasCompletedFirstExport }
     var canExport: Bool { watermarkURL != nil && !images.isEmpty && !isExporting && !maxFileSizeBlocksExport }
     // Compact mode's always-visible Watermark All Images button stays
     // enabled even without a watermark chosen yet -- tapping it without one
@@ -160,19 +143,6 @@ final class AppState: ObservableObject {
     }
     var numberedCount: Int { orderedImageURLs.filter { url in images.contains { $0.url == url } }.count }
     var orderSummary: String { String(format: String(localized: "%d of %d images numbered"), numberedCount, images.count) }
-    // Governs how far advance(to:) lets navigation jump ahead -- images are
-    // a hard requirement (nothing else makes sense without them), but a
-    // watermark is not: the Watermark stage's Skip action is a deliberate,
-    // supported way to move on without one, so gating this on watermarkURL
-    // would leave Skip inconsistent with the progress nav and every other
-    // way of reaching a later stage (both would silently refuse the exact
-    // jump Skip just performed). The actual export ACTION stays correctly
-    // blocked without a watermark via canExport/exportHint below --
-    // this only governs which stage VIEWS are reachable, not whether
-    // export itself is allowed to run.
-    var nextAvailableStage: Stage {
-        images.isEmpty ? .selectImages : .export
-    }
     var exportHint: String? {
         if images.isEmpty { return String(localized: "Choose a folder or images before export.") }
         if watermarkURL == nil { return String(localized: "Choose a watermark image before export.") }
@@ -234,16 +204,6 @@ final class AppState: ObservableObject {
         selected = item
         smartPlacementProposal = nil
         updateEstimate()
-    }
-
-    func advance(to stage: Stage) {
-        guard stage.rawValue <= nextAvailableStage.rawValue else { return }
-        self.stage = stage
-    }
-
-    func advanceIfReady() {
-        if !images.isEmpty && stage == .selectImages { stage = .watermark }
-        if watermarkURL != nil && stage == .watermark { stage = .position }
     }
 
     func orderNumber(for item: ImageItem) -> Int? {
@@ -415,6 +375,7 @@ final class AppState: ObservableObject {
             var usedOutputURLs = Set<URL>()
             let watermarkAccess = watermark?.startAccessingSecurityScopedResource() ?? false
             var revealURL: URL?
+            var permissionFailedItems: [ImageItem] = []
             defer {
                 if watermarkAccess { watermark?.stopAccessingSecurityScopedResource() }
             }
@@ -441,7 +402,15 @@ final class AppState: ObservableObject {
                     // Was silently swallowing the real reason -- "Failed:
                     // IMG_1234.jpg" with no cause told nobody anything
                     // (including me) about what actually went wrong.
-                    summary.failed.append("\(item.filename) (\(error.localizedDescription))")
+                    if Self.isPermissionError(error) {
+                        // Held back rather than added straight to
+                        // summary.failed -- these get one retry to a
+                        // customer-chosen folder below, once the whole
+                        // pass has finished.
+                        permissionFailedItems.append(item)
+                    } else {
+                        summary.failed.append("\(item.filename) (\(error.localizedDescription))")
+                    }
                 }
                 await MainActor.run {
                     let progress = Double(index + 1) / Double(items.count)
@@ -452,6 +421,43 @@ final class AppState: ObservableObject {
                     self.status = String(format: String(localized: "Exporting %d of %d..."), index + 1, items.count)
                 }
             }
+
+            // Permission-failure recovery: the folder next to the source
+            // images refused the write. Rather than just reporting that,
+            // offer a folder picker so the customer can pick/re-authorize a
+            // destination, then retry those files there once.
+            if !permissionFailedItems.isEmpty {
+                let retryFolder = await MainActor.run { self.presentPermissionRecoveryPanel() }
+                if let retryFolder {
+                    var retryOutputURLs = Set<URL>()
+                    for item in permissionFailedItems {
+                        let access = item.url.startAccessingSecurityScopedResource()
+                        defer { if access { item.url.stopAccessingSecurityScopedResource() } }
+                        do {
+                            let outputURL = ImageProcessor.uniqueOutputURL(for: item.url, outputFolder: retryFolder, settings: settings, order: numberedOrder[item.url], numberedCount: numberedCount, roomLabel: roomLabels[item.url], usedURLs: &retryOutputURLs)
+                            let cropRect = cropEnabled ? (perImageCropRects[item.url] ?? sharedCropRect) : .fullFrame
+                            let result: (url: URL, bytes: Int, usedHEICFallback: Bool, metSizeTarget: Bool)
+                            if compressOnly || watermark == nil {
+                                result = try ImageProcessor.compressOnly(sourceURL: item.url, outputURL: outputURL, settings: settings, cropRect: cropRect)
+                            } else {
+                                result = try ImageProcessor.export(sourceURL: item.url, watermarkURL: watermark!, outputURL: outputURL, settings: settings, cropRect: cropRect)
+                            }
+                            revealURL = retryFolder
+                            summary.success += 1
+                            summary.bytes += result.bytes
+                            summary.usedHEICFallback = summary.usedHEICFallback || result.usedHEICFallback
+                            if !result.metSizeTarget { summary.unmetSizeTarget.append(item.filename) }
+                        } catch {
+                            summary.failed.append("\(item.filename) (\(error.localizedDescription))")
+                        }
+                    }
+                } else {
+                    // Declined the recovery folder picker -- report those as
+                    // ordinary failures rather than dropping them silently.
+                    summary.failed += permissionFailedItems.map { "\($0.filename) (no permission to save there)" }
+                }
+            }
+
             await MainActor.run {
                 if let revealURL {
                     NSWorkspace.shared.activateFileViewerSelecting([revealURL])
@@ -473,7 +479,6 @@ final class AppState: ObservableObject {
                 }
                 let succeeded = summary.success == items.count && summary.failed.isEmpty
                 if succeeded {
-                    self.hasCompletedFirstExport = true
                     self.showExportCelebration = true
                     Task { @MainActor in
                         try? await Task.sleep(nanoseconds: 2_500_000_000)
@@ -488,6 +493,44 @@ final class AppState: ObservableObject {
                 completion?(succeeded)
             }
         }
+    }
+
+    /// Blocking AppKit alert + folder picker, run synchronously on the main
+    /// actor from inside exportAll's MainActor.run hop -- same pattern as
+    /// chooseFolderOrImages()/chooseWatermark() using NSOpenPanel.runModal()
+    /// directly from a plain action. Returns the chosen folder, tracked via
+    /// the existing SecurityScopedAccessTracker (sourceAccess) and bookmarked
+    /// the same way every other folder pick in this app is, or nil if the
+    /// customer declined.
+    private func presentPermissionRecoveryPanel() -> URL? {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(localized: "Can't save to that folder")
+        alert.informativeText = String(localized: "WatermarkFactory doesn't have permission to save files there. Choose a folder to save to instead.")
+        alert.addButton(withTitle: String(localized: "Choose Folder..."))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = String(localized: "Choose")
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+        sourceAccess.start(url)
+        saveBookmark(url, key: "lastPermissionRecoveryFolderBookmark")
+        return url
+    }
+
+    /// Matches NSFileWriteNoPermissionError and its POSIX EACCES/EPERM
+    /// equivalents, including when wrapped as an NSUnderlyingErrorKey inside
+    /// another NSError (how CGImageDestination/FileManager failures often
+    /// surface a permission problem).
+    nonisolated private static func isPermissionError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        if nsError.domain == NSCocoaErrorDomain, nsError.code == NSFileWriteNoPermissionError { return true }
+        if nsError.domain == NSPOSIXErrorDomain, nsError.code == Int(EACCES) || nsError.code == Int(EPERM) { return true }
+        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? Error { return isPermissionError(underlying) }
+        return false
     }
 
     func setOptimizeForWeb(_ value: Bool) {
@@ -717,7 +760,6 @@ final class AppState: ObservableObject {
         status = images.isEmpty ? String(localized: "No supported images selected.") : String(format: String(localized: "%d images selected."), images.count)
         pruneImageOrder()
         saveImageBookmarks()
-        advanceIfReady()
         updateEstimate()
     }
 
@@ -725,7 +767,6 @@ final class AppState: ObservableObject {
         watermarkAccess.replace(with: [url])
         watermarkURL = url
         saveBookmark(url, key: "watermarkBookmark")
-        advanceIfReady()
         updateEstimate()
     }
 
@@ -771,7 +812,6 @@ final class AppState: ObservableObject {
             status = images.isEmpty ? String(localized: "No supported images found in this folder.") : String(format: String(localized: "%d images found."), images.count)
             pruneImageOrder()
             saveImageBookmarks()
-            advanceIfReady()
             updateEstimate()
         } catch {
             sourceAccess.stopAll()
@@ -854,7 +894,6 @@ final class AppState: ObservableObject {
             status = String(format: String(localized: "%d images restored."), images.count)
             updateEstimate()
         }
-        advanceIfReady()
     }
 
     private func saveBookmark(_ url: URL, key: String) {
@@ -970,8 +1009,8 @@ struct ContentView: View {
     @State private var showingOverwriteConfirm = false
     @State private var draggingItem: ImageItem?
     @State private var isFileDropTargeted = false
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     private let controlsWidth: CGFloat = 360
-    private var compactControlsWidth: CGFloat { controlsWidth + BrandScrollBar<EmptyView>.railWidth }
     private let imageListWidth: CGFloat = 300
     private let previewMinWidth: CGFloat = 560
     private let spacing: CGFloat = AutomalitySpacing.sm
@@ -980,19 +1019,18 @@ struct ContentView: View {
     private struct SectionSpec {
         let id: String
         let title: String
-        let stage: AppState.Stage
         let startExpanded: Bool
     }
 
     private var allSections: [SectionSpec] {
         [
-            SectionSpec(id: "crop", title: "Crop", stage: .watermark, startExpanded: false),
-            SectionSpec(id: "watermarkSource", title: "Watermark source", stage: .watermark, startExpanded: true),
-            SectionSpec(id: "sizeOpacity", title: "Size & Opacity", stage: .position, startExpanded: true),
-            SectionSpec(id: "layoutMode", title: "Layout mode", stage: .position, startExpanded: false),
-            SectionSpec(id: "positionPadding", title: "Position & Padding", stage: .position, startExpanded: false),
-            SectionSpec(id: "orderRename", title: "Order & Rename", stage: .orderRename, startExpanded: false),
-            SectionSpec(id: "export", title: "Export", stage: .export, startExpanded: true),
+            SectionSpec(id: "crop", title: "Crop", startExpanded: false),
+            SectionSpec(id: "watermarkSource", title: "Watermark source", startExpanded: true),
+            SectionSpec(id: "sizeOpacity", title: "Size & Opacity", startExpanded: true),
+            SectionSpec(id: "layoutMode", title: "Layout mode", startExpanded: false),
+            SectionSpec(id: "positionPadding", title: "Position & Padding", startExpanded: false),
+            SectionSpec(id: "orderRename", title: "Order & Rename", startExpanded: false),
+            SectionSpec(id: "export", title: "Export", startExpanded: true),
         ]
     }
 
@@ -1001,17 +1039,9 @@ struct ContentView: View {
     }
 
     var body: some View {
-        VStack(spacing: AutomalitySpacing.sm) {
-            if state.isWalkthroughActive {
-                walkthroughHeader
-                    .padding(.horizontal, panePadding)
-                    .padding(.top, panePadding)
-            }
-
-            content
-        }
+        content
         .frame(minWidth: 980, minHeight: 680)
-        .background(AutomalityColor.gray100)
+        .background(Color(nsColor: .windowBackgroundColor))
         .toolbar {
             primaryActionToolbarItem
             globalActionsToolbarItem
@@ -1035,7 +1065,7 @@ struct ContentView: View {
                     Button("Save") { submitPresetName() }
                         .keyboardShortcut(.defaultAction)
                         .disabled(presetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .buttonStyle(.automalityPrimary)
+                        .buttonStyle(.bordered)
                 }
             }
             .padding()
@@ -1054,98 +1084,33 @@ struct ContentView: View {
         }
     }
 
-    private var walkthroughHeader: some View {
-        HStack(alignment: .top, spacing: AutomalitySpacing.sm) {
-            // Scrolls rather than clips/truncates if 5 steps plus
-            // longer localized titles don't fit the window width.
-            ScrollView(.horizontal, showsIndicators: false) {
-                AutomalityProgressNav(steps: AppState.Stage.allCases.map(\.title), currentStep: Binding(
-                    get: { state.stage.rawValue },
-                    set: { if let stage = AppState.Stage(rawValue: $0) { state.advance(to: stage) } }
-                ))
-            }
-            Spacer()
-            Button("Skip to full view") { state.hasCompletedFirstExport = true }
-                .buttonStyle(.plain)
-        }
-    }
-
+    // No modes, no wizard: images loaded -> the always-visible three-column
+    // layout (thumbnails / preview / settings). No images yet -> a single
+    // drag-and-drop / click-to-browse empty state fills the window.
     @ViewBuilder
     private var content: some View {
-        if state.isWalkthroughActive {
-            if state.stage == .selectImages {
-                selectImagesStage
-            } else {
-                walkthroughContent
-            }
+        if state.images.isEmpty {
+            emptyStateView
         } else {
-            denseContent
+            mainContent
         }
     }
 
     private var primaryActionToolbarItem: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
-            if state.isWalkthroughActive {
-                switch state.stage {
-                case .selectImages:
-                    Button("Next") { state.advance(to: .watermark) }
-                        .buttonStyle(state.images.isEmpty ? .automalitySecondary : .automalityAccent)
-                        .disabled(state.images.isEmpty)
-                case .watermark:
-                    // No watermark chosen yet: this becomes an explicit, always-
-                    // enabled "Skip" rather than a disabled "Next" -- watermarking
-                    // is the app's whole point but not force-required.
-                    // advance(to:) itself now allows this (nextAvailableStage no
-                    // longer gates on watermarkURL, see AppState) rather than this
-                    // button bypassing the guard directly -- a direct bypass here
-                    // left the progress nav and every other forward-navigation path
-                    // still silently blocked once on a later stage, since they all
-                    // go through advance(to:). One fix at the source, not another
-                    // one-off workaround. Primary (teal) rather than accent: it's a
-                    // real, deliberate choice, not the orange "do this next"
-                    // spotlight, which stays on Choose Watermark until one's
-                    // actually picked.
-                    if state.watermarkURL == nil {
-                        // Skips both Watermark AND Position -- there's nothing to
-                        // position without a watermark chosen, so Position isn't a
-                        // meaningful stop on the way past.
-                        Button("Skip") { state.advance(to: .orderRename) }
-                            .buttonStyle(.automalityPrimary)
-                    } else {
-                        Button("Next") { state.advance(to: .position) }
-                            .buttonStyle(.automalityAccent)
+            HStack(spacing: 8) {
+                if state.isExporting {
+                    GlowingProgressBar(progress: state.progress)
+                        .frame(width: 120)
+                    if !state.exportETAText.isEmpty {
+                        Text(state.exportETAText)
+                            .font(.caption2)
+                            .foregroundStyle(Color.secondary)
                     }
-                case .position:
-                    Button("Next") { state.advance(to: .orderRename) }
-                        .buttonStyle(.automalityAccent)
-                case .orderRename:
-                    Button("Next") { state.advance(to: .export) }
-                        .buttonStyle(.automalityAccent)
-                case .export:
-                    // The terminal action gets the same top-right, always-visible,
-                    // orange-when-actionable treatment as every other stage's
-                    // Next -- previously buried at the bottom of a scrolling
-                    // settings pane, easy to miss after scrolling through format/
-                    // size/prefix controls to get there.
-                    Button("Watermark All Images") { state.exportAll() }
-                        .buttonStyle(state.canExport ? .automalityAccent : .automalitySecondary)
-                        .disabled(!state.canExport)
                 }
-            } else {
-                HStack(spacing: 8) {
-                    if state.isExporting {
-                        GlowingProgressBar(progress: state.progress)
-                            .frame(width: 120)
-                        if !state.exportETAText.isEmpty {
-                            Text(state.exportETAText)
-                                .font(.caption2)
-                                .foregroundStyle(AutomalityColor.inkMuted)
-                        }
-                    }
-                    Button("Watermark All Images") { state.watermarkAllTapped() }
-                        .buttonStyle(state.watermarkURL != nil ? .automalityAccent : .automalityPrimary)
-                        .disabled(!state.canTapWatermarkAll)
-                }
+                Button("Watermark All Images") { state.watermarkAllTapped() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!state.canTapWatermarkAll)
             }
         }
     }
@@ -1203,107 +1168,88 @@ struct ContentView: View {
         }
     }
 
-    private func sectionsForCurrentStage() -> [SectionSpec] {
-        allSections.filter { $0.stage == state.stage }
-    }
-
-    private var walkthroughContent: some View {
-        HStack(spacing: 0) {
+    // Apple's own three-column layout primitive (same pattern as Mail/Photos/
+    // Xcode: sidebar/content/detail) rather than a hand-rolled HStack of
+    // fixed-width panes with manual Dividers -- resizable/collapsible panes
+    // come for free instead of being built here.
+    private var mainContent: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            imageList
+                .navigationSplitViewColumnWidth(min: 220, ideal: imageListWidth, max: 340)
+        } content: {
             previewPane
-            Divider()
-            ScrollView {
+                .navigationSplitViewColumnWidth(min: previewMinWidth, ideal: previewMinWidth + 140)
+        } detail: {
+            BrandScrollBar {
                 VStack(alignment: .leading, spacing: spacing) {
-                    ForEach(sectionsForCurrentStage(), id: \.id) { spec in
-                        sectionBody(spec.id)
+                    ForEach(allSections, id: \.id) { spec in
+                        CollapsibleControlSection(spec.title, startExpanded: spec.startExpanded) {
+                            sectionBody(spec.id)
+                        }
                     }
                 }
                 .padding(panePadding)
             }
-            .frame(width: controlsWidth)
+            .navigationSplitViewColumnWidth(min: controlsWidth, ideal: controlsWidth, max: controlsWidth + 120)
         }
+        .navigationSplitViewStyle(.balanced)
     }
 
-    private var selectImagesStage: some View {
-        imageList
-    }
-
-    private var denseContent: some View {
-        // Matches walkthrough header's own .padding(.horizontal, panePadding) -- without
-        // this, the left/right panes sit flush against the window edge
-        // while the header row above stays inset, reading as a cropped/
-        // clipped left edge instead of a deliberate margin.
-        HStack(spacing: 0) {
-            selectImagesStage
-            .frame(width: imageListWidth)
-            Divider()
-            previewPane
-            Divider()
-            VStack(spacing: 0) {
-                BrandScrollBar {
-                    VStack(alignment: .leading, spacing: spacing) {
-                        ForEach(allSections, id: \.id) { spec in
-                            CollapsibleControlSection(spec.title, startExpanded: spec.startExpanded) {
-                                sectionBody(spec.id)
-                            }
-                        }
-                    }
-                    .padding(panePadding)
-                }
-            }
-            .frame(width: compactControlsWidth)
-        }
-        .padding(.horizontal, panePadding)
-    }
-
-    private var imagePickerEmptyState: some View {
+    private var emptyStateView: some View {
         VStack(spacing: 8) {
             FlowLayout {
                 Button("Choose Folder or Images...") { state.chooseFolderOrImages() }
-                    .buttonStyle(.automalityPrimary)
+                    .buttonStyle(.bordered)
             }
             Text("...or drag a folder or images in")
                 .font(.caption)
-                .foregroundStyle(AutomalityColor.inkMuted)
+                .foregroundStyle(Color.secondary)
         }
-        .frame(maxWidth: .infinity, minHeight: 240)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Same dispatch as the Choose Folder or Images button and the
+        // Finder Quick Action (AppState.addDroppedURLs -> openedURLInput ->
+        // open(_:)) -- one rule everywhere for "what does dropping a mix of
+        // folders/files actually mean", not three different ones.
+        .dropDestination(for: URL.self) { urls, _ in
+            state.addDroppedURLs(urls)
+            return true
+        } isTargeted: { targeted in
+            isFileDropTargeted = targeted
+        }
+        .background(isFileDropTargeted ? theme.primary.opacity(0.12) : Color.clear)
+        .animation(.easeOut(duration: 0.15), value: isFileDropTargeted)
     }
 
     private var imageList: some View {
         ScrollView {
-            if state.images.isEmpty {
-                imagePickerEmptyState
-            } else {
-                LazyVStack(alignment: .center, spacing: 8) {
-                    ForEach(state.images) { item in
-                        VStack(spacing: 4) {
-                            ZStack(alignment: .topTrailing) {
-                                Thumb(url: item.url, size: 88)
-                                if state.hasWatermarkedOutput(for: item) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(theme.primary)
-                                        .background(Circle().fill(.white))
-                                        .offset(x: 4, y: -4)
-                                }
+            LazyVStack(alignment: .center, spacing: 8) {
+                ForEach(state.images) { item in
+                    VStack(spacing: 4) {
+                        ZStack(alignment: .topTrailing) {
+                            Thumb(url: item.url, size: 88)
+                            if state.hasWatermarkedOutput(for: item) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(theme.primary)
+                                    .background(Circle().fill(.white))
+                                    .offset(x: 4, y: -4)
                             }
-                            Text(item.filename)
-                                .font(.caption)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                                .foregroundStyle(AutomalityColor.ink)
                         }
-                        .padding(8)
-                        .frame(maxWidth: .infinity)
-                        .background(state.selected == item ? theme.primary.opacity(0.12) : Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .contentShape(Rectangle())
-                        .onTapGesture { state.select(item) }
+                        Text(item.filename)
+                            .font(.caption)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .foregroundStyle(Color.primary)
                     }
+                    .padding(8)
+                    .frame(maxWidth: .infinity)
+                    .background(state.selected == item ? theme.primary.opacity(0.12) : Color.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .contentShape(Rectangle())
+                    .onTapGesture { state.select(item) }
                 }
-                .frame(minHeight: 420, alignment: .top)
             }
+            .padding(panePadding)
         }
-        .padding(panePadding)
-        .frame(maxWidth: .infinity, alignment: .leading)
         // Same dispatch as the Choose Folder or Images button and the
         // Finder Quick Action (AppState.addDroppedURLs -> openedURLInput ->
         // open(_:)) -- one rule everywhere for "what does dropping a mix of
@@ -1321,22 +1267,22 @@ struct ContentView: View {
     private var previewPane: some View {
         VStack(spacing: spacing) {
             ZStack {
-                AutomalityColor.gray100
+                Color(nsColor: .windowBackgroundColor)
                 if let image = state.previewImage {
                     WatermarkPreview(image: image, state: state)
                 } else {
                     Text("Select an image to preview.")
                         .font(.title3)
-                        .foregroundStyle(AutomalityColor.inkMuted)
+                        .foregroundStyle(Color.secondary)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .overlay(Rectangle().stroke(AutomalityColor.ink.opacity(0.2)))
+            .overlay(Rectangle().stroke(Color.primary.opacity(0.2)))
             .overlay(alignment: .top) {
                 if state.isDemoPreview {
                     Text("Previewing with Automality's mark — choose your own watermark to replace it")
                         .font(.caption)
-                        .foregroundStyle(AutomalityColor.offWhite)
+                        .foregroundStyle(Color.white)
                         .padding(.horizontal, AutomalitySpacing.sm)
                         .padding(.vertical, 6)
                         .background(theme.primaryDeep.opacity(0.85))
@@ -1352,17 +1298,17 @@ struct ContentView: View {
                 HStack(spacing: 8) {
                     ForEach(state.images) { item in
                         Thumb(url: item.url, size: 60)
-                            .overlay(Rectangle().stroke(state.selected == item ? theme.primary : AutomalityColor.gray300, lineWidth: state.selected == item ? 2 : 1))
+                            .overlay(Rectangle().stroke(state.selected == item ? theme.primary : Color.secondary.opacity(0.35), lineWidth: state.selected == item ? 2 : 1))
                             .onTapGesture { state.select(item) }
                     }
                 }
                 .padding(.horizontal, panePadding)
             }
             .frame(height: 76)
-            .background(AutomalityColor.offWhite)
+            .background(Color(nsColor: .windowBackgroundColor))
             Text(state.status)
                 .font(.caption)
-                .foregroundStyle(AutomalityColor.inkMuted)
+                .foregroundStyle(Color.secondary)
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, panePadding)
@@ -1371,30 +1317,28 @@ struct ContentView: View {
         .frame(minWidth: previewMinWidth)
     }
 
-    private var watermarkSourceSection: some View {
-        ControlSection("Watermark source") {
-            watermarkSourceSectionBody
-        }
-    }
-
     @ViewBuilder
     private var watermarkSourceSectionBody: some View {
         HStack(spacing: 12) {
-            // Accent (orange) until a watermark is picked -- it's the
-            // one thing blocking progress on this stage, so it's the
-            // single orange element on screen (the toolbar's Next stays
-            // secondary/disabled until this is done).
-            // Reverts to primary once set, handing the "next step"
-            // spotlight to Next.
-            Button("Choose Watermark...") { state.chooseWatermark() }
-                .buttonStyle(state.watermarkURL == nil ? .automalityAccent : .automalityPrimary)
+            // Prominent until a watermark is picked -- it's the one thing
+            // blocking a real export -- then reverts to a plain bordered
+            // button once set.
+            if state.watermarkURL == nil {
+                Button("Choose Watermark...") { state.chooseWatermark() }
+                    .buttonStyle(.borderedProminent)
+            } else {
+                Button("Choose Watermark...") { state.chooseWatermark() }
+                    .buttonStyle(.bordered)
+            }
             Spacer()
             if let url = state.watermarkURL { Thumb(url: url, size: 56) }
         }
-        Text("Tint").automalityLabelText().foregroundStyle(AutomalityColor.ink)
-        AutomalitySegmentedControl(options: WatermarkTint.allCases, selection: $state.watermarkTint, label: \.label) { tint in
-            AnyView(tintSwatch(tint))
+        Text("Tint").automalityLabelText().foregroundStyle(Color.primary)
+        Picker("Tint", selection: $state.watermarkTint) {
+            ForEach(WatermarkTint.allCases) { Text($0.label).tag($0) }
         }
+        .pickerStyle(.segmented)
+        .labelsHidden()
         // For watermarks that weren't prepared as a proper transparent
         // PNG (a flat-color-filled square exported straight from a
         // design tool, say) -- strips a solid/near-solid background at
@@ -1406,15 +1350,9 @@ struct ContentView: View {
             .toggleStyle(.automality)
         // Smart Placement ("Suggest Placement") is disabled for this
         // release — the suggestions weren't reliable enough yet. The
-        // underlying logic (AppState.suggestPlacement, smartPlacementCard,
-        // SmartPlacementProposal) is left intact for a future version;
-        // this just removes the UI entry point.
-    }
-
-    private var cropSection: some View {
-        ControlSection("Crop") {
-            cropSectionBody
-        }
+        // underlying logic (AppState.suggestPlacement, SmartPlacementProposal)
+        // is left intact for a future version; this just removes the UI
+        // entry point.
     }
 
     @ViewBuilder
@@ -1422,18 +1360,16 @@ struct ContentView: View {
         Toggle(String(localized: "Enable Crop"), isOn: $state.cropEnabled)
             .toggleStyle(.automality)
         if state.cropEnabled {
-            AutomalitySegmentedControl(options: CropScope.allCases, selection: $state.cropScope, label: \.label)
+            Picker("Crop scope", selection: $state.cropScope) {
+                ForEach(CropScope.allCases) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
             Text(state.cropScope == .allImages
                 ? String(localized: "Dragging on any image applies the same crop to the whole batch.")
                 : String(localized: "Dragging on any image crops just that image."))
                 .font(.caption)
-                .foregroundStyle(AutomalityColor.inkMuted)
-        }
-    }
-
-    private var sizeOpacitySection: some View {
-        ControlSection("Size & Opacity") {
-            sizeOpacitySectionBody
+                .foregroundStyle(Color.secondary)
         }
     }
 
@@ -1444,68 +1380,58 @@ struct ContentView: View {
             state.sizeFraction = preset.value
         }
         AutomalitySlider(value: Binding(get: { state.sizeFraction }, set: { state.sizePreset = nil; state.sizeFraction = $0 }), in: 0.05...1.0)
-        Text("\(Int(state.sizeFraction * 100))%").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+        Text("\(Int(state.sizeFraction * 100))%").font(.caption).foregroundStyle(Color.secondary)
         Divider()
         presetSection("Opacity", presets: OpacityPreset.allCases, selected: state.opacityPreset?.id, valueText: state.opacityPreset?.label ?? "Custom") { preset in
             state.opacityPreset = preset
             state.opacity = preset.value
         }
         AutomalitySlider(value: Binding(get: { state.opacity }, set: { state.opacityPreset = nil; state.opacity = $0 }), in: 0...1)
-        Text("\(Int(state.opacity * 100))%").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
-    }
-
-    private var layoutModeSection: some View {
-        ControlSection("Layout mode") {
-            layoutModeSectionBody
-        }
+        Text("\(Int(state.opacity * 100))%").font(.caption).foregroundStyle(Color.secondary)
     }
 
     @ViewBuilder
     private var layoutModeSectionBody: some View {
-        AutomalitySegmentedControl(options: LayoutMode.allCases, selection: $state.layoutMode, label: \.label)
-    }
-
-    private var positionPaddingSection: some View {
-        ControlSection("Position & Padding") {
-            positionPaddingSectionBody
+        Picker("Layout mode", selection: $state.layoutMode) {
+            ForEach(LayoutMode.allCases) { Text($0.label).tag($0) }
         }
+        .pickerStyle(.segmented)
+        .labelsHidden()
     }
 
     @ViewBuilder
     private var positionPaddingSectionBody: some View {
         if state.layoutMode == .single {
-            Text("Anchor").automalityLabelText().foregroundStyle(AutomalityColor.ink)
+            Text("Anchor").automalityLabelText().foregroundStyle(Color.primary)
             singleControls
         }
         Text(state.layoutMode == .single ? "Padding — distance from that edge" : "Padding — margin around each mark")
             .automalityLabelText()
-            .foregroundStyle(AutomalityColor.ink)
+            .foregroundStyle(Color.primary)
         AutomalitySlider(value: $state.padding, in: 0...100)
-        Text("\(Int(state.padding)) px").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+        Text("\(Int(state.padding)) px").font(.caption).foregroundStyle(Color.secondary)
         if state.layoutMode == .tiled {
             Divider()
             tiledControls
         }
     }
 
-    private var exportSection: some View {
-        ControlSection("Export") {
-            exportSectionBody
-        }
-    }
-
     @ViewBuilder
     private var exportSectionBody: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Optimize").automalityLabelText().foregroundStyle(AutomalityColor.ink)
-            AutomalitySegmentedControl(options: ExportFormat.allCases, selection: $state.exportFormat, label: \.label)
+            Text("Optimize").automalityLabelText().foregroundStyle(Color.primary)
+            Picker("Export format", selection: $state.exportFormat) {
+                ForEach(ExportFormat.allCases) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
             if state.exportFormat == .jpeg {
                 AutomalitySlider(value: $state.jpegQuality, in: 0...1)
-                Text(String(format: String(localized: "JPEG quality %d%%"), Int(state.jpegQuality * 100))).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+                Text(String(format: String(localized: "JPEG quality %d%%"), Int(state.jpegQuality * 100))).font(.caption).foregroundStyle(Color.secondary)
             }
             Toggle("Optimize for Web", isOn: Binding(get: { state.optimizeForWeb }, set: { state.setOptimizeForWeb($0) }))
                 .toggleStyle(.automality)
-            Text(state.exportFormat.hint).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+            Text(state.exportFormat.hint).font(.caption).foregroundStyle(Color.secondary)
         }
         Divider()
         VStack(alignment: .leading, spacing: 8) {
@@ -1515,15 +1441,19 @@ struct ContentView: View {
             // genuine choice, so keep this control prominent.
             Text("Location metadata")
                 .font(.headline)
-                .foregroundStyle(AutomalityColor.ink)
-            AutomalitySegmentedControl(options: MetadataPrivacyLevel.allCases, selection: $state.metadataPrivacy, label: \.label)
+                .foregroundStyle(Color.primary)
+            Picker("Location metadata", selection: $state.metadataPrivacy) {
+                ForEach(MetadataPrivacyLevel.allCases) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
             Text(state.metadataPrivacy == .removeLocation ? "Removed from exported images" : "Kept in exported images")
                 .font(.caption)
-                .foregroundStyle(state.metadataPrivacy == .removeLocation ? AutomalityColor.inkMuted : AutomalityColor.orangeDeep)
+                .foregroundStyle(state.metadataPrivacy == .removeLocation ? Color.secondary : Color.orange)
         }
         Divider()
         VStack(alignment: .leading, spacing: 8) {
-            Text("Save & Rename").automalityLabelText().foregroundStyle(AutomalityColor.ink)
+            Text("Save & Rename").automalityLabelText().foregroundStyle(Color.primary)
             HStack(spacing: 8) {
                 TextField("Prefix", text: Binding(get: { state.outputPrefix }, set: { state.outputPrefix = AppState.sanitizedFilenameAffix($0) }))
                     .textFieldStyle(.automality)
@@ -1531,7 +1461,7 @@ struct ContentView: View {
                     .textFieldStyle(.automality)
             }
             if !state.estimatedFilename.isEmpty {
-                Text(String(format: String(localized: "-> %@"), state.estimatedFilename)).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+                Text(String(format: String(localized: "-> %@"), state.estimatedFilename)).font(.caption).foregroundStyle(Color.secondary)
             }
         }
         CollapsibleControlSection("Advanced", startExpanded: false) {
@@ -1541,22 +1471,22 @@ struct ContentView: View {
                 TextField("Height", value: $state.outputHeight, format: .number)
                     .textFieldStyle(.automalityData)
             }
-            Text(state.outputWidth > 0 && state.outputHeight > 0 ? String(format: String(localized: "Output size %d×%d px"), state.outputWidth, state.outputHeight) : String(localized: "Output size original")).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+            Text(state.outputWidth > 0 && state.outputHeight > 0 ? String(format: String(localized: "Output size %d×%d px"), state.outputWidth, state.outputHeight) : String(localized: "Output size original")).font(.caption).foregroundStyle(Color.secondary)
             HStack(spacing: 8) {
                 Text("Max file size")
                 TextField("Off", value: $state.maxFileSizeKB, format: .number)
                     .textFieldStyle(.automalityData)
                     .frame(width: 70)
-                Text("KB").foregroundStyle(AutomalityColor.inkMuted)
+                Text("KB").foregroundStyle(Color.secondary)
             }
             if state.maxFileSizeBlocksExport {
                 Text("Max file size requires JPEG — switch format or clear this limit.")
                     .font(.caption)
-                    .foregroundStyle(AutomalityColor.orangeDeep)
+                    .foregroundStyle(Color.orange)
             } else if state.maxFileSizeKB > 0 {
                 Text(String(format: String(localized: "Quality (and, if needed, dimensions) will be reduced to fit ~%d KB per image."), state.maxFileSizeKB))
                     .font(.caption)
-                    .foregroundStyle(AutomalityColor.inkMuted)
+                    .foregroundStyle(Color.secondary)
             }
         }
         if !state.estimatedSize.isEmpty {
@@ -1565,83 +1495,14 @@ struct ContentView: View {
         // The action itself moved to the top-right header (always
         // visible, orange when ready) -- this hint/progress stays here,
         // next to the settings it's actually explaining.
-        if let hint = state.exportHint { Text(hint).font(.caption).foregroundStyle(AutomalityColor.inkMuted) }
+        if let hint = state.exportHint { Text(hint).font(.caption).foregroundStyle(Color.secondary) }
         if state.isExporting {
             GlowingProgressBar(progress: state.progress)
             if !state.exportETAText.isEmpty {
                 Text(state.exportETAText)
                     .font(.caption2)
-                    .foregroundStyle(AutomalityColor.inkMuted)
+                    .foregroundStyle(Color.secondary)
             }
-        }
-    }
-
-    private var savedPresetLibrary: some View {
-        ControlSection("Presets") {
-            savedPresetLibraryBody
-        }
-    }
-
-    @ViewBuilder
-    private var savedPresetLibraryBody: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button("Save current as preset...") {
-                presetName = ""
-                isNamingPreset = true
-            }
-            .buttonStyle(.automalityPrimary)
-            .disabled(!state.canSavePreset)
-            if state.presets.isEmpty {
-                Text("No saved presets.").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
-            } else {
-                ScrollView {
-                    VStack(spacing: 4) {
-                        ForEach(state.presets) { preset in
-                            HStack {
-                                Button(preset.name) { state.applyPreset(preset) }
-                                    .buttonStyle(.plain)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                Button(role: .destructive) { state.deletePreset(preset) } label: {
-                                    Image(systemName: "trash")
-                                }
-                                .buttonStyle(.borderless)
-                                .help("Delete preset")
-                            }
-                            .padding(.vertical, 2)
-                        }
-                    }
-                }
-                .frame(maxHeight: 140)
-            }
-        }
-    }
-
-    private var platformPresets: some View {
-        ControlSection("Platform presets") {
-            platformPresetsBody
-        }
-    }
-
-    @ViewBuilder
-    private var platformPresetsBody: some View {
-        ForEach(PlatformExportPreset.all) { preset in
-            Button {
-                state.applyPlatformPreset(preset)
-            } label: {
-                HStack {
-                    Text(preset.name)
-                    Spacer()
-                    Text(preset.sizeLabel).foregroundStyle(AutomalityColor.inkMuted)
-                }
-            }
-            .buttonStyle(.automalitySecondary)
-            .help(preset.note)
-        }
-    }
-
-    private var orderRenameSection: some View {
-        ControlSection("Order & Rename") {
-            orderRenameSectionBody
         }
     }
 
@@ -1654,126 +1515,21 @@ struct ContentView: View {
         }
     }
 
-    /// A small swatch previewing what each tint option actually does, so the
-    /// choice reads visually instead of relying on the word alone — "Light"
-    /// looks light, "Dark" looks dark, "Original" shows a split (keeps
-    /// whatever the source watermark already is).
-    @ViewBuilder
-    private func tintSwatch(_ tint: WatermarkTint) -> some View {
-        ZStack {
-            switch tint {
-            case .original:
-                GeometryReader { proxy in
-                    Path { path in
-                        path.move(to: .zero)
-                        path.addLine(to: CGPoint(x: proxy.size.width, y: 0))
-                        path.addLine(to: .zero)
-                        path.closeSubpath()
-                    }.fill(AutomalityColor.offWhite)
-                    Path { path in
-                        path.move(to: CGPoint(x: proxy.size.width, y: 0))
-                        path.addLine(to: CGPoint(x: proxy.size.width, y: proxy.size.height))
-                        path.addLine(to: CGPoint(x: 0, y: proxy.size.height))
-                        path.closeSubpath()
-                    }.fill(AutomalityColor.ink)
-                }
-            case .light:
-                AutomalityColor.offWhite
-            case .dark:
-                AutomalityColor.ink
-            }
-        }
-        .frame(width: 16, height: 16)
-        .overlay(Rectangle().stroke(AutomalityColor.gray300, lineWidth: 1))
-    }
-
-    /// "How loud should this be" as one control -- six named steps ordered
-    /// low to high intrusiveness (Discrete...Protective), each setting
-    /// size+opacity+layout together, plus a continuous slider that
-    /// interpolates between them for fine adjustment. The granular Size &
-    /// Opacity section below stays available for anyone who wants an exact
-    /// custom combination this ladder doesn't cover.
-    private var intensitySection: some View {
-        ControlSection("Watermark Intensity") {
-            WatermarkIntensityPad(
-                sizeFraction: $state.sizeFraction,
-                layoutStyle: Binding(get: { state.intensityLayoutStyle }, set: { state.intensityLayoutStyle = $0 }),
-                opacity: state.opacity
-            )
-            FlowLayout {
-                ForEach(WatermarkIntensityPreset.allCases) { preset in
-                    Button(preset.label) {
-                        state.sizeFraction = preset.sizeFraction
-                        state.intensityLayoutStyle = preset.layoutStyle
-                        state.opacity = preset.opacity
-                    }
-                    .buttonStyle(.automalityChip(isSelected: isCurrentIntensityPreset(preset)))
-                }
-            }
-            Text("Opacity").automalityLabelText().foregroundStyle(AutomalityColor.ink)
-            AutomalitySlider(value: $state.opacity, in: 0...1)
-            Text("\(Int(state.opacity * 100))%").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
-            Text(currentIntensityPurpose)
-                .font(.caption)
-                .foregroundStyle(AutomalityColor.inkMuted)
-        }
-    }
-
-    private func isCurrentIntensityPreset(_ preset: WatermarkIntensityPreset) -> Bool {
-        abs(state.sizeFraction - preset.sizeFraction) < 0.005
-            && state.intensityLayoutStyle == preset.layoutStyle
-            && abs(state.opacity - preset.opacity) < 0.005
-    }
-
-    private var currentIntensityPurpose: String {
-        WatermarkIntensityPreset.nearest(sizeFraction: state.sizeFraction, layoutStyle: state.intensityLayoutStyle).purpose
-    }
-
-    @ViewBuilder
-    private var smartPlacementCard: some View {
-        if let proposal = state.smartPlacementProposal {
-            ControlSection("Suggested Placement") {
-                Text(proposal.note)
-                    .font(.caption)
-                    .foregroundStyle(AutomalityColor.inkMuted)
-                if proposal.saliencyUnavailable {
-                    Text("Saliency was unavailable for this image.")
-                        .font(.caption)
-                        .foregroundStyle(AutomalityColor.orangeDeep)
-                }
-                FlowLayout {
-                    Button("Dismiss") { state.dismissSmartPlacement() }
-                        .buttonStyle(.automalitySecondary)
-                    Button("Apply") { state.applySmartPlacement() }
-                        .buttonStyle(.automalityPrimary)
-                }
-            }
-        }
-    }
-
     private var orderRenameHeader: some View {
         VStack(alignment: .leading, spacing: AutomalitySpacing.sm) {
             Text(state.orderSummary)
                 .font(.headline)
-                .foregroundStyle(AutomalityColor.ink)
+                .foregroundStyle(Color.primary)
             FlowLayout {
                 Button("Clear order") { state.clearOrder() }
-                    .buttonStyle(.automalitySecondary)
+                    .buttonStyle(.bordered)
                     .disabled(state.numberedCount == 0)
                 Button("Number in current order") { state.numberInCurrentOrder(state.orderedItems) }
-                    .buttonStyle(.automalityPrimary)
+                    .buttonStyle(.bordered)
                     .disabled(state.images.isEmpty)
                 Button(state.isClassifyingRooms ? "Detecting Rooms..." : "Auto-name by Room") { state.classifyRoomsForAllImages() }
-                    .buttonStyle(.automalitySecondary)
+                    .buttonStyle(.plain)
                     .disabled(state.images.isEmpty || state.isClassifyingRooms)
-                // Only images are required to view the Export stage --
-                // watermarkURL is intentionally not part of this gate (see
-                // AppState.nextAvailableStage): the actual export action
-                // stays correctly blocked without one via canExport/
-                // exportHint on that stage, this only governs navigation.
-                Button("Skip") { state.advance(to: .export) }
-                    .buttonStyle(.automalitySecondary)
-                    .disabled(state.images.isEmpty)
             }
         }
     }
@@ -1801,11 +1557,11 @@ struct ContentView: View {
                 if let number {
                     Text("\(number)")
                         .font(.headline)
-                        .foregroundStyle(AutomalityColor.offWhite)
+                        .foregroundStyle(Color.white)
                         .padding(.horizontal, AutomalitySpacing.xs)
                         .padding(.vertical, 4)
                         .background(theme.primary)
-                        .overlay(Rectangle().stroke(AutomalityColor.ink, lineWidth: 2))
+                        .overlay(Rectangle().stroke(Color.primary, lineWidth: 2))
                         .padding(AutomalitySpacing.xs)
                     }
             }
@@ -1818,20 +1574,20 @@ struct ContentView: View {
             }
             Text(item.filename)
                 .font(.caption)
-                .foregroundStyle(AutomalityColor.inkMuted)
+                .foregroundStyle(Color.secondary)
                 .lineLimit(2)
                 .frame(width: 128, alignment: .leading)
             if roomLabel != nil {
                 Text(outputName)
                     .font(.caption2)
-                    .foregroundStyle(AutomalityColor.inkMuted)
+                    .foregroundStyle(Color.secondary)
                     .lineLimit(2)
                     .frame(width: 128, alignment: .leading)
             }
         }
         .padding(AutomalitySpacing.xs)
-        .background(AutomalityColor.offWhite)
-        .overlay(Rectangle().stroke(number == nil ? AutomalityColor.gray300 : AutomalityColor.ink, lineWidth: 2))
+        .background(Color(nsColor: .windowBackgroundColor))
+        .overlay(Rectangle().stroke(number == nil ? Color.secondary.opacity(0.35) : Color.primary, lineWidth: 2))
         .onTapGesture { state.toggleOrder(for: item) }
         .onDrag {
             draggingItem = item
@@ -1862,7 +1618,7 @@ struct ContentView: View {
                     .buttonStyle(.automalityChip(isSelected: state.anchor == anchor))
                 }
             }
-            Text("Nudge from anchor (optional)").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+            Text("Nudge from anchor (optional)").font(.caption).foregroundStyle(Color.secondary)
             HStack(spacing: 8) {
                 TextField("X", value: $state.offsetX, format: .number)
                     .textFieldStyle(.automalityData)
@@ -1876,9 +1632,9 @@ struct ContentView: View {
 
     private var tiledControls: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Spacing — gap between tiles").automalityLabelText().foregroundStyle(AutomalityColor.ink)
+            Text("Spacing — gap between tiles").automalityLabelText().foregroundStyle(Color.primary)
             AutomalitySlider(value: $state.spacing, in: 0...400)
-            Text("\(Int(state.spacing)) px").font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+            Text("\(Int(state.spacing)) px").font(.caption).foregroundStyle(Color.secondary)
             Picker("Rotation", selection: $state.rotationPattern) {
                 ForEach(RotationPattern.allCases) { Text($0.label).tag($0) }
             }
@@ -1893,9 +1649,9 @@ struct ContentView: View {
     private func presetSection<P: Identifiable>(_ title: String, presets: [P], selected: P.ID?, valueText: String, action: @escaping (P) -> Void) -> some View where P.ID == String {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(title).font(.subheadline).fontWeight(.semibold).foregroundStyle(AutomalityColor.ink)
+                Text(title).font(.subheadline).fontWeight(.semibold).foregroundStyle(Color.primary)
                 Spacer()
-                Text(valueText).font(.caption).foregroundStyle(AutomalityColor.inkMuted)
+                Text(valueText).font(.caption).foregroundStyle(Color.secondary)
             }
             // A single aligned row, ordered smallest-to-largest / least-to-most,
             // each chip a short label with a small icon swatch that previews
@@ -1936,120 +1692,17 @@ struct ContentView: View {
             // Size: the swatch itself scales from small to large across tiers.
             let side: CGFloat = 6 + CGFloat(WatermarkSizePreset.allCases.firstIndex(of: preset) ?? 0) * 2.5
             Rectangle()
-                .fill(AutomalityColor.ink)
+                .fill(Color.primary)
                 .frame(width: side, height: side)
                 .frame(width: 16, height: 16)
         } else if let preset = preset as? OpacityPreset {
             // Opacity: a fixed-size swatch whose fill opacity previews the tier.
             Rectangle()
-                .fill(AutomalityColor.ink.opacity(preset.value))
-                .overlay(Rectangle().stroke(AutomalityColor.gray300, lineWidth: 1))
+                .fill(Color.primary.opacity(preset.value))
+                .overlay(Rectangle().stroke(Color.secondary.opacity(0.35), lineWidth: 1))
                 .frame(width: 16, height: 16)
         } else {
             Color.clear.frame(width: 16, height: 16)
-        }
-    }
-}
-
-/// Drag anywhere to set size (X) and layout style (Y) together in one
-/// gesture. Opacity isn't a third spatial axis -- forcing four independent
-/// dimensions into one control is exactly what makes a control hard to
-/// use, not powerful. It rides along as the handle's own transparency
-/// instead, live, while staying a real independently-adjustable value via
-/// the slider underneath.
-struct WatermarkIntensityPad: View {
-    @Environment(\.brandTheme) private var theme
-
-    @Binding var sizeFraction: Double
-    @Binding var layoutStyle: WatermarkLayoutStyle
-    let opacity: Double
-
-    private let padHeight: CGFloat = 168
-
-    var body: some View {
-        GeometryReader { geo in
-            let rowHeight = geo.size.height / CGFloat(WatermarkLayoutStyle.allCases.count)
-            ZStack(alignment: .topLeading) {
-                AutomalityColor.gray100
-                // Row bands + labels
-                ForEach(WatermarkLayoutStyle.allCases) { style in
-                    let y = CGFloat(style.rawValue) * rowHeight
-                    Rectangle()
-                        .stroke(AutomalityColor.gray300, lineWidth: 1)
-                        .frame(width: geo.size.width, height: rowHeight)
-                        .position(x: geo.size.width / 2, y: y + rowHeight / 2)
-                    Text(style.label)
-                        .font(.caption2)
-                        .foregroundStyle(AutomalityColor.inkMuted)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                        .background(AutomalityColor.offWhite.opacity(0.85))
-                        .position(x: 44, y: y + 10)
-                }
-                // Reference dots for the six named presets, so the grid
-                // isn't just an empty field -- it shows where the named
-                // steps actually sit.
-                ForEach(WatermarkIntensityPreset.allCases) { preset in
-                    let px = xPosition(for: preset.sizeFraction, width: geo.size.width)
-                    let py = CGFloat(preset.layoutStyle.rawValue) * rowHeight + rowHeight / 2
-                    Circle()
-                        .fill(AutomalityColor.gray300)
-                        .frame(width: 6, height: 6)
-                        .position(x: px, y: py)
-                }
-                // The draggable handle itself
-                let hx = xPosition(for: sizeFraction, width: geo.size.width)
-                let hy = CGFloat(layoutStyle.rawValue) * rowHeight + rowHeight / 2
-                Circle()
-                    .fill(theme.accent.opacity(max(opacity, 0.15)))
-                    .overlay(Circle().stroke(AutomalityColor.ink, lineWidth: 2))
-                    .frame(width: 22, height: 22)
-                    .position(x: hx, y: hy)
-            }
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        let clampedX = min(max(value.location.x, 0), geo.size.width)
-                        sizeFraction = fraction(forX: clampedX, width: geo.size.width)
-                        let row = min(max(Int(value.location.y / rowHeight), 0), WatermarkLayoutStyle.allCases.count - 1)
-                        if let style = WatermarkLayoutStyle(rawValue: row) { layoutStyle = style }
-                    }
-            )
-        }
-        .frame(height: padHeight)
-        .overlay(Rectangle().stroke(AutomalityColor.ink.opacity(0.3), lineWidth: 1))
-    }
-
-    private func xPosition(for size: Double, width: CGFloat) -> CGFloat {
-        let range = WatermarkIntensityPreset.sizeRange
-        let t = (size - range.lowerBound) / (range.upperBound - range.lowerBound)
-        return CGFloat(min(max(t, 0), 1)) * width
-    }
-
-    private func fraction(forX x: CGFloat, width: CGFloat) -> Double {
-        let range = WatermarkIntensityPreset.sizeRange
-        guard width > 0 else { return range.lowerBound }
-        let t = Double(x / width)
-        return range.lowerBound + t * (range.upperBound - range.lowerBound)
-    }
-}
-
-struct ControlSection<Content: View>: View {
-    let title: String
-    @ViewBuilder var content: Content
-
-    init(_ title: String, @ViewBuilder content: () -> Content) {
-        self.title = String(localized: String.LocalizationValue(title))
-        self.content = content()
-    }
-
-    var body: some View {
-        AutomalitySectionBox(title) {
-            VStack(alignment: .leading, spacing: 12) {
-                content
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
@@ -2151,11 +1804,11 @@ struct CollapsibleControlSection<Content: View>: View {
                         .foregroundStyle(theme.primary)
                     Text(title)
                         .font(.headline)
-                        .foregroundStyle(AutomalityColor.ink)
+                        .foregroundStyle(Color.primary)
                     if !isExpanded {
                         Text(String(localized: "Expand"))
                             .font(.caption)
-                            .foregroundStyle(AutomalityColor.inkMuted)
+                            .foregroundStyle(Color.secondary)
                     }
                     Spacer()
                 }
@@ -2167,8 +1820,8 @@ struct CollapsibleControlSection<Content: View>: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AutomalityColor.offWhite)
-        .overlay(RoundedRectangle(cornerRadius: 4).stroke(AutomalityColor.gray300.opacity(0.5)))
+        .background(Color(nsColor: .windowBackgroundColor))
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.35)))
     }
 }
 
@@ -2480,7 +2133,7 @@ struct Thumb: View {
 
     var body: some View {
         ZStack {
-            AutomalityColor.gray100
+            Color(nsColor: .windowBackgroundColor)
             if let image { Image(nsImage: image).resizable().scaledToFit() }
         }
         .frame(width: size, height: size)
