@@ -262,8 +262,22 @@ enum WatermarkTint: String, CaseIterable, Identifiable, Codable {
     case original = "Original"
     case light = "Light"
     case dark = "Dark"
+    // Tiling-only, same reasoning as RotationPattern.alternating -- nothing
+    // to alternate between with a single mark, so the UI filters this out
+    // in Single mode (see ContentView's appearanceControls).
+    case alternating = "Alternating rows"
+    case inverted = "Inverted"
     var id: String { rawValue }
     var label: String { String(localized: String.LocalizationValue(rawValue)) }
+    var icon: String {
+        switch self {
+        case .original: "circle.lefthalf.filled"
+        case .light: "sun.max.fill"
+        case .dark: "moon.fill"
+        case .alternating: "square.stack.3d.up.fill"
+        case .inverted: "circle.dashed.inset.filled"
+        }
+    }
 }
 
 enum ExportFormat: String, CaseIterable, Identifiable, Codable {
@@ -354,8 +368,11 @@ struct WatermarkSettings: Codable {
     /// watermark (a solid badge, a colored banner) shouldn't have its
     /// background silently stripped just because this exists.
     var removeWatermarkBackground: Bool
+    /// 0 = unchanged; increase-only, matches CIColorControls' inputContrast
+    /// convention of 1.0 = unchanged (see ImageProcessor.contrastAdjustedWatermark).
+    var watermarkContrast: Double
 
-    init(sizeFraction: Double, opacity: Double, anchor: Anchor, additionalAnchors: [Anchor] = [], offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputWidth: Int = 0, outputHeight: Int = 0, outputPrefix: String, outputSuffix: String, maxFileSizeKB: Int = 0, watermarkTint: WatermarkTint = .original, metadataPrivacy: MetadataPrivacyLevel = .removeLocation, removeWatermarkBackground: Bool = false) {
+    init(sizeFraction: Double, opacity: Double, anchor: Anchor, additionalAnchors: [Anchor] = [], offsetX: Double, offsetY: Double, layoutMode: LayoutMode, padding: Double, spacing: Double, rotationPattern: RotationPattern, customAngle: Double, exportFormat: ExportFormat, jpegQuality: Double, optimizeForWeb: Bool = false, outputWidth: Int = 0, outputHeight: Int = 0, outputPrefix: String, outputSuffix: String, maxFileSizeKB: Int = 0, watermarkTint: WatermarkTint = .original, metadataPrivacy: MetadataPrivacyLevel = .removeLocation, removeWatermarkBackground: Bool = false, watermarkContrast: Double = 0) {
         self.sizeFraction = sizeFraction
         self.opacity = opacity
         self.anchor = anchor
@@ -378,10 +395,11 @@ struct WatermarkSettings: Codable {
         self.watermarkTint = watermarkTint
         self.metadataPrivacy = metadataPrivacy
         self.removeWatermarkBackground = removeWatermarkBackground
+        self.watermarkContrast = watermarkContrast
     }
 
     private enum CodingKeys: String, CodingKey {
-        case sizeFraction, opacity, anchor, additionalAnchors, offsetX, offsetY, layoutMode, padding, spacing, rotationPattern, customAngle, exportFormat, jpegQuality, optimizeForWeb, outputWidth, outputHeight, outputPrefix, outputSuffix, maxFileSizeKB, watermarkTint, metadataPrivacy, removeWatermarkBackground
+        case sizeFraction, opacity, anchor, additionalAnchors, offsetX, offsetY, layoutMode, padding, spacing, rotationPattern, customAngle, exportFormat, jpegQuality, optimizeForWeb, outputWidth, outputHeight, outputPrefix, outputSuffix, maxFileSizeKB, watermarkTint, metadataPrivacy, removeWatermarkBackground, watermarkContrast
     }
 
     init(from decoder: Decoder) throws {
@@ -408,6 +426,7 @@ struct WatermarkSettings: Codable {
         watermarkTint = try container.decodeIfPresent(WatermarkTint.self, forKey: .watermarkTint) ?? .original
         metadataPrivacy = try container.decodeIfPresent(MetadataPrivacyLevel.self, forKey: .metadataPrivacy) ?? .removeLocation
         removeWatermarkBackground = try container.decodeIfPresent(Bool.self, forKey: .removeWatermarkBackground) ?? false
+        watermarkContrast = try container.decodeIfPresent(Double.self, forKey: .watermarkContrast) ?? 0
     }
 }
 

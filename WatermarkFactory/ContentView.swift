@@ -57,6 +57,11 @@ final class AppState: ObservableObject {
             if layoutMode == .single, rotationPattern == .alternating {
                 rotationPattern = .none
             }
+            // Same reasoning for "Alternating rows" appearance -- also
+            // tiling-only, nothing to alternate between with one mark.
+            if layoutMode == .single, watermarkTint == .alternating {
+                watermarkTint = .original
+            }
             saveSettings()
             updateEstimate()
         }
@@ -82,6 +87,20 @@ final class AppState: ObservableObject {
     @Published var watermarkTint: WatermarkTint = .original { didSet { saveSettings(); updateEstimate() } }
     @Published var metadataPrivacy: MetadataPrivacyLevel = .removeLocation { didSet { saveSettings(); updateEstimate() } }
     @Published var removeWatermarkBackground = false { didSet { saveSettings(); updateEstimate() } }
+    // 0 = no change, matches Opacity/Size's own 0...1 slider convention.
+    @Published var watermarkContrast: Double = 0 { didSet { saveSettings(); updateEstimate() } }
+    @Published var textWatermarkFontSize: Double = 200 {
+        didSet {
+            saveSettings()
+            // Editable anytime, not just at creation -- re-render in place
+            // so the slider actually does something after the fact.
+            if isTextWatermark { refreshTextWatermark() }
+        }
+    }
+    // Remembers what was typed so the font-size slider can re-render the
+    // same label later -- only the rendered PNG persists otherwise.
+    @Published var textWatermarkContent: String = "" { didSet { saveSettings() } }
+    @Published var isTextWatermark: Bool = false
     @Published var cropScope: CropScope = .allImages
     @Published var cropEnabled = false { didSet { updateEstimate() } }
     @Published var sharedCropRect: CGRect = .fullFrame { didSet { updateEstimate() } }
@@ -178,7 +197,7 @@ final class AppState: ObservableObject {
         return nil
     }
     var settings: WatermarkSettings {
-        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, additionalAnchors: additionalAnchors, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, optimizeForWeb: optimizeForWeb, outputWidth: outputWidth, outputHeight: outputHeight, outputPrefix: outputPrefix, outputSuffix: outputSuffix, maxFileSizeKB: maxFileSizeKB, watermarkTint: watermarkTint, metadataPrivacy: metadataPrivacy, removeWatermarkBackground: removeWatermarkBackground)
+        WatermarkSettings(sizeFraction: sizeFraction, opacity: opacity, anchor: anchor, additionalAnchors: additionalAnchors, offsetX: offsetX, offsetY: offsetY, layoutMode: layoutMode, padding: padding, spacing: spacing, rotationPattern: rotationPattern, customAngle: customAngle, exportFormat: exportFormat, jpegQuality: jpegQuality, optimizeForWeb: optimizeForWeb, outputWidth: outputWidth, outputHeight: outputHeight, outputPrefix: outputPrefix, outputSuffix: outputSuffix, maxFileSizeKB: maxFileSizeKB, watermarkTint: watermarkTint, metadataPrivacy: metadataPrivacy, removeWatermarkBackground: removeWatermarkBackground, watermarkContrast: watermarkContrast)
     }
     var canSavePreset: Bool { watermarkURL != nil }
     var canSuggestPlacement: Bool { selected != nil && watermarkURL != nil && !isSuggestingPlacement }
@@ -224,6 +243,7 @@ final class AppState: ObservableObject {
         panel.canChooseDirectories = false
         panel.allowedContentTypes = [.png, .jpeg, .heic, .tiff, .gif]
         if panel.runModal() == .OK, let url = panel.url {
+            isTextWatermark = false
             setWatermark(url)
             recordSavedWatermark(url)
         }
@@ -232,8 +252,19 @@ final class AppState: ObservableObject {
     /// Renders `text` to a PNG and uses it as the watermark, same as
     /// picking an image file -- see ImageProcessor.renderTextWatermark.
     func createTextWatermark(_ text: String) {
-        guard let url = ImageProcessor.renderTextWatermark(text) else { return }
+        guard let url = ImageProcessor.renderTextWatermark(text, fontSize: textWatermarkFontSize) else { return }
+        textWatermarkContent = text
+        isTextWatermark = true
         setWatermark(url)
+    }
+
+    /// Re-renders the current text watermark at its (possibly just
+    /// changed) font size -- same file path, so the existing watermarkURL
+    /// stays valid; only the pixels change.
+    private func refreshTextWatermark() {
+        guard !textWatermarkContent.isEmpty,
+              ImageProcessor.renderTextWatermark(textWatermarkContent, fontSize: textWatermarkFontSize) != nil else { return }
+        updateEstimate()
     }
 
     func select(_ item: ImageItem) {
@@ -728,6 +759,7 @@ final class AppState: ObservableObject {
             saveSavedWatermarks()
             return
         }
+        isTextWatermark = false
         setWatermark(url)
     }
 
@@ -934,6 +966,9 @@ final class AppState: ObservableObject {
         defaults.set(watermarkTint.rawValue, forKey: "watermarkTint")
         defaults.set(metadataPrivacy.rawValue, forKey: "metadataPrivacy")
         defaults.set(removeWatermarkBackground, forKey: "removeWatermarkBackground")
+        defaults.set(watermarkContrast, forKey: "watermarkContrast")
+        defaults.set(textWatermarkFontSize, forKey: "textWatermarkFontSize")
+        defaults.set(textWatermarkContent, forKey: "textWatermarkContent")
     }
 
     private func restore() {
@@ -963,6 +998,11 @@ final class AppState: ObservableObject {
         watermarkTint = WatermarkTint(rawValue: defaults.string(forKey: "watermarkTint") ?? "") ?? .original
         metadataPrivacy = MetadataPrivacyLevel(rawValue: defaults.string(forKey: "metadataPrivacy") ?? "") ?? .removeLocation
         removeWatermarkBackground = defaults.bool(forKey: "removeWatermarkBackground")
+        watermarkContrast = defaults.object(forKey: "watermarkContrast") == nil ? 0 : defaults.double(forKey: "watermarkContrast")
+        textWatermarkFontSize = defaults.object(forKey: "textWatermarkFontSize") == nil ? 200 : defaults.double(forKey: "textWatermarkFontSize")
+        textWatermarkContent = defaults.string(forKey: "textWatermarkContent") ?? ""
+        // isTextWatermark isn't persisted directly -- it's true only if the
+        // restored watermark is in fact the rendered text-watermark file.
         syncPresetSelections()
         folderURL = restoreBookmark("folderBookmark")
         watermarkURL = restoreBookmark("watermarkBookmark")
@@ -974,6 +1014,7 @@ final class AppState: ObservableObject {
                 watermarkURL = resolved
             }
         }
+        isTextWatermark = watermarkURL == ImageProcessor.textWatermarkURL
         if let watermarkURL {
             watermarkAccess.replace(with: [watermarkURL])
         } else {
@@ -1390,6 +1431,21 @@ struct ContentView: View {
             .foregroundStyle(Color.secondary)
     }
 
+    // Icon + label + trailing control, one row -- the settings-list layout
+    // pattern (System Settings, Accessibility Inspector) rather than a
+    // header-above-control stack. Used for Appearance/Text Size/Contrast.
+    @ViewBuilder
+    private func settingsRow<Trailing: View>(icon: String, label: String, @ViewBuilder trailing: () -> Trailing) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .foregroundStyle(Color.secondary)
+                .frame(width: 20)
+            Text(label)
+            Spacer()
+            trailing()
+        }
+    }
+
     @ViewBuilder
     private func tabBody(_ tab: SettingsTab) -> some View {
         switch tab {
@@ -1591,12 +1647,19 @@ struct ContentView: View {
             Spacer()
             if let url = state.watermarkURL { Thumb(url: url, size: 56) }
         }
-        groupHeader("Tint")
-        Picker("Tint", selection: $state.watermarkTint) {
-            ForEach(WatermarkTint.allCases) { Text($0.label).tag($0) }
+        // Alternating rows is tiling-only -- same reasoning as Rotation's
+        // own mode-filtered picker (see rotationControls).
+        let availableTints = state.layoutMode == .single
+            ? WatermarkTint.allCases.filter { $0 != .alternating }
+            : WatermarkTint.allCases
+        settingsRow(icon: state.watermarkTint.icon, label: "Appearance") {
+            Picker("Appearance", selection: $state.watermarkTint) {
+                ForEach(availableTints) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .fixedSize()
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
         // For watermarks that weren't prepared as a proper transparent
         // PNG (a flat-color-filled square exported straight from a
         // design tool, say) -- strips a solid/near-solid background at
@@ -1606,6 +1669,16 @@ struct ContentView: View {
         // its background just because this exists.
         Toggle("Remove watermark background", isOn: $state.removeWatermarkBackground)
             .toggleStyle(.automality)
+        if state.isTextWatermark {
+            settingsRow(icon: "textformat.size", label: "Text Size") {
+                Slider(value: $state.textWatermarkFontSize, in: 50...400)
+                    .frame(width: 120)
+            }
+        }
+        settingsRow(icon: "circle.righthalf.filled", label: "Contrast") {
+            Slider(value: $state.watermarkContrast, in: 0...1)
+                .frame(width: 120)
+        }
         // Smart Placement ("Suggest Placement") is disabled for this
         // release — the suggestions weren't reliable enough yet. The
         // underlying logic (AppState.suggestPlacement, SmartPlacementProposal)
