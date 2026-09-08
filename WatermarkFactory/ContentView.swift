@@ -1257,7 +1257,11 @@ struct ContentView: View {
                 .labelsHidden()
                 .padding(panePadding)
                 Divider()
-                BrandScrollBar {
+                // Plain ScrollView, not BrandScrollBar -- this panel is short
+                // now that it's trimmed down, and BrandScrollBar's NSScrollView
+                // bridge doesn't report an intrinsic height to SwiftUI, which
+                // let it collapse and paint over the tab picker above it.
+                ScrollView {
                     VStack(alignment: .leading, spacing: spacing) {
                         tabBody(settingsTab)
                     }
