@@ -1063,7 +1063,7 @@ struct ContentView: View {
         // needs, and the settings column gets squeezed past its stated
         // minimum with no clipping, which read as content "overflowing"
         // when it was really the window itself too narrow.
-        .frame(minWidth: 1200, minHeight: 680)
+        .frame(minWidth: 1260, minHeight: 720)
         .background(Color(nsColor: .windowBackgroundColor))
         .toolbar {
             primaryActionToolbarItem
