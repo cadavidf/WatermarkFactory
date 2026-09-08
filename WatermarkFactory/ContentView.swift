@@ -1402,7 +1402,7 @@ struct ContentView: View {
             Spacer()
             if let url = state.watermarkURL { Thumb(url: url, size: 56) }
         }
-        Text("Tint").automalityLabelText().foregroundStyle(Color.primary)
+        groupHeader("Tint")
         Picker("Tint", selection: $state.watermarkTint) {
             ForEach(WatermarkTint.allCases) { Text($0.label).tag($0) }
         }
@@ -1454,21 +1454,25 @@ struct ContentView: View {
         .labelsHidden()
     }
 
+    // Every field stays on screen and in the same order regardless of
+    // Single vs. Tiled -- only which ones are enabled changes. Switching
+    // modes used to swap in a completely different set of controls
+    // (anchor grid vs. spacing/rotation), which reflowed the whole panel
+    // every time; disabling instead of hiding keeps the layout stable.
     @ViewBuilder
     private var positionPaddingSectionBody: some View {
-        if state.layoutMode == .single {
-            Text("Anchor").automalityLabelText().foregroundStyle(Color.primary)
-            singleControls
-        }
-        Text(state.layoutMode == .single ? "Padding — distance from that edge" : "Padding — margin around each mark")
-            .automalityLabelText()
-            .foregroundStyle(Color.primary)
+        groupHeader("Anchor")
+        singleControls
+            .disabled(state.layoutMode != .single)
+            .opacity(state.layoutMode == .single ? 1 : 0.4)
+        groupHeader("Padding")
         AutomalitySlider(value: $state.padding, in: 0...100)
         Text("\(Int(state.padding)) px").font(.caption).foregroundStyle(Color.secondary)
-        if state.layoutMode == .tiled {
-            Divider()
-            tiledControls
-        }
+        Divider()
+        groupHeader("Spacing")
+        tiledControls
+            .disabled(state.layoutMode != .tiled)
+            .opacity(state.layoutMode == .tiled ? 1 : 0.4)
     }
 
     @ViewBuilder
@@ -1687,12 +1691,13 @@ struct ContentView: View {
 
     private var tiledControls: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Spacing — gap between tiles").automalityLabelText().foregroundStyle(Color.primary)
             AutomalitySlider(value: $state.spacing, in: 0...400)
             Text("\(Int(state.spacing)) px").font(.caption).foregroundStyle(Color.secondary)
+            groupHeader("Rotation")
             Picker("Rotation", selection: $state.rotationPattern) {
                 ForEach(RotationPattern.allCases) { Text($0.label).tag($0) }
             }
+            .labelsHidden()
             if state.rotationPattern == .custom {
                 TextField("Degrees", value: $state.customAngle, format: .number)
                     .textFieldStyle(.automalityData)
