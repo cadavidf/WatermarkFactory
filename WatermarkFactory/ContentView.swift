@@ -49,10 +49,21 @@ final class AppState: ObservableObject {
     @Published var additionalAnchors: [Anchor] = [] { didSet { saveSettings(); updateEstimate() } }
     @Published var offsetX = 24.0 { didSet { saveSettings(); if !suppressOffsetPreview { updateEstimate() } } }
     @Published var offsetY = 24.0 { didSet { saveSettings(); if !suppressOffsetPreview { updateEstimate() } } }
-    @Published var layoutMode: LayoutMode = .single { didSet { saveSettings(); updateEstimate() } }
+    @Published var layoutMode: LayoutMode = .single {
+        didSet {
+            // "Alternating rows" only means something when tiled -- switching
+            // to Single with it selected would leave the Rotation picker
+            // showing a choice that isn't even offered there.
+            if layoutMode == .single, rotationPattern == .alternating {
+                rotationPattern = .none
+            }
+            saveSettings()
+            updateEstimate()
+        }
+    }
     @Published var padding = 16.0 { didSet { saveSettings(); updateEstimate() } }
     @Published var spacing = 80.0 { didSet { saveSettings(); updateEstimate() } }
-    @Published var rotationPattern: RotationPattern = .diagonal { didSet { saveSettings(); updateEstimate() } }
+    @Published var rotationPattern: RotationPattern = .none { didSet { saveSettings(); updateEstimate() } }
     @Published var customAngle = 30.0 { didSet { saveSettings(); updateEstimate() } }
     @Published var exportFormat: ExportFormat = .keepOriginal {
         didSet {
@@ -887,7 +898,7 @@ final class AppState: ObservableObject {
         layoutMode = LayoutMode(rawValue: defaults.string(forKey: "layoutMode") ?? "") ?? .single
         padding = defaults.object(forKey: "padding") == nil ? 16 : defaults.double(forKey: "padding")
         spacing = defaults.object(forKey: "spacing") == nil ? 80 : defaults.double(forKey: "spacing")
-        rotationPattern = RotationPattern(rawValue: defaults.string(forKey: "rotationPattern") ?? "") ?? .diagonal
+        rotationPattern = RotationPattern(rawValue: defaults.string(forKey: "rotationPattern") ?? "") ?? .none
         customAngle = defaults.object(forKey: "customAngle") == nil ? 30 : defaults.double(forKey: "customAngle")
         exportFormat = ExportFormat(rawValue: defaults.string(forKey: "exportFormat") ?? "") ?? .keepOriginal
         jpegQuality = defaults.object(forKey: "jpegQuality") == nil ? 0.9 : defaults.double(forKey: "jpegQuality")
@@ -1763,11 +1774,16 @@ struct ContentView: View {
     // Rotation applies to a single watermark exactly as much as a tiled
     // one -- ImageProcessor.drawSingleWatermark reads the same
     // rotationPattern/customAngle as drawTiles does. Unlike Spacing, this
-    // stays enabled in both Single and Tiled.
+    // stays enabled in both Single and Tiled -- but the choices differ:
+    // "Alternating rows" is a tiling-only concept (nothing to alternate
+    // between with one mark), so Single only offers angle presets + Custom.
     private var rotationControls: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let availablePatterns = state.layoutMode == .single
+            ? RotationPattern.allCases.filter { $0 != .alternating }
+            : RotationPattern.allCases
+        return VStack(alignment: .leading, spacing: 8) {
             Picker("Rotation", selection: $state.rotationPattern) {
-                ForEach(RotationPattern.allCases) { Text($0.label).tag($0) }
+                ForEach(availablePatterns) { Text($0.label).tag($0) }
             }
             .labelsHidden()
             if state.rotationPattern == .custom {
