@@ -442,6 +442,19 @@ struct RecentFolder: Identifiable, Codable, Equatable {
     var lastUsed: Date
 }
 
+/// A watermark image chosen before (via Choose Watermark, not the
+/// auto-generated text-watermark file, which gets overwritten each time
+/// and would break dedup by path). isFavorite marks the one watermark
+/// that should load automatically on next launch, overriding whatever
+/// was last used -- at most one entry is favorite at a time.
+struct SavedWatermark: Identifiable, Codable, Equatable {
+    var id = UUID()
+    var name: String
+    var path: String
+    var bookmark: Data
+    var isFavorite: Bool = false
+}
+
 /// One completed batch export -- the source folder, watermark, and settings
 /// that produced it. Recorded once per `exportAll()` run (batch-level, not
 /// per file), since "redo this" and "swap the logo" are batch-level asks in

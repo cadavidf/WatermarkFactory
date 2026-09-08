@@ -104,6 +104,7 @@ final class AppState: ObservableObject {
     @Published var smartPlacementProposal: SmartPlacementProposal?
     @Published var presets: [WatermarkPreset] = []
     @Published var recentFolders: [RecentFolder] = []
+    @Published var savedWatermarks: [SavedWatermark] = []
     @Published var exportHistory: [ExportHistoryEntry] = []
     @Published var orderedImageURLs: [URL] = [] { didSet { saveImageOrder() } }
 
@@ -224,6 +225,7 @@ final class AppState: ObservableObject {
         panel.allowedContentTypes = [.png, .jpeg, .heic, .tiff, .gif]
         if panel.runModal() == .OK, let url = panel.url {
             setWatermark(url)
+            recordSavedWatermark(url)
         }
     }
 
@@ -718,6 +720,55 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Same resolve-or-drop pattern as selectRecentFolder above.
+    func selectSavedWatermark(_ saved: SavedWatermark) {
+        var stale = false
+        guard let url = try? URL(resolvingBookmarkData: saved.bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale) else {
+            savedWatermarks.removeAll { $0.id == saved.id }
+            saveSavedWatermarks()
+            return
+        }
+        setWatermark(url)
+    }
+
+    /// Only one favorite at a time -- it's what loads automatically on
+    /// next launch (see restore(), below), so more than one would be
+    /// ambiguous about which "always launches with this" actually wins.
+    func toggleFavoriteWatermark(_ saved: SavedWatermark) {
+        let makingFavorite = !saved.isFavorite
+        for index in savedWatermarks.indices {
+            savedWatermarks[index].isFavorite = makingFavorite && savedWatermarks[index].id == saved.id
+        }
+        saveSavedWatermarks()
+    }
+
+    func removeSavedWatermark(_ saved: SavedWatermark) {
+        savedWatermarks.removeAll { $0.id == saved.id }
+        saveSavedWatermarks()
+    }
+
+    private func recordSavedWatermark(_ url: URL) {
+        guard let bookmark = bookmarkData(for: url) else { return }
+        let path = url.path
+        let wasFavorite = savedWatermarks.first { $0.path == path }?.isFavorite ?? false
+        savedWatermarks.removeAll { $0.path == path }
+        savedWatermarks.insert(SavedWatermark(name: url.lastPathComponent, path: path, bookmark: bookmark, isFavorite: wasFavorite), at: 0)
+        savedWatermarks = Array(savedWatermarks.prefix(12))
+        saveSavedWatermarks()
+    }
+
+    private func saveSavedWatermarks() {
+        if let data = try? JSONEncoder().encode(savedWatermarks) {
+            defaults.set(data, forKey: "savedWatermarks")
+        }
+    }
+
+    private func restoreSavedWatermarks() {
+        guard let data = defaults.data(forKey: "savedWatermarks"),
+              let decoded = try? JSONDecoder().decode([SavedWatermark].self, from: data) else { return }
+        savedWatermarks = decoded
+    }
+
     private func restoreRecentFolders() {
         guard let data = defaults.data(forKey: "recentFolders"),
               let decoded = try? JSONDecoder().decode([RecentFolder].self, from: data) else { return }
@@ -888,6 +939,7 @@ final class AppState: ObservableObject {
     private func restore() {
         restorePresets()
         restoreRecentFolders()
+        restoreSavedWatermarks()
         restoreExportHistory()
         if defaults.object(forKey: "sizeFraction") != nil { sizeFraction = defaults.double(forKey: "sizeFraction") }
         if defaults.object(forKey: "opacity") != nil { opacity = defaults.double(forKey: "opacity") }
@@ -914,6 +966,14 @@ final class AppState: ObservableObject {
         syncPresetSelections()
         folderURL = restoreBookmark("folderBookmark")
         watermarkURL = restoreBookmark("watermarkBookmark")
+        // A favorite watermark always wins over whatever was last used --
+        // that's the whole point of marking one as favorite/default.
+        if let favorite = savedWatermarks.first(where: \.isFavorite) {
+            var stale = false
+            if let resolved = try? URL(resolvingBookmarkData: favorite.bookmark, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &stale) {
+                watermarkURL = resolved
+            }
+        }
         if let watermarkURL {
             watermarkAccess.replace(with: [watermarkURL])
         } else {
@@ -1070,6 +1130,7 @@ struct ContentView: View {
     @State private var showExportSheet = false
     @State private var showTextWatermarkSheet = false
     @State private var textWatermarkInput = ""
+    @State private var showSavedWatermarksSheet = false
 
     init(state: AppState = .shared) {
         self.state = state
@@ -1131,6 +1192,60 @@ struct ContentView: View {
         .sheet(isPresented: $showTextWatermarkSheet) {
             textWatermarkSheet
         }
+        .sheet(isPresented: $showSavedWatermarksSheet) {
+            savedWatermarksSheet
+        }
+    }
+
+    private var savedWatermarksSheet: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Previous Watermarks").font(.headline)
+            Text("Pick one to use now, or mark your default with the star -- the default loads automatically every time you open the app.")
+                .font(.caption)
+                .foregroundStyle(Color.secondary)
+            ScrollView {
+                VStack(spacing: 6) {
+                    ForEach(state.savedWatermarks) { saved in
+                        HStack(spacing: 10) {
+                            Thumb(url: URL(fileURLWithPath: saved.path), size: 40)
+                            Text(saved.name)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer()
+                            Button {
+                                state.toggleFavoriteWatermark(saved)
+                            } label: {
+                                Image(systemName: saved.isFavorite ? "star.fill" : "star")
+                                    .foregroundStyle(saved.isFavorite ? Color.orange : Color.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Default watermark -- loads automatically on launch")
+                            Button {
+                                state.removeSavedWatermark(saved)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill").foregroundStyle(Color.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(6)
+                        .background(Color(nsColor: .controlBackgroundColor))
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            state.selectSavedWatermark(saved)
+                            showSavedWatermarksSheet = false
+                        }
+                    }
+                }
+            }
+            .frame(maxHeight: 320)
+            HStack {
+                Spacer()
+                Button("Done") { showSavedWatermarksSheet = false }
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding()
+        .frame(width: 420)
     }
 
     private var textWatermarkSheet: some View {
@@ -1470,6 +1585,9 @@ struct ContentView: View {
                 showTextWatermarkSheet = true
             }
             .buttonStyle(.bordered)
+            Button("Previous...") { showSavedWatermarksSheet = true }
+                .buttonStyle(.bordered)
+                .disabled(state.savedWatermarks.isEmpty)
             Spacer()
             if let url = state.watermarkURL { Thumb(url: url, size: 56) }
         }
