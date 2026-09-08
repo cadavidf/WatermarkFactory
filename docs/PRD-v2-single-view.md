@@ -112,6 +112,20 @@ Also carried into that same pass: permission-denied recovery on export
 (alert + folder re-picker + retry), unrelated to the six requirements but
 fixing a real reported customer failure.
 
+**Standing direction for this pass (zen mindset — confirmed by Felipe):**
+- Less is more. v2 is fundamentally about *removing* bloated code, not
+  adding new UI machinery. Every added line needs to be justified by
+  something bigger it deletes.
+- Apple HIG first: the three-column layout (sidebar/content/inspector) is
+  SwiftUI's native `NavigationSplitView(sidebar:content:detail:)`
+  (macOS 13+) — the same pattern Photos.app/Mail/Xcode use. Use the stock
+  primitive instead of a hand-rolled HStack/VStack scaffold.
+- Delete dead code outright — the Guided walkthrough, its state flags, any
+  leftover mode toggle — don't just stop calling it and leave it in the
+  file.
+- Net line count for this pass should read as a reduction once the
+  wizard/walkthrough code is gone, even after the new layout goes in.
+
 ## Open items before closing out this PRD
 
 1. Confirm with Felipe whether the aggregate batch-size cap (item 5) is
