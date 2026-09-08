@@ -1965,12 +1965,12 @@ struct ContentView: View {
                     .buttonStyle(.automalityChip(isSelected: state.anchor == anchor))
                 }
             }
-            // Answers "where is the anchor" directly, in words, instead of
-            // making you decode the arrow icon in the grid above.
+            Text("Precise Position").font(.caption).foregroundStyle(Color.secondary)
+            // Sits right above the D-pad, not the grid -- it's telling you
+            // which corner these specific arrows nudge from.
             Text("Anchor: \(state.anchor.displayName.capitalized)")
                 .font(.caption)
                 .foregroundStyle(Color.secondary)
-            Text("Precise Position").font(.caption).foregroundStyle(Color.secondary)
             // Arrow buttons, not X/Y number fields -- each one nudges in
             // the literal screen direction it points, so there's no sign
             // to interpret (the old fields meant opposite things depending
