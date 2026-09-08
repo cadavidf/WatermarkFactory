@@ -1040,16 +1040,16 @@ struct ContentView: View {
     // three tabs, each just the sections that belong together. Crop is
     // dropped for now (not wired into any tab); its underlying state/logic
     // stays untouched, there's just no UI path to turn it on.
+    // Export settings moved into the confirmation sheet the Watermark
+    // button opens (see exportOptionsSheet) -- only Position/Watermark
+    // stay as always-visible tabs.
     private enum SettingsTab: String, CaseIterable, Identifiable {
         case position = "Position"
         case watermark = "Watermark"
-        case export = "Export"
         var id: String { rawValue }
     }
     @State private var settingsTab: SettingsTab = .watermark
-
-    private enum WatermarkScope { case selected, all }
-    @State private var watermarkScope: WatermarkScope = .all
+    @State private var showExportSheet = false
 
     init(state: AppState = .shared) {
         self.state = state
@@ -1099,6 +1099,42 @@ struct ContentView: View {
         .sheet(isPresented: $state.showQuickActionPrompt) {
             QuickActionPromptView(isPresented: $state.showQuickActionPrompt)
         }
+        .sheet(isPresented: $showExportSheet) {
+            exportOptionsSheet
+        }
+    }
+
+    private var exportOptionsSheet: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Export Options").font(.headline)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    exportSectionBody
+                    Divider()
+                    groupHeader("Order & Rename")
+                    orderRenameSectionBody
+                }
+            }
+            .frame(maxHeight: 380)
+            HStack {
+                Button("Cancel", role: .cancel) { showExportSheet = false }
+                Spacer()
+                Button("Watermark 1") {
+                    showExportSheet = false
+                    state.watermarkSelectedTapped()
+                }
+                .buttonStyle(.bordered)
+                .disabled(!state.canTapWatermarkSelected)
+                Button("Watermark All (\(state.images.count))") {
+                    showExportSheet = false
+                    state.watermarkAllTapped()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!state.canTapWatermarkAll)
+            }
+        }
+        .padding()
+        .frame(width: 460)
     }
 
     // No modes, no wizard: images loaded -> the always-visible three-column
@@ -1125,27 +1161,12 @@ struct ContentView: View {
                             .foregroundStyle(Color.secondary)
                     }
                 }
-                // One pill, two segments, each segment tap both selects and
-                // fires the export for that scope -- not a separate toggle
-                // plus a separate action button.
-                Picker("", selection: $watermarkScope) {
-                    Text("Watermark This One").tag(WatermarkScope.selected)
-                    Text("Watermark All Images").tag(WatermarkScope.all)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-                // Not .disabled(): switching segments should always work so
-                // the user can pick the other scope. watermarkAllTapped()/
-                // watermarkSelectedTapped() already no-op via their own
-                // guards (e.g. nothing selected, mid-export) -- same
-                // protection, without locking the toggle itself.
-                .onChange(of: watermarkScope) { newScope in
-                    switch newScope {
-                    case .all: state.watermarkAllTapped()
-                    case .selected: state.watermarkSelectedTapped()
-                    }
-                }
+                // The scope choice (this one vs. all) and the export
+                // settings both live in the confirmation sheet now -- this
+                // button just opens it.
+                Button("Watermark...") { showExportSheet = true }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!state.canTapWatermarkAll)
             }
         }
     }
@@ -1211,12 +1232,6 @@ struct ContentView: View {
             Divider()
             groupHeader("Size & Opacity")
             sizeOpacitySectionBody
-        case .export:
-            groupHeader("Export")
-            exportSectionBody
-            Divider()
-            groupHeader("Order & Rename")
-            orderRenameSectionBody
         }
     }
 
@@ -1241,11 +1256,13 @@ struct ContentView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .padding(panePadding)
+                Divider()
                 BrandScrollBar {
                     VStack(alignment: .leading, spacing: spacing) {
                         tabBody(settingsTab)
                     }
                     .padding(.horizontal, panePadding)
+                    .padding(.top, panePadding)
                     .padding(.bottom, panePadding)
                 }
             }
