@@ -1453,7 +1453,6 @@ struct ContentView: View {
             groupHeader("Layout Mode")
             layoutModeSectionBody
             Divider()
-            groupHeader("Position & Padding")
             positionPaddingSectionBody
         case .watermark:
             groupHeader("Watermark Source")
