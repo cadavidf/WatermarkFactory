@@ -1057,7 +1057,13 @@ struct ContentView: View {
 
     var body: some View {
         content
-        .frame(minWidth: 980, minHeight: 680)
+        // Must be >= the sum of the three NavigationSplitView columns' own
+        // minimums (220 + previewMinWidth(560) + controlsWidth(380) = 1160)
+        // -- otherwise the window can open smaller than the panel actually
+        // needs, and the settings column gets squeezed past its stated
+        // minimum with no clipping, which read as content "overflowing"
+        // when it was really the window itself too narrow.
+        .frame(minWidth: 1200, minHeight: 680)
         .background(Color(nsColor: .windowBackgroundColor))
         .toolbar {
             primaryActionToolbarItem
@@ -1268,6 +1274,12 @@ struct ContentView: View {
                     .padding(.horizontal, panePadding)
                     .padding(.top, panePadding)
                     .padding(.bottom, panePadding)
+                    // Plain ScrollView doesn't pin its content's width the way
+                    // BrandScrollBar's NSLayoutConstraint did -- without this,
+                    // a wide child (e.g. a long trailing label) can push the
+                    // whole row past the column edge instead of wrapping/
+                    // clipping inside it.
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             // Wider floor than before (content was overflowing at 360) and no
@@ -1715,8 +1727,15 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(title).font(.subheadline).fontWeight(.semibold).foregroundStyle(Color.primary)
-                Spacer()
+                Spacer(minLength: 8)
+                // `.frame(maxWidth: .infinity)` (tried earlier) sets an
+                // upper bound of infinite -- it caps nothing. An actual
+                // numeric width is what forces this to truncate instead of
+                // pushing the row wider than its container.
                 Text(valueText).font(.caption).foregroundStyle(Color.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: 110, alignment: .trailing)
             }
             // A single aligned row, ordered smallest-to-largest / least-to-most,
             // each chip a short label with a small icon swatch that previews
