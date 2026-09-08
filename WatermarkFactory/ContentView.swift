@@ -20,6 +20,10 @@ final class AppState: ObservableObject {
     // Compress Only), shown when Watermark All Images is tapped with no
     // watermark chosen -- see watermarkAllTapped() below.
     @Published var showWatermarkMissingPrompt = false
+    // Set right before showWatermarkMissingPrompt so the alert's "Compress
+    // Only" fallback (see ContentView's .alert) compresses the same scope
+    // (all images vs. just the selected one) the user actually asked for.
+    var missingWatermarkPromptOnlySelected = false
     @Published var images: [ImageItem] = []
     @Published var selected: ImageItem?
     @Published var sizePreset: WatermarkSizePreset? = .medium
@@ -127,12 +131,24 @@ final class AppState: ObservableObject {
     // opens the "Watermark not uploaded yet" prompt (Upload Watermark /
     // Compress Only) instead of just sitting there disabled and unexplained.
     var canTapWatermarkAll: Bool { !images.isEmpty && !isExporting && !maxFileSizeBlocksExport }
+    var canTapWatermarkSelected: Bool { selected != nil && !isExporting && !maxFileSizeBlocksExport }
 
     func watermarkAllTapped() {
         guard canTapWatermarkAll else { return }
         if watermarkURL != nil {
             exportAll()
         } else {
+            missingWatermarkPromptOnlySelected = false
+            showWatermarkMissingPrompt = true
+        }
+    }
+
+    func watermarkSelectedTapped() {
+        guard canTapWatermarkSelected else { return }
+        if watermarkURL != nil {
+            exportAll(onlySelected: true)
+        } else {
+            missingWatermarkPromptOnlySelected = true
             showWatermarkMissingPrompt = true
         }
     }
@@ -350,9 +366,14 @@ final class AppState: ObservableObject {
     /// Watermark All Images before picking a watermark, so they aren't
     /// blocked from exporting at all. Without it, a nil watermarkURL still
     /// refuses to run, same as before.
-    func exportAll(compressOnly: Bool = false, completion: ((Bool) -> Void)? = nil) {
+    func exportAll(compressOnly: Bool = false, onlySelected: Bool = false, completion: ((Bool) -> Void)? = nil) {
         let watermark = watermarkURL
         guard compressOnly || watermark != nil else {
+            completion?(false)
+            return
+        }
+        let items = onlySelected ? selected.map { [$0] } ?? [] : orderedItems
+        guard !items.isEmpty else {
             completion?(false)
             return
         }
@@ -360,8 +381,7 @@ final class AppState: ObservableObject {
         exportStartedAt = Date()
         exportETAText = ""
         progress = 0
-        status = String(format: String(localized: "Exporting 0 of %d..."), images.count)
-        let items = orderedItems
+        status = String(format: String(localized: "Exporting 0 of %d..."), items.count)
         let settings = settings
         let sourceFolder = folderURL
         let cropEnabled = cropEnabled
@@ -1016,23 +1036,17 @@ struct ContentView: View {
     private let spacing: CGFloat = AutomalitySpacing.sm
     private let panePadding: CGFloat = AutomalitySpacing.sm
 
-    private struct SectionSpec {
-        let id: String
-        let title: String
-        let startExpanded: Bool
+    // Settings panel is one flat tab, not a stack of collapsible boxes --
+    // three tabs, each just the sections that belong together. Crop is
+    // dropped for now (not wired into any tab); its underlying state/logic
+    // stays untouched, there's just no UI path to turn it on.
+    private enum SettingsTab: String, CaseIterable, Identifiable {
+        case position = "Position"
+        case watermark = "Watermark"
+        case export = "Export Settings"
+        var id: String { rawValue }
     }
-
-    private var allSections: [SectionSpec] {
-        [
-            SectionSpec(id: "crop", title: "Crop", startExpanded: false),
-            SectionSpec(id: "watermarkSource", title: "Watermark source", startExpanded: true),
-            SectionSpec(id: "sizeOpacity", title: "Size & Opacity", startExpanded: true),
-            SectionSpec(id: "layoutMode", title: "Layout mode", startExpanded: false),
-            SectionSpec(id: "positionPadding", title: "Position & Padding", startExpanded: false),
-            SectionSpec(id: "orderRename", title: "Order & Rename", startExpanded: false),
-            SectionSpec(id: "export", title: "Export", startExpanded: true),
-        ]
-    }
+    @State private var settingsTab: SettingsTab = .watermark
 
     init(state: AppState = .shared) {
         self.state = state
@@ -1048,7 +1062,7 @@ struct ContentView: View {
         }
         .alert("Watermark not uploaded yet", isPresented: $state.showWatermarkMissingPrompt) {
             Button("Upload Watermark") { state.chooseWatermark() }
-            Button("Compress Only") { state.exportAll(compressOnly: true) }
+            Button("Compress Only") { state.exportAll(compressOnly: true, onlySelected: state.missingWatermarkPromptOnlySelected) }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Choose a watermark image to apply, or export the images compressed only, with no watermark.")
@@ -1108,6 +1122,9 @@ struct ContentView: View {
                             .foregroundStyle(Color.secondary)
                     }
                 }
+                Button("Watermark This One Only") { state.watermarkSelectedTapped() }
+                    .buttonStyle(.bordered)
+                    .disabled(!state.canTapWatermarkSelected)
                 Button("Watermark All Images") { state.watermarkAllTapped() }
                     .buttonStyle(.borderedProminent)
                     .disabled(!state.canTapWatermarkAll)
@@ -1155,16 +1172,33 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private func sectionBody(_ id: String) -> some View {
-        switch id {
-        case "crop": cropSectionBody
-        case "watermarkSource": watermarkSourceSectionBody
-        case "sizeOpacity": sizeOpacitySectionBody
-        case "layoutMode": layoutModeSectionBody
-        case "positionPadding": positionPaddingSectionBody
-        case "orderRename": orderRenameSectionBody
-        case "export": exportSectionBody
-        default: EmptyView()
+    private func groupHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(Color.secondary)
+    }
+
+    @ViewBuilder
+    private func tabBody(_ tab: SettingsTab) -> some View {
+        switch tab {
+        case .position:
+            groupHeader("Layout Mode")
+            layoutModeSectionBody
+            Divider()
+            groupHeader("Position & Padding")
+            positionPaddingSectionBody
+        case .watermark:
+            groupHeader("Watermark Source")
+            watermarkSourceSectionBody
+            Divider()
+            groupHeader("Size & Opacity")
+            sizeOpacitySectionBody
+        case .export:
+            groupHeader("Export")
+            exportSectionBody
+            Divider()
+            groupHeader("Order & Rename")
+            orderRenameSectionBody
         }
     }
 
@@ -1180,15 +1214,22 @@ struct ContentView: View {
             previewPane
                 .navigationSplitViewColumnWidth(min: previewMinWidth, ideal: previewMinWidth + 140)
         } detail: {
-            BrandScrollBar {
-                VStack(alignment: .leading, spacing: spacing) {
-                    ForEach(allSections, id: \.id) { spec in
-                        CollapsibleControlSection(spec.title, startExpanded: spec.startExpanded) {
-                            sectionBody(spec.id)
-                        }
+            VStack(spacing: 0) {
+                Picker("", selection: $settingsTab) {
+                    ForEach(SettingsTab.allCases) { tab in
+                        Text(tab.rawValue).tag(tab)
                     }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
                 .padding(panePadding)
+                BrandScrollBar {
+                    VStack(alignment: .leading, spacing: spacing) {
+                        tabBody(settingsTab)
+                    }
+                    .padding(.horizontal, panePadding)
+                    .padding(.bottom, panePadding)
+                }
             }
             .navigationSplitViewColumnWidth(min: controlsWidth, ideal: controlsWidth, max: controlsWidth + 120)
         }
@@ -1294,18 +1335,8 @@ struct ContentView: View {
                 }
             }
             .clipped()
-            ScrollView(.horizontal) {
-                HStack(spacing: 8) {
-                    ForEach(state.images) { item in
-                        Thumb(url: item.url, size: 60)
-                            .overlay(Rectangle().stroke(state.selected == item ? theme.primary : Color.secondary.opacity(0.35), lineWidth: state.selected == item ? 2 : 1))
-                            .onTapGesture { state.select(item) }
-                    }
-                }
-                .padding(.horizontal, panePadding)
-            }
-            .frame(height: 76)
-            .background(Color(nsColor: .windowBackgroundColor))
+            // Thumbnail selection lives in the sidebar (imageList) -- this
+            // pane doesn't need its own duplicate strip.
             Text(state.status)
                 .font(.caption)
                 .foregroundStyle(Color.secondary)
@@ -1355,23 +1386,9 @@ struct ContentView: View {
         // entry point.
     }
 
-    @ViewBuilder
-    private var cropSectionBody: some View {
-        Toggle(String(localized: "Enable Crop"), isOn: $state.cropEnabled)
-            .toggleStyle(.automality)
-        if state.cropEnabled {
-            Picker("Crop scope", selection: $state.cropScope) {
-                ForEach(CropScope.allCases) { Text($0.label).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            Text(state.cropScope == .allImages
-                ? String(localized: "Dragging on any image applies the same crop to the whole batch.")
-                : String(localized: "Dragging on any image crops just that image."))
-                .font(.caption)
-                .foregroundStyle(Color.secondary)
-        }
-    }
+    // Crop UI removed for now (2026-09-08, Felipe) -- no tab surfaces it.
+    // Underlying state (cropEnabled/cropScope/crop rects) and CropOverlay
+    // stay in place, just unreachable, in case it comes back later.
 
     @ViewBuilder
     private var sizeOpacitySectionBody: some View {
