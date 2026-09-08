@@ -1932,6 +1932,15 @@ struct ContentView: View {
         }
     }
 
+    private static let nudgeStep: Double = 8
+
+    private func nudgeButton(_ systemName: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName).font(.caption).frame(width: 22, height: 20)
+        }
+        .buttonStyle(.automalityChip(isSelected: false))
+    }
+
     private var singleControls: some View {
         VStack(alignment: .leading, spacing: 8) {
             LazyVGrid(columns: Array(repeating: GridItem(.fixed(32)), count: 3), spacing: 4) {
@@ -1942,14 +1951,26 @@ struct ContentView: View {
                     .buttonStyle(.automalityChip(isSelected: state.anchor == anchor))
                 }
             }
-            Text("Nudge from anchor (optional)").font(.caption).foregroundStyle(Color.secondary)
-            HStack(spacing: 8) {
-                TextField("X", value: $state.offsetX, format: .number)
-                    .textFieldStyle(.automalityData)
-                    .frame(width: 70)
-                TextField("Y", value: $state.offsetY, format: .number)
-                    .textFieldStyle(.automalityData)
-                    .frame(width: 70)
+            // Answers "where is the anchor" directly, in words, instead of
+            // making you decode the arrow icon in the grid above.
+            Text("Anchor: \(state.anchor.displayName.capitalized)")
+                .font(.caption)
+                .foregroundStyle(Color.secondary)
+            Text("Nudge").font(.caption).foregroundStyle(Color.secondary)
+            // Arrow buttons, not X/Y number fields -- each one nudges in
+            // the literal screen direction it points, so there's no sign
+            // to interpret (the old fields meant opposite things depending
+            // on which corner was anchored: negative X nudged "inward" from
+            // the right edge but "outward" from the left edge).
+            VStack(spacing: 4) {
+                nudgeButton("arrow.up") { state.offsetY += Self.nudgeStep }
+                HStack(spacing: 4) {
+                    nudgeButton("arrow.left") { state.offsetX -= Self.nudgeStep }
+                    nudgeButton("arrow.counterclockwise") { state.offsetX = 0; state.offsetY = 0 }
+                        .help("Reset nudge")
+                    nudgeButton("arrow.right") { state.offsetX += Self.nudgeStep }
+                }
+                nudgeButton("arrow.down") { state.offsetY -= Self.nudgeStep }
             }
         }
     }
