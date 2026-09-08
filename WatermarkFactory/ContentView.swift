@@ -1723,7 +1723,6 @@ struct ContentView: View {
     // every time; disabling instead of hiding keeps the layout stable.
     @ViewBuilder
     private var positionPaddingSectionBody: some View {
-        groupHeader("Anchor")
         singleControls
             .disabled(state.layoutMode != .single)
             .opacity(state.layoutMode == .single ? 1 : 0.4)
@@ -1955,8 +1954,15 @@ struct ContentView: View {
         .buttonStyle(.automalityChip(isSelected: false))
     }
 
+    // One grouped, shaded card -- title / description / buttons -- instead
+    // Two plain labeled groups, same groupHeader+Divider pattern as every
+    // other section in this panel (Watermark Source, Size & Opacity, ...)
+    // -- not a bespoke card. Coarse corner pick, then fine pixel nudge;
+    // no restated description text, the grid's highlight already shows
+    // which corner is picked.
     private var singleControls: some View {
         VStack(alignment: .leading, spacing: 8) {
+            groupHeader("Anchor")
             LazyVGrid(columns: Array(repeating: GridItem(.fixed(32)), count: 3), spacing: 4) {
                 ForEach(Anchor.allCases) { anchor in
                     Button { state.anchor = anchor } label: {
@@ -1965,12 +1971,8 @@ struct ContentView: View {
                     .buttonStyle(.automalityChip(isSelected: state.anchor == anchor))
                 }
             }
-            Text("Precise Position").font(.caption).foregroundStyle(Color.secondary)
-            // Sits right above the D-pad, not the grid -- it's telling you
-            // which corner these specific arrows nudge from.
-            Text("Anchor: \(state.anchor.displayName.capitalized)")
-                .font(.caption)
-                .foregroundStyle(Color.secondary)
+            Divider()
+            groupHeader("Precise Position")
             // Arrow buttons, not X/Y number fields -- each one nudges in
             // the literal screen direction it points, so there's no sign
             // to interpret (the old fields meant opposite things depending
