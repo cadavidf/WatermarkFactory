@@ -1030,7 +1030,7 @@ struct ContentView: View {
     @State private var draggingItem: ImageItem?
     @State private var isFileDropTargeted = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
-    private let controlsWidth: CGFloat = 360
+    private let controlsWidth: CGFloat = 380
     private let imageListWidth: CGFloat = 300
     private let previewMinWidth: CGFloat = 560
     private let spacing: CGFloat = AutomalitySpacing.sm
@@ -1043,10 +1043,13 @@ struct ContentView: View {
     private enum SettingsTab: String, CaseIterable, Identifiable {
         case position = "Position"
         case watermark = "Watermark"
-        case export = "Export Settings"
+        case export = "Export"
         var id: String { rawValue }
     }
     @State private var settingsTab: SettingsTab = .watermark
+
+    private enum WatermarkScope { case selected, all }
+    @State private var watermarkScope: WatermarkScope = .all
 
     init(state: AppState = .shared) {
         self.state = state
@@ -1122,12 +1125,27 @@ struct ContentView: View {
                             .foregroundStyle(Color.secondary)
                     }
                 }
-                Button("Watermark This One Only") { state.watermarkSelectedTapped() }
-                    .buttonStyle(.bordered)
-                    .disabled(!state.canTapWatermarkSelected)
-                Button("Watermark All Images") { state.watermarkAllTapped() }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!state.canTapWatermarkAll)
+                // One pill, two segments, each segment tap both selects and
+                // fires the export for that scope -- not a separate toggle
+                // plus a separate action button.
+                Picker("", selection: $watermarkScope) {
+                    Text("Watermark This One").tag(WatermarkScope.selected)
+                    Text("Watermark All Images").tag(WatermarkScope.all)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                // Not .disabled(): switching segments should always work so
+                // the user can pick the other scope. watermarkAllTapped()/
+                // watermarkSelectedTapped() already no-op via their own
+                // guards (e.g. nothing selected, mid-export) -- same
+                // protection, without locking the toggle itself.
+                .onChange(of: watermarkScope) { newScope in
+                    switch newScope {
+                    case .all: state.watermarkAllTapped()
+                    case .selected: state.watermarkSelectedTapped()
+                    }
+                }
             }
         }
     }
@@ -1231,7 +1249,10 @@ struct ContentView: View {
                     .padding(.bottom, panePadding)
                 }
             }
-            .navigationSplitViewColumnWidth(min: controlsWidth, ideal: controlsWidth, max: controlsWidth + 120)
+            // Wider floor than before (content was overflowing at 360) and no
+            // tight ceiling -- the divider drags freely so long text/labels
+            // always have somewhere to go instead of clipping.
+            .navigationSplitViewColumnWidth(min: controlsWidth, ideal: controlsWidth, max: 640)
         }
         .navigationSplitViewStyle(.balanced)
     }
