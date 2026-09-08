@@ -1933,9 +1933,23 @@ struct ContentView: View {
     }
 
     private static let nudgeStep: Double = 8
+    private static let nudgeStepLarge: Double = 32
 
     private func nudgeButton(_ systemName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
+            Image(systemName: systemName).font(.caption).frame(width: 22, height: 20)
+        }
+        .buttonStyle(.automalityChip(isSelected: false))
+    }
+
+    // Four buttons, not eight -- Shift-click for the larger step is the
+    // standard macOS nudge convention (same as arrow keys in Photoshop/
+    // Figma/Sketch: normal = 1 unit, Shift = a bigger jump), so "single
+    // step vs. further" doesn't need a second row of icons to discover.
+    private func nudgeDirectionButton(_ systemName: String, small: @escaping () -> Void, large: @escaping () -> Void) -> some View {
+        Button {
+            if NSEvent.modifierFlags.contains(.shift) { large() } else { small() }
+        } label: {
             Image(systemName: systemName).font(.caption).frame(width: 22, height: 20)
         }
         .buttonStyle(.automalityChip(isSelected: false))
@@ -1956,22 +1970,34 @@ struct ContentView: View {
             Text("Anchor: \(state.anchor.displayName.capitalized)")
                 .font(.caption)
                 .foregroundStyle(Color.secondary)
-            Text("Nudge").font(.caption).foregroundStyle(Color.secondary)
+            Text("Precise Position").font(.caption).foregroundStyle(Color.secondary)
             // Arrow buttons, not X/Y number fields -- each one nudges in
             // the literal screen direction it points, so there's no sign
             // to interpret (the old fields meant opposite things depending
             // on which corner was anchored: negative X nudged "inward" from
             // the right edge but "outward" from the left edge).
+            // offsetY's sign is inverted relative to what "up"/"down" read
+            // as on screen (confirmed live, not just from the rect() math)
+            // -- the up button subtracts, the down button adds.
             VStack(spacing: 4) {
-                nudgeButton("arrow.up") { state.offsetY += Self.nudgeStep }
+                nudgeDirectionButton("chevron.up",
+                    small: { state.offsetY -= Self.nudgeStep },
+                    large: { state.offsetY -= Self.nudgeStepLarge })
                 HStack(spacing: 4) {
-                    nudgeButton("arrow.left") { state.offsetX -= Self.nudgeStep }
+                    nudgeDirectionButton("chevron.left",
+                        small: { state.offsetX -= Self.nudgeStep },
+                        large: { state.offsetX -= Self.nudgeStepLarge })
                     nudgeButton("arrow.counterclockwise") { state.offsetX = 0; state.offsetY = 0 }
                         .help("Reset nudge")
-                    nudgeButton("arrow.right") { state.offsetX += Self.nudgeStep }
+                    nudgeDirectionButton("chevron.right",
+                        small: { state.offsetX += Self.nudgeStep },
+                        large: { state.offsetX += Self.nudgeStepLarge })
                 }
-                nudgeButton("arrow.down") { state.offsetY -= Self.nudgeStep }
+                nudgeDirectionButton("chevron.down",
+                    small: { state.offsetY += Self.nudgeStep },
+                    large: { state.offsetY += Self.nudgeStepLarge })
             }
+            Text("Hold Shift to move further").font(.caption2).foregroundStyle(Color.secondary)
         }
     }
 
