@@ -1391,13 +1391,14 @@ struct ContentView: View {
         HStack(spacing: 12) {
             // Prominent until a watermark is picked -- it's the one thing
             // blocking a real export -- then reverts to a plain bordered
-            // button once set.
+            // button once set. (SwiftUI's bordered/borderedProminent are
+            // different concrete types, so the style itself still needs an
+            // if/else -- but the button's label/action is written once.)
+            let chooseWatermarkButton = Button("Choose Watermark...") { state.chooseWatermark() }
             if state.watermarkURL == nil {
-                Button("Choose Watermark...") { state.chooseWatermark() }
-                    .buttonStyle(.borderedProminent)
+                chooseWatermarkButton.buttonStyle(.borderedProminent)
             } else {
-                Button("Choose Watermark...") { state.chooseWatermark() }
-                    .buttonStyle(.bordered)
+                chooseWatermarkButton.buttonStyle(.bordered)
             }
             Spacer()
             if let url = state.watermarkURL { Thumb(url: url, size: 56) }
@@ -1669,10 +1670,10 @@ struct ContentView: View {
 
     private var singleControls: some View {
         VStack(alignment: .leading, spacing: 8) {
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(44)), count: 3), spacing: 8) {
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(32)), count: 3), spacing: 4) {
                 ForEach(Anchor.allCases) { anchor in
                     Button { state.anchor = anchor } label: {
-                        Image(systemName: anchor.symbol).frame(width: 32, height: 30)
+                        Image(systemName: anchor.symbol).font(.caption).frame(width: 22, height: 20)
                     }
                     .buttonStyle(.automalityChip(isSelected: state.anchor == anchor))
                 }
