@@ -463,6 +463,89 @@ final class ImageProcessorMetadataTests: XCTestCase {
         XCTAssertNil(AppState.openedURLInput(from: [], isDirectory: { _ in false }))
     }
 
+    func testLooksLikePhoneNumberUsesSevenDigitsAsThreshold() {
+        let cases = [
+            ("555-123-4567", true),
+            ("Call me at (555) 123-4567", true),
+            ("John Smith Realty", false),
+            ("Room 204", false),
+            ("", false),
+            ("12345678901234", true)
+        ]
+
+        for (text, expected) in cases {
+            XCTAssertEqual(ImageProcessor.looksLikePhoneNumber(text), expected, text)
+        }
+    }
+
+    @MainActor
+    func testRenderTextWatermarkWritesTransparentPNGAtStableURL() throws {
+        let firstURL = try XCTUnwrap(ImageProcessor.renderTextWatermark("Jane Smith Realty", fontSize: 100))
+        let firstImage = try XCTUnwrap(CGImageSourceCreateWithURL(firstURL as CFURL, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) })
+        let firstData = try Data(contentsOf: firstURL)
+        let properties = try imageProperties(firstURL)
+        XCTAssertEqual(properties.object(forKey: kCGImagePropertyHasAlpha) as? Bool, true)
+        XCTAssertNotEqual(firstImage.alphaInfo, .none)
+
+        XCTAssertNil(ImageProcessor.renderTextWatermark("", fontSize: 100))
+        XCTAssertNil(ImageProcessor.renderTextWatermark(" \n\t ", fontSize: 100))
+
+        let smallURL = try XCTUnwrap(ImageProcessor.renderTextWatermark("Jane Smith Realty", fontSize: 100))
+        let smallImage = try XCTUnwrap(CGImageSourceCreateWithURL(smallURL as CFURL, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) })
+        let largeURL = try XCTUnwrap(ImageProcessor.renderTextWatermark("Jane Smith Realty", fontSize: 300))
+        let largeImage = try XCTUnwrap(CGImageSourceCreateWithURL(largeURL as CFURL, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) })
+        XCTAssertEqual(smallURL, largeURL)
+        XCTAssertTrue(smallImage.width != largeImage.width || smallImage.height != largeImage.height)
+        XCTAssertNotEqual(firstData, try Data(contentsOf: largeURL))
+
+        let directoryContents = try FileManager.default.contentsOfDirectory(at: firstURL.deletingLastPathComponent(), includingPropertiesForKeys: nil)
+        XCTAssertEqual(directoryContents.filter { $0.lastPathComponent == firstURL.lastPathComponent }.count, 1)
+    }
+
+    func testInvertedTintInvertsWatermarkRGBThroughComposition() throws {
+        let source = tempDir.appendingPathComponent("source.png")
+        let watermark = tempDir.appendingPathComponent("watermark.png")
+        try writeImage(source, type: .png, width: 100, height: 100, color: srgb(0, 0, 0))
+        try writeImage(watermark, type: .png, width: 4, height: 4, color: srgb(1, 0, 0))
+
+        let image = try ImageProcessor.watermarkedImage(sourceURL: source, watermarkURL: watermark, settings: settings(tint: .inverted))
+
+        XCTAssertEqual(try pixel(image, x: 50, y: 50), RGB(0, 255, 255))
+        XCTAssertNotEqual(image.alphaInfo, .none)
+    }
+
+    func testWatermarkContrastChangesMidtonePixels() throws {
+        let source = tempDir.appendingPathComponent("source.png")
+        let watermark = tempDir.appendingPathComponent("watermark.png")
+        try writeImage(source, type: .png, width: 100, height: 100, color: srgb(0, 0, 0))
+        try writeImage(watermark, type: .png, width: 4, height: 4, color: srgb(0.6, 0.6, 0.6))
+
+        let unchanged = try ImageProcessor.watermarkedImage(sourceURL: source, watermarkURL: watermark, settings: settings())
+        let increased = try ImageProcessor.watermarkedImage(sourceURL: source, watermarkURL: watermark, settings: settings(contrast: 0.5))
+
+        let unchangedPixel = try pixel(unchanged, x: 50, y: 50)
+        let increasedPixel = try pixel(increased, x: 50, y: 50)
+        XCTAssertNotEqual(unchangedPixel, increasedPixel)
+        XCTAssertGreaterThan(increasedPixel.r, unchangedPixel.r)
+        XCTAssertEqual(increasedPixel.r, increasedPixel.g)
+        XCTAssertEqual(increasedPixel.g, increasedPixel.b)
+    }
+
+    func testAlternatingTintChangesColorsBetweenTiledRows() throws {
+        let source = tempDir.appendingPathComponent("source.png")
+        let watermark = tempDir.appendingPathComponent("watermark.png")
+        try writeImage(source, type: .png, width: 100, height: 100, color: srgb(0.5, 0.5, 0.5))
+        try writeImage(watermark, type: .png, width: 4, height: 4, color: srgb(1, 0, 0))
+
+        let image = try ImageProcessor.watermarkedImage(sourceURL: source, watermarkURL: watermark, settings: settings(sizeFraction: 0.4, spacing: 0, tint: .alternating, layout: .tiled))
+
+        XCTAssertNotEqual(try pixel(image, x: 20, y: 20), try pixel(image, x: 20, y: 60))
+    }
+
+    private func settings(sizeFraction: Double = 0.5, spacing: Double = 0, tint: WatermarkTint = .original, contrast: Double = 0, layout: LayoutMode = .single) -> WatermarkSettings {
+        WatermarkSettings(sizeFraction: sizeFraction, opacity: 1, anchor: .center, offsetX: 0, offsetY: 0, layoutMode: layout, padding: 0, spacing: spacing, rotationPattern: .none, customAngle: 0, exportFormat: .png, jpegQuality: 0.9, outputPrefix: "", outputSuffix: "", watermarkTint: tint, watermarkContrast: contrast)
+    }
+
     private func export(_ source: URL, to output: URL, format: ExportFormat, metadataPrivacy: MetadataPrivacyLevel = .removeLocation) throws {
         let watermark = tempDir.appendingPathComponent("watermark.png")
         try writeImage(watermark, type: .png)
