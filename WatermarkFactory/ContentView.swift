@@ -230,6 +230,42 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Toolbar "Add More..." -- appends to the current batch instead of
+    /// starting a fresh one (unlike chooseFolderOrImages/drag-and-drop,
+    /// which both replace it via open()). A folder pick here just
+    /// contributes its images to the existing set, same expansion
+    /// reloadImages uses for a tracked folder, rather than switching the
+    /// app into folder-tracking mode.
+    func addMoreImages() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.allowedContentTypes = [.png, .jpeg, .heic, .tiff, .gif]
+        guard panel.runModal() == .OK, let input = Self.openedURLInput(from: panel.urls) else { return }
+        let candidates: [URL]
+        switch input {
+        case .folder(let folder):
+            sourceAccess.start(folder)
+            candidates = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        case .images(let urls):
+            candidates = urls
+        }
+        let existingURLs = Set(images.map(\.url))
+        let toAdd = candidates
+            .filter { ImageProcessor.supportedExtensions.contains($0.pathExtension.lowercased()) && !existingURLs.contains($0) }
+        guard !toAdd.isEmpty else { return }
+        sourceAccess.replace(with: Array(existingURLs) + toAdd + (folderURL.map { [$0] } ?? []))
+        images += toAdd.map(ImageItem.init)
+        images.sort { $0.filename.localizedStandardCompare($1.filename) == .orderedAscending }
+        selected = selected ?? images.first
+        defaults.set(true, forKey: "usedIndividualImages")
+        status = String(format: String(localized: "%d images added."), toAdd.count)
+        pruneImageOrder()
+        saveImageBookmarks()
+        updateEstimate()
+    }
+
     /// Drag-and-drop entry point (see imageList's dropDestination)
     /// -- same dispatch as chooseFolderOrImages/openFromFinder.
     func addDroppedURLs(_ urls: [URL]) {
@@ -1375,6 +1411,13 @@ struct ContentView: View {
                             .foregroundStyle(Color.secondary)
                     }
                 }
+                Button {
+                    state.addMoreImages()
+                } label: {
+                    Label("Add More...", systemImage: "plus")
+                }
+                .buttonStyle(.bordered)
+                .disabled(state.isExporting)
                 // The scope choice (this one vs. all) and the export
                 // settings both live in the confirmation sheet now -- this
                 // button just opens it.
