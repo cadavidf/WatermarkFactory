@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import CoreImage
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
@@ -55,6 +56,52 @@ struct ImageProcessor {
     static func imageSize(for url: URL) -> CGSize? {
         guard let image = loadCGImage(url) else { return nil }
         return CGSize(width: image.width, height: image.height)
+    }
+
+    /// True if `text` contains a run of 7+ digits (ignoring separators like
+    /// spaces/dashes/dots/parens) -- the same loose heuristic real portals'
+    /// own listing-photo scanners use, so a typed watermark label gets
+    /// flagged before export, not after a listing gets pulled for it.
+    static func looksLikePhoneNumber(_ text: String) -> Bool {
+        text.filter(\.isNumber).count >= 7
+    }
+
+    /// Renders a typed label to a transparent PNG so it can flow through
+    /// the exact same pipeline as a chosen watermark image -- tint, size,
+    /// opacity, position, tiling all already work on "a watermark image";
+    /// this just makes the source of that image text instead of a file.
+    /// Fixed path so a font-size change re-renders the same file in place
+    /// instead of accumulating a new one per edit -- also lets callers
+    /// recognize "is the current watermark the text one" by comparing paths.
+    static var textWatermarkURL: URL {
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("WatermarkFactory", isDirectory: true)
+        return dir.appendingPathComponent("text-watermark.png")
+    }
+
+    static func renderTextWatermark(_ text: String, fontSize: Double = 200) -> URL? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let font = NSFont.boldSystemFont(ofSize: fontSize)
+        let attributed = NSAttributedString(string: trimmed, attributes: [.font: font, .foregroundColor: NSColor.black])
+        let textSize = attributed.size()
+        let padding: CGFloat = 40
+        let canvasSize = NSSize(width: textSize.width + padding * 2, height: textSize.height + padding * 2)
+        let image = NSImage(size: canvasSize)
+        image.lockFocus()
+        attributed.draw(at: NSPoint(x: padding, y: padding))
+        image.unlockFocus()
+        guard let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else { return nil }
+        let fileURL = textWatermarkURL
+        try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        do {
+            try png.write(to: fileURL)
+            return fileURL
+        } catch {
+            return nil
+        }
     }
 
     static func smartPlacementProposal(sourceURL: URL, watermarkURL: URL, settings: WatermarkSettings, cropRect: CGRect = .fullFrame) -> SmartPlacementProposal? {
@@ -283,22 +330,32 @@ struct ImageProcessor {
         context.interpolationQuality = .high
         context.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
         context.setAlpha(settings.opacity)
-        let watermark = try tintedWatermark(
+        let prepared = try contrastAdjustedWatermark(
             try backgroundRemovedWatermark(watermark, remove: settings.removeWatermarkBackground),
-            tint: settings.watermarkTint
+            contrast: settings.watermarkContrast
         )
 
         let targetLongestSide = min(CGFloat(width), CGFloat(height)) * settings.sizeFraction
-        let scale = targetLongestSide / max(CGFloat(watermark.width), CGFloat(watermark.height))
-        let watermarkSize = CGSize(width: CGFloat(watermark.width) * scale, height: CGFloat(watermark.height) * scale)
+        let scale = targetLongestSide / max(CGFloat(prepared.width), CGFloat(prepared.height))
+        let watermarkSize = CGSize(width: CGFloat(prepared.width) * scale, height: CGFloat(prepared.height) * scale)
 
         switch settings.layoutMode {
         case .single:
+            // .alternating never reaches Single (UI/reset logic keeps it
+            // Tiled-only), so a plain tint is always correct here.
+            let tinted = try tintedWatermark(prepared, tint: settings.watermarkTint)
             for anchor in [settings.anchor] + settings.additionalAnchors {
-                drawSingleWatermark(context: context, watermark: watermark, canvas: CGSize(width: width, height: height), size: watermarkSize, anchor: anchor, settings: settings)
+                drawSingleWatermark(context: context, watermark: tinted, canvas: CGSize(width: width, height: height), size: watermarkSize, anchor: anchor, settings: settings)
             }
         case .tiled:
-            drawTiles(context: context, watermark: watermark, canvas: CGSize(width: width, height: height), size: watermarkSize, settings: settings)
+            if settings.watermarkTint == .alternating {
+                let lightRows = try tintedWatermark(prepared, tint: .light)
+                let darkRows = try tintedWatermark(prepared, tint: .dark)
+                drawTiles(context: context, watermark: lightRows, alternateWatermark: darkRows, canvas: CGSize(width: width, height: height), size: watermarkSize, settings: settings)
+            } else {
+                let tinted = try tintedWatermark(prepared, tint: settings.watermarkTint)
+                drawTiles(context: context, watermark: tinted, canvas: CGSize(width: width, height: height), size: watermarkSize, settings: settings)
+            }
         }
 
         guard let image = context.makeImage() else { throw ImageProcessorError.contextFailed }
@@ -409,22 +466,68 @@ struct ImageProcessor {
         return result
     }
 
+    // .alternating never reaches here -- compose() branches it into two
+    // separate .light/.dark calls and hands both to drawTiles for
+    // per-row selection (see drawTiles' alternateWatermark parameter).
+    // Reached directly it would have no per-row context, so it's treated
+    // as a passthrough rather than crashing on an unhandled case.
     private static func tintedWatermark(_ image: CGImage, tint: WatermarkTint) throws -> CGImage {
-        guard tint != .original else { return image }
-        let color = tint == .light ? NSColor(calibratedWhite: 0.96, alpha: 1).cgColor : NSColor(calibratedWhite: 0.08, alpha: 1).cgColor
-        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
-              let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
-            throw ImageProcessorError.contextFailed
+        switch tint {
+        case .original, .alternating:
+            return image
+        case .inverted:
+            return try invertedWatermark(image)
+        case .light, .dark:
+            let color = tint == .light ? NSColor(calibratedWhite: 0.96, alpha: 1).cgColor : NSColor(calibratedWhite: 0.08, alpha: 1).cgColor
+            guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+                  let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+                throw ImageProcessorError.contextFailed
+            }
+            let rect = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+            context.clip(to: rect, mask: image)
+            context.setFillColor(color)
+            context.fill(rect)
+            guard let tinted = context.makeImage() else { throw ImageProcessorError.contextFailed }
+            return tinted
         }
-        let rect = CGRect(x: 0, y: 0, width: image.width, height: image.height)
-        context.clip(to: rect, mask: image)
-        context.setFillColor(color)
-        context.fill(rect)
-        guard let tinted = context.makeImage() else { throw ImageProcessorError.contextFailed }
-        return tinted
     }
 
-    private static func drawTiles(context: CGContext, watermark: CGImage, canvas: CGSize, size: CGSize, settings: WatermarkSettings) {
+    // CIColorInvert flips RGB and leaves alpha alone, so the watermark's
+    // transparent background stays transparent -- only its visible pixels
+    // go negative.
+    private static func invertedWatermark(_ image: CGImage) throws -> CGImage {
+        let ciImage = CIImage(cgImage: image)
+        guard let filter = CIFilter(name: "CIColorInvert") else { return image }
+        filter.setValue(ciImage, forKey: kCIInputImageKey)
+        guard let output = filter.outputImage,
+              let result = CIContext().createCGImage(output, from: ciImage.extent) else {
+            throw ImageProcessorError.contextFailed
+        }
+        return result
+    }
+
+    // contrast: 0 = unchanged, matches the rest of the app's 0...1 slider
+    // convention; maps to CIColorControls' 1.0 = unchanged, so this is an
+    // increase-only control (0...1 here -> 1.0...2.0 inputContrast) --
+    // matches "increase contrast", not a full +/- range.
+    private static func contrastAdjustedWatermark(_ image: CGImage, contrast: Double) throws -> CGImage {
+        guard contrast > 0 else { return image }
+        let ciImage = CIImage(cgImage: image)
+        guard let filter = CIFilter(name: "CIColorControls") else { return image }
+        filter.setValue(ciImage, forKey: kCIInputImageKey)
+        filter.setValue(1.0 + contrast, forKey: kCIInputContrastKey)
+        guard let output = filter.outputImage,
+              let result = CIContext().createCGImage(output, from: ciImage.extent) else {
+            throw ImageProcessorError.contextFailed
+        }
+        return result
+    }
+
+    // alternateWatermark: non-nil only for WatermarkTint.alternating -- odd
+    // rows draw this (dark-tinted) instead of `watermark` (light-tinted).
+    // Independent of rotationPattern's own row-alternating, which can be
+    // on or off at the same time; the two just both key off `row`.
+    private static func drawTiles(context: CGContext, watermark: CGImage, alternateWatermark: CGImage? = nil, canvas: CGSize, size: CGSize, settings: WatermarkSettings) {
         let padding = CGFloat(settings.padding)
         let cellSize = CGSize(width: size.width + padding * 2, height: size.height + padding * 2)
         let stepX = max(1, cellSize.width + settings.spacing)
@@ -439,12 +542,13 @@ struct ImageProcessor {
             case .alternating: angle = row.isMultiple(of: 2) ? 0 : 45
             case .custom: angle = settings.customAngle
             }
+            let rowWatermark = (row.isMultiple(of: 2) ? watermark : alternateWatermark) ?? watermark
             var x = -cellSize.width
             while x < canvas.width + cellSize.width {
                 context.saveGState()
                 context.translateBy(x: x + padding + size.width / 2, y: y + padding + size.height / 2)
                 context.rotate(by: angle * .pi / 180)
-                context.draw(watermark, in: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
+                context.draw(rowWatermark, in: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
                 context.restoreGState()
                 x += stepX
             }

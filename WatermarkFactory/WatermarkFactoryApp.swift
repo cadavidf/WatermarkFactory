@@ -12,7 +12,13 @@ struct WatermarkFactoryApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(state: .shared)
-                .frame(minWidth: 1180, minHeight: 720)
+                // Must stay >= ContentView's own minWidth (see ContentView.swift,
+                // which must in turn stay >= the sum of the NavigationSplitView
+                // columns' minimums). This outer frame is the one that actually
+                // governs the window under .windowResizability(.contentSize)
+                // below -- ContentView's inner .frame(minWidth:) alone was not
+                // enough; this one was silently overriding it at a smaller value.
+                .frame(minWidth: 1260, minHeight: 720)
                 // Automality's fixed light palette needs light chrome; the
                 // system theme should follow the user's normal macOS appearance.
                 .modifier(BrandColorSchemeModifier(useAutomalityBrandColors: useAutomalityBrandColors))
