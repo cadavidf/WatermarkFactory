@@ -313,6 +313,23 @@ final class AppState: ObservableObject {
         orderedImageURLs.firstIndex(of: item.url).map { $0 + 1 }
     }
 
+    /// Removes one image from the current batch (sidebar hover-to-remove).
+    /// Doesn't touch the source file -- only drops it from this session.
+    func removeImage(_ item: ImageItem) {
+        guard let index = images.firstIndex(of: item) else { return }
+        images.remove(at: index)
+        sourceAccess.stop(item.url)
+        roomLabels.removeValue(forKey: item.url)
+        orderedImageURLs.removeAll { $0 == item.url }
+        if selected == item {
+            selected = index < images.count ? images[index] : images.last
+        }
+        status = images.isEmpty ? String(localized: "No images.") : String(format: String(localized: "%d images."), images.count)
+        pruneImageOrder()
+        saveImageBookmarks()
+        updateEstimate()
+    }
+
     func toggleOrder(for item: ImageItem) {
         if let index = orderedImageURLs.firstIndex(of: item.url) {
             orderedImageURLs.remove(at: index)
@@ -644,6 +661,12 @@ final class AppState: ObservableObject {
         optimizeForWeb = value
         if value && exportFormat == .jpeg && jpegQuality > 0.8 {
             jpegQuality = 0.8
+        }
+        // Sensible default for a "web" target -- only pre-fills if the
+        // field is still untouched (0/off), never overwrites a value
+        // someone already set.
+        if value && maxFileSizeKB == 0 {
+            maxFileSizeKB = 200
         }
     }
 
@@ -1183,6 +1206,7 @@ struct ContentView: View {
     @State private var duplicatePresetName = ""
     @State private var showingOverwriteConfirm = false
     @State private var draggingItem: ImageItem?
+    @State private var hoveredImage: ImageItem?
     @State private var isFileDropTargeted = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     private let controlsWidth: CGFloat = 380
@@ -1595,12 +1619,29 @@ struct ContentView: View {
                     VStack(spacing: 4) {
                         ZStack(alignment: .topTrailing) {
                             Thumb(url: item.url, size: 88)
-                            if state.hasWatermarkedOutput(for: item) {
+                            // Hover-to-remove takes over the same corner the
+                            // watermarked checkmark uses -- showing both at
+                            // once would overlap, and "remove this" is the
+                            // more relevant affordance while hovering.
+                            if hoveredImage == item {
+                                Button {
+                                    state.removeImage(item)
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .symbolRenderingMode(.palette)
+                                        .foregroundStyle(.white, Color.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .offset(x: 4, y: -4)
+                            } else if state.hasWatermarkedOutput(for: item) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(theme.primary)
                                     .background(Circle().fill(.white))
                                     .offset(x: 4, y: -4)
                             }
+                        }
+                        .onHover { hovering in
+                            hoveredImage = hovering ? item : nil
                         }
                         Text(item.filename)
                             .font(.caption)

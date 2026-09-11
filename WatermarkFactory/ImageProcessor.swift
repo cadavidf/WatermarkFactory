@@ -607,7 +607,13 @@ struct ImageProcessor {
             return (result.data, result.ext, result.usedHEICFallback, true)
         }
 
-        let targetBytes = settings.maxFileSizeKB * 1024
+        // Target 95% of the requested size, not the exact number -- JPEG
+        // encoder quantization steps don't land on arbitrary byte counts,
+        // so aiming exactly at the limit risked landing a couple KB over
+        // it (e.g. a 200 KB request coming out ~202 KB). The 5% margin
+        // absorbs that without the user needing to ask for less than they
+        // actually want.
+        let targetBytes = Int(Double(settings.maxFileSizeKB * 1024) * 0.95)
         var currentImage = image
 
         while true {
