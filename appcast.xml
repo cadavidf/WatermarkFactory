@@ -3,6 +3,20 @@
     <channel>
         <title>WatermarkFactory</title>
         <item>
+            <title>2.0.2</title>
+            <pubDate>Fri, 11 Sep 2026 15:55:00 -0500</pubDate>
+            <sparkle:version>25</sparkle:version>
+            <sparkle:shortVersionString>2.0.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <ul>
+                    <li>Moved the "Add More" button to the left side of the toolbar, next to the ... menu.</li>
+                    <li>Custom About panel: Acknowledgements and Check for Updates now live as buttons inside About, instead of separate menu bar items.</li>
+                </ul>
+            ]]></description>
+            <enclosure url="https://www.automality.com/downloads/WatermarkFactory-2.0.2.dmg" length="2474029" type="application/octet-stream" sparkle:edSignature="TJoDAmfiE1FuVkEKZd52txXy0RTU83N1OZFdZTFLdLYGLpbG7u5lE522LyFND/UyFfcIBYF4+IOPylapA7lKCw=="/>
+        </item>
+        <item>
             <title>2.0.1</title>
             <pubDate>Thu, 10 Sep 2026 13:40:00 -0500</pubDate>
             <sparkle:version>24</sparkle:version>
