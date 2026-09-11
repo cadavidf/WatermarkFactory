@@ -3,6 +3,21 @@
     <channel>
         <title>WatermarkFactory</title>
         <item>
+            <title>2.0.3</title>
+            <pubDate>Fri, 11 Sep 2026 16:18:00 -0500</pubDate>
+            <sparkle:version>26</sparkle:version>
+            <sparkle:shortVersionString>2.0.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <ul>
+                    <li>Hover over a thumbnail in the sidebar to reveal an X button to remove it from the current batch.</li>
+                    <li>Fixed: Max File Size could occasionally overshoot the requested limit (e.g. 200KB -> 202KB) -- now targets 95% internally as a safety margin.</li>
+                    <li>Optimize for Web now pre-fills Max File Size to 200KB if it was unset.</li>
+                </ul>
+            ]]></description>
+            <enclosure url="https://www.automality.com/downloads/WatermarkFactory-2.0.3.dmg" length="2493632" type="application/octet-stream" sparkle:edSignature="grrfucyMLNIQyJIGlx+OdSLUzbUWPetQsJz00gr5bLTT3FcX3goqIKrgGE2k6O9T53XzQ62dt3fwbQVMO+fvAw=="/>
+        </item>
+        <item>
             <title>2.0.2</title>
             <pubDate>Fri, 11 Sep 2026 15:55:00 -0500</pubDate>
             <sparkle:version>25</sparkle:version>
