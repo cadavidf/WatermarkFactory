@@ -54,21 +54,19 @@ struct WatermarkFactoryApp: App {
                     }
                 }
             }
-            // "About WatermarkFactory" is the standard macOS About panel --
-            // provided automatically by SwiftUI/AppKit, no code needed here.
-            // Acknowledgements gets its own window rather than being crammed
-            // into the About panel's small credits box, since license text
-            // (Sparkle's, specifically) is long enough to need real scrolling
-            // and formatting.
-            CommandGroup(after: .appInfo) {
-                Button("Acknowledgements…") {
-                    openWindow(id: "acknowledgements")
-                }
-                Button("Check for Updates…") {
-                    appDelegate.checkForUpdates(nil)
+            // Custom About panel replaces the system one so Acknowledgements
+            // and Check for Updates can live as real buttons inside it,
+            // instead of as separate menu bar items.
+            CommandGroup(replacing: .appInfo) {
+                Button("About WatermarkFactory") {
+                    openWindow(id: "about")
                 }
             }
         }
+        Window("About WatermarkFactory", id: "about") {
+            AboutView(checkForUpdates: { appDelegate.checkForUpdates(nil) })
+        }
+        .windowResizability(.contentSize)
         Window("Acknowledgements", id: "acknowledgements") {
             AcknowledgementsView()
         }
