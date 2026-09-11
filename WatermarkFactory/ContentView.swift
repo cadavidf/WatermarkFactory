@@ -1224,8 +1224,9 @@ struct ContentView: View {
         .frame(minWidth: 1260, minHeight: 720)
         .background(Color(nsColor: .windowBackgroundColor))
         .toolbar {
-            primaryActionToolbarItem
+            addMoreToolbarItem
             globalActionsToolbarItem
+            primaryActionToolbarItem
         }
         .alert("Watermark not uploaded yet", isPresented: $state.showWatermarkMissingPrompt) {
             Button("Upload Watermark") { state.chooseWatermark() }
@@ -1411,13 +1412,6 @@ struct ContentView: View {
                             .foregroundStyle(Color.secondary)
                     }
                 }
-                Button {
-                    state.addMoreImages()
-                } label: {
-                    Label("Add More...", systemImage: "plus")
-                }
-                .buttonStyle(.bordered)
-                .disabled(state.isExporting)
                 // The scope choice (this one vs. all) and the export
                 // settings both live in the confirmation sheet now -- this
                 // button just opens it.
@@ -1425,6 +1419,20 @@ struct ContentView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(!state.canTapWatermarkAll)
             }
+        }
+    }
+
+    // Left side of the toolbar, next to the "..." menu -- Watermark stays
+    // alone on the right (primaryAction) per Felipe's explicit ask.
+    private var addMoreToolbarItem: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
+            Button {
+                state.addMoreImages()
+            } label: {
+                Label("Add More...", systemImage: "plus")
+            }
+            .buttonStyle(.bordered)
+            .disabled(state.isExporting)
         }
     }
 
